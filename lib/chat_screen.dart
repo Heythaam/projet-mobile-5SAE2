@@ -22,11 +22,13 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const _ink = Color(0xFF12251D);
-  static const _pitch = Color(0xFF164A35);
-  static const _lime = Color(0xFFD6F36A);
-  static const _paper = Color(0xFFF7F7F1);
-  static const _muted = Color(0xFF78827A);
+  static const _ink = Color(0xFF10112F);
+  static const _lime = Color(0xFFFFD21E);
+  static const _night = Color(0xFF17194F);
+  static const _nightPanel = Color(0xFF3D4B70);
+  static const _nightRaised = Color(0xFF0866F5);
+  static const _nightText = Color(0xFFEAF0E8);
+  static const _nightMuted = Color(0xFFCDD8F0);
 
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
@@ -132,9 +134,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _paper,
+    backgroundColor: _night,
     appBar: AppBar(
-      backgroundColor: _ink,
+      backgroundColor: _nightPanel,
       foregroundColor: Colors.white,
       titleSpacing: 0,
       title: Row(
@@ -144,9 +146,9 @@ class _ChatScreenState extends State<ChatScreen> {
             width: 39,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _lime.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-              border: Border.all(color: _lime.withValues(alpha: 0.45)),
+              color: _nightRaised,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: _ink, width: 2),
             ),
             child: Text(
               widget.friend.username[0].toUpperCase(),
@@ -194,8 +196,8 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
             decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFE8EBE4))),
+              color: _nightPanel,
+              border: Border(top: BorderSide(color: Color(0x1AFFFFFF))),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -209,19 +211,23 @@ class _ChatScreenState extends State<ChatScreen> {
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       hintText: 'Message your teammate…',
-                      hintStyle: const TextStyle(color: _muted, fontSize: 14),
+                      hintStyle: const TextStyle(
+                        color: _nightMuted,
+                        fontSize: 14,
+                      ),
                       filled: true,
-                      fillColor: _paper,
+                      fillColor: _nightRaised,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 17,
                         vertical: 13,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(13),
+                        borderSide: const BorderSide(color: _ink, width: 2),
                       ),
                       counterText: '',
                     ),
+                    style: const TextStyle(color: _nightText),
                     onSubmitted: (_) => _send(),
                   ),
                 ),
@@ -232,9 +238,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: IconButton(
                     tooltip: 'Send message',
                     style: IconButton.styleFrom(
-                      backgroundColor: _ink,
-                      foregroundColor: _lime,
-                      disabledBackgroundColor: _ink.withValues(alpha: 0.5),
+                      backgroundColor: _lime,
+                      foregroundColor: _night,
+                      side: const BorderSide(color: _ink, width: 2),
+                      disabledBackgroundColor: _lime.withValues(alpha: 0.5),
                     ),
                     onPressed: _sending ? null : _send,
                     icon: _sending
@@ -242,7 +249,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             height: 18,
                             width: 18,
                             child: CircularProgressIndicator(
-                              color: _lime,
+                              color: _night,
                               strokeWidth: 2,
                             ),
                           )
@@ -259,7 +266,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _messageList() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _pitch));
+      return const Center(child: CircularProgressIndicator(color: _lime));
     }
     if (_error != null && _messages.isEmpty) {
       return Center(
@@ -268,7 +275,11 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _nightText),
+              ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: _loadMessages,
@@ -293,12 +304,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     height: 76,
                     width: 76,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE7EDDF),
-                      borderRadius: BorderRadius.circular(27),
+                      color: _nightRaised,
+                      borderRadius: BorderRadius.circular(17),
+                      border: Border.all(color: _ink, width: 3),
                     ),
                     child: const Icon(
                       Icons.sports_soccer_rounded,
-                      color: _pitch,
+                      color: _lime,
                       size: 35,
                     ),
                   ),
@@ -307,7 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     'First words.\nFuture match stories.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _ink,
+                      color: _nightText,
                       fontSize: 23,
                       height: 1.15,
                       letterSpacing: -0.5,
@@ -318,7 +330,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text(
                     'You and @${widget.friend.username} are on the same team. Say hello.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: _muted, height: 1.5),
+                    style: const TextStyle(color: _nightMuted, height: 1.5),
                   ),
                 ],
               ),
@@ -343,12 +355,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   margin: const EdgeInsets.only(bottom: 11),
                   padding: const EdgeInsets.fromLTRB(15, 11, 15, 9),
                   decoration: BoxDecoration(
-                    color: isMine ? _ink : Colors.white,
+                    color: isMine ? _lime : _nightPanel,
+                    border: Border.all(color: _ink, width: 2),
                     borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(19),
-                      topRight: const Radius.circular(19),
-                      bottomLeft: Radius.circular(isMine ? 19 : 5),
-                      bottomRight: Radius.circular(isMine ? 5 : 19),
+                      topLeft: const Radius.circular(14),
+                      topRight: const Radius.circular(14),
+                      bottomLeft: Radius.circular(isMine ? 14 : 4),
+                      bottomRight: Radius.circular(isMine ? 4 : 14),
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -364,7 +377,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       Text(
                         message.body,
                         style: TextStyle(
-                          color: isMine ? Colors.white : _ink,
+                          color: isMine ? _night : _nightText,
                           height: 1.35,
                           fontSize: 14,
                         ),
@@ -373,7 +386,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       Text(
                         _messageTime(message.sentAt),
                         style: TextStyle(
-                          color: isMine ? Colors.white60 : _muted,
+                          color: isMine
+                              ? _night.withValues(alpha: 0.6)
+                              : _nightMuted,
                           fontSize: 9,
                         ),
                       ),
@@ -402,7 +417,7 @@ class _ChatPitchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF164A35).withValues(alpha: 0.035)
+      ..color = Colors.white.withValues(alpha: 0.035)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final field = Rect.fromLTWH(

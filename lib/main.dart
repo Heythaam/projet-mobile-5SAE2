@@ -57,12 +57,14 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF164A35),
-        primary: const Color(0xFF164A35),
-        surface: const Color(0xFFF7F7F1),
+        seedColor: const Color(0xFF0866F5),
+        primary: const Color(0xFF0866F5),
+        secondary: const Color(0xFFFFD21E),
+        surface: const Color(0xFF17194F),
+        onSurface: const Color(0xFFEAF0E8),
       ),
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF7F7F1),
+      scaffoldBackgroundColor: const Color(0xFF17194F),
       navigationBarTheme: NavigationBarThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);

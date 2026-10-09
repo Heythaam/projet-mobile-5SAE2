@@ -108,6 +108,28 @@ void main() {
     expect(received['body'], 'See you at kickoff!');
     expect(received['senderId'], alice['user']['id']);
 
+    final career = await sendRequest(
+      app,
+      'GET',
+      '/gamification',
+      token: alice['token'] as String,
+    );
+    expect(career.statusCode, 200);
+    final careerJson = await decode(career);
+    expect(careerJson['xp'], 310);
+    expect(careerJson['level'], 2);
+    expect(careerJson['currentStreak'], 1);
+    expect(careerJson['sentMessages'], 1);
+    final earned = (careerJson['achievements'] as List)
+        .cast<Map<String, dynamic>>()
+        .where((achievement) => achievement['unlockedAt'] != null)
+        .map((achievement) => achievement['code'])
+        .toSet();
+    expect(
+      earned,
+      containsAll(['first_kickoff', 'first_teammate', 'first_message']),
+    );
+
     final removed = await sendRequest(
       app,
       'DELETE',

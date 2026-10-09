@@ -1,8 +1,18 @@
 # Kickoff
 
 Kickoff is a Flutter football-match app with a Dart Shelf API and a shared
-SQLite database. The first implemented module covers accounts, friends, and
-one-to-one chat.
+SQLite database. The implemented user module covers accounts, friends,
+one-to-one chat, and server-backed gamification. Match creation and stadium
+booking remain future product work.
+
+## Interface direction
+
+Kickoff uses a football-themed arcade/party-game style: an indigo patterned
+backdrop, vivid blue panels, warm yellow controls, chunky outlined buttons, and
+clear social actions. Progress and rewards shown in the interface come from the
+API rather than local presentation-only calculations. Sporcle Party and Kalak
+are visual/interaction references; Kickoff uses its own football identity and
+original artwork.
 
 ## User module
 
@@ -48,6 +58,16 @@ Replace the example address with the computer's actual LAN IP. The API must be
 reachable from the device. Android allows HTTP only in debug builds; use HTTPS
 for release deployments.
 
+For a USB-connected Android phone, start the API on the computer, then run
+`adb reverse tcp:8080 tcp:8080` and launch the app with:
+
+```powershell
+flutter run -d <device-serial> --dart-define=API_BASE_URL=http://127.0.0.1:8080
+```
+
+If `adb` is not on `PATH`, use
+`$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe`.
+
 ## Tests
 
 ```powershell
@@ -56,5 +76,5 @@ Set-Location backend
 dart test
 ```
 
-The API routes and SQLite schema are in `backend/lib`; the Flutter user
-interface and API client are in `lib`.
+The API routes, SQLite schema, and gamification rules are in `backend/lib`;
+the Flutter user interface, models, and API client are in `lib`.

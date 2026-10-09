@@ -1,6 +1,7 @@
 # Kickoff API
 
-Dart Shelf API for Kickoff's user, friend-request, and direct-message features.
+Dart Shelf API for Kickoff's user, friend-request, direct-message, and
+gamification features.
 SQLite data is stored in `data/football_matches.sqlite` by default.
 
 ## Start
@@ -20,13 +21,15 @@ dart run bin/server.dart
 ## Routes
 
 - `POST /auth/register`, `POST /auth/login`
-- `GET /me`
+- `GET /me`, `GET /gamification`
 - `GET /friends`, `DELETE /friends/{friendId}`
 - `GET /friend-requests`, `POST /friend-requests`
 - `POST /friend-requests/{requestId}/accept`
 - `GET /friends/{friendId}/messages`, `POST /friends/{friendId}/messages`
 
 All routes other than registration and login require a bearer token.
+Gamification state is stored in SQLite; XP and achievements are awarded by
+defined server-side events and exposed through `GET /gamification`.
 
 ## Test
 

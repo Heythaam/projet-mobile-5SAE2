@@ -90,6 +90,11 @@ class ApiClient {
         .toList();
   }
 
+  Future<GamificationProfile> getGamificationProfile() async {
+    final response = await _authenticated('GET', '/gamification');
+    return GamificationProfile.fromJson(response);
+  }
+
   Future<void> sendFriendRequest(String username) async {
     await _authenticated(
       'POST',

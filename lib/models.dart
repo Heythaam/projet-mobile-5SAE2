@@ -64,3 +64,77 @@ class ChatMessage {
     sentAt: json['sentAt'] as String,
   );
 }
+
+class Achievement {
+  const Achievement({
+    required this.code,
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.rewardXp,
+    required this.progress,
+    required this.total,
+    this.unlockedAt,
+  });
+
+  final String code;
+  final String title;
+  final String description;
+  final String icon;
+  final int rewardXp;
+  final int progress;
+  final int total;
+  final String? unlockedAt;
+
+  bool get unlocked => unlockedAt != null;
+
+  factory Achievement.fromJson(Map<String, dynamic> json) => Achievement(
+    code: json['code'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    icon: json['icon'] as String,
+    rewardXp: json['rewardXp'] as int,
+    progress: json['progress'] as int,
+    total: json['total'] as int,
+    unlockedAt: json['unlockedAt'] as String?,
+  );
+}
+
+class GamificationProfile {
+  const GamificationProfile({
+    required this.xp,
+    required this.level,
+    required this.rank,
+    required this.xpIntoLevel,
+    required this.xpForNextLevel,
+    required this.currentStreak,
+    required this.bestStreak,
+    required this.sentMessages,
+    required this.achievements,
+  });
+
+  final int xp;
+  final int level;
+  final String rank;
+  final int xpIntoLevel;
+  final int xpForNextLevel;
+  final int currentStreak;
+  final int bestStreak;
+  final int sentMessages;
+  final List<Achievement> achievements;
+
+  factory GamificationProfile.fromJson(Map<String, dynamic> json) =>
+      GamificationProfile(
+        xp: json['xp'] as int,
+        level: json['level'] as int,
+        rank: json['rank'] as String,
+        xpIntoLevel: json['xpIntoLevel'] as int,
+        xpForNextLevel: json['xpForNextLevel'] as int,
+        currentStreak: json['currentStreak'] as int,
+        bestStreak: json['bestStreak'] as int,
+        sentMessages: json['sentMessages'] as int,
+        achievements: (json['achievements'] as List<dynamic>)
+            .map((item) => Achievement.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
+}

@@ -7,6 +7,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'database.dart';
+import 'gamification.dart';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message);
@@ -24,6 +25,7 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
     )
     ..post('/auth/login', (request) => _login(request, database, jwtSecret))
     ..get('/me', _authenticated(database, jwtSecret, _me))
+    ..get('/gamification', _authenticated(database, jwtSecret, _gamification))
     ..get('/friends', _authenticated(database, jwtSecret, _friends))
     ..get(
       '/friend-requests',
@@ -147,6 +149,8 @@ Future<Response> _register(
     'SELECT id, username, email FROM users WHERE username = ?',
     [username],
   ).first;
+  recordActiveDay(database, user['id'] as int);
+  unlockAchievement(database, user['id'] as int, 'first_kickoff');
   return _sessionResponse(user, secret, status: 201);
 }
 
@@ -167,6 +171,7 @@ Future<Response> _login(
       !BCrypt.checkpw(password, users.first['password_hash'] as String)) {
     throw ApiException(401, 'Email or password is incorrect.');
   }
+  recordActiveDay(database, users.first['id'] as int);
   return _sessionResponse(users.first, secret);
 }
 
@@ -187,8 +192,12 @@ Response _sessionResponse(Row user, String secret, {int status = 200}) {
 
 Response _me(Request request) {
   final userId = _userId(request);
-  final rows = _database(request).db
-      .select('SELECT id, username, email FROM users WHERE id = ?', [userId]);
+  final database = _database(request);
+  recordActiveDay(database, userId);
+  final rows = database.db.select(
+    'SELECT id, username, email FROM users WHERE id = ?',
+    [userId],
+  );
   if (rows.isEmpty) {
     throw ApiException(404, 'Account not found.');
   }
@@ -198,6 +207,15 @@ Response _me(Request request) {
     'username': user['username'],
     'email': user['email'],
   });
+}
+
+Response _gamification(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  recordActiveDay(database, userId);
+  unlockAchievement(database, userId, 'first_kickoff');
+  unlockEligibleAchievements(database, userId);
+  return _json(gamificationSnapshot(database, userId));
 }
 
 Response _friends(Request request) {
@@ -304,6 +322,13 @@ Response _acceptFriendRequest(Request request) {
     "UPDATE friendships SET status = 'accepted' WHERE id = ?",
     [requestId],
   );
+  final requesterId =
+      database.db.select('SELECT requester_id FROM friendships WHERE id = ?', [
+            requestId,
+          ]).first['requester_id']
+          as int;
+  grantFriendshipXp(database, requesterId);
+  grantFriendshipXp(database, _userId(request));
   return _json({'accepted': true});
 }
 
@@ -377,13 +402,15 @@ Future<Response> _sendMessage(Request request) async {
     'INSERT INTO messages (sender_id, recipient_id, body) VALUES (?, ?, ?)',
     [userId, friendId, body],
   );
+  final messageId = database.db.lastInsertRowId;
+  grantMessageXp(database, userId);
   final message = database.db
       .select(
         '''
       SELECT id, sender_id, recipient_id, body, sent_at
       FROM messages WHERE id = ?
     ''',
-        [database.db.lastInsertRowId],
+        [messageId],
       )
       .first;
   return _json({
