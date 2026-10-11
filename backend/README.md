@@ -1,8 +1,9 @@
 # Kickoff API
 
-Dart Shelf API for Kickoff's user, friend-request, direct-message, and
-gamification features.
-SQLite data is stored in `data/football_matches.sqlite` by default.
+Dart Shelf API for Kickoff's user, friend-request, direct-message,
+gamification, and tournament features.
+SQLite data is stored in `data/football_matches.sqlite` by default; the schema
+is created and migrated by `lib/database.dart` when the server starts.
 
 ## Start
 
@@ -26,13 +27,35 @@ dart run bin/server.dart
 - `GET /friend-requests`, `POST /friend-requests`
 - `POST /friend-requests/{requestId}/accept`
 - `GET /friends/{friendId}/messages`, `POST /friends/{friendId}/messages`
+- `GET /me/tournament-requests`, `GET /users/{userId}/profile`
+- `GET /tournaments[?status=]`, `GET /tournaments/{id}`
+- `POST /tournaments/{id}/join`, `DELETE /tournaments/{id}/join`
+- `GET /tournaments/{id}/standings`, `GET /tournaments/{id}/bracket`
+- `GET /tournaments/{id}/teams/{teamId}`,
+  `POST /tournaments/{id}/teams/{teamId}/request`,
+  `DELETE /tournaments/{id}/teams/{teamId}/members/{memberId}`
+- `GET /tournaments/{id}/requests`, `PUT /tournaments/{id}/requests/{requestId}`
 
 All routes other than registration and login require a bearer token.
+Tournament request bodies, responses, errors and rules are documented in
+[../docs/tournaments.md](../docs/tournaments.md).
 Gamification state is stored in SQLite; XP and achievements are awarded by
 defined server-side events and exposed through `GET /gamification`.
+
+## Seed data
+
+`tool/seed_tournaments.dart` and `tool/seed_champions_league.dart` insert test
+tournaments, skipping ones that already exist. Run them with
+`dart run tool/<name>.dart` while the API is stopped, or build them with
+`dart build cli` while it runs; see
+[../docs/tournaments.md](../docs/tournaments.md#seed-data).
 
 ## Test
 
 ```powershell
+dart analyze
 dart test
 ```
+
+On Windows, stop the API first: the running server locks
+`.dart_tool/lib/sqlite3.dll`.

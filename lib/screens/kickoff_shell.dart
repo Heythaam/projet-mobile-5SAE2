@@ -6,6 +6,9 @@ import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
 import '../models.dart';
+import '../tournaments/screens/tournaments_list_screen.dart';
+import '../tournaments/services/tournament_service.dart';
+import '../tournaments/widgets/requests_badge.dart';
 import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
@@ -41,10 +44,15 @@ class _KickoffShellState extends State<KickoffShell> {
   String? _matchesError;
   bool _showHistoryOnCalendar = false;
 
+  /// Join requests waiting for this captain; the home banner hides at zero.
+  int _pendingJoinRequests = 0;
+  late final _tournamentService = TournamentService(widget.api);
+
   @override
   void initState() {
     super.initState();
     _refreshProfile();
+    _loadPendingJoinRequests();
     _loadMatches();
   }
 
@@ -67,6 +75,21 @@ class _KickoffShellState extends State<KickoffShell> {
         _loadingProfile = false;
       });
     }
+  }
+
+  /// The banner is a shortcut, so a failure only hides it; the service logs
+  /// the cause and the tournaments screens show their own errors.
+  Future<void> _loadPendingJoinRequests() async {
+    try {
+      final count = await _tournamentService.getPendingRequestCount();
+      if (mounted) setState(() => _pendingJoinRequests = count);
+    } on TournamentException {
+      if (mounted) setState(() => _pendingJoinRequests = 0);
+    }
+  }
+
+  Future<void> _refreshHome() async {
+    await Future.wait([_refreshProfile(), _loadPendingJoinRequests()]);
   }
 
   Future<void> _loadMatches() async {
@@ -97,6 +120,17 @@ class _KickoffShellState extends State<KickoffShell> {
         builder: (_) => PlaceholderScreen(title: title, icon: icon),
       ),
     );
+  }
+
+  Future<void> _openTournaments() async {
+    setState(() => _menuOpen = false);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TournamentsListScreen(service: _tournamentService),
+      ),
+    );
+    // Requests may have been answered in the tournaments screens.
+    if (mounted) await _loadPendingJoinRequests();
   }
 
   void _openFriends() {
@@ -192,8 +226,14 @@ class _KickoffShellState extends State<KickoffShell> {
       loading: _loadingProfile,
       loadError: _profileError,
       nextMatch: _nextMatch,
-      onRetry: _refreshProfile,
+      onRetry: _refreshHome,
       onOpenBallMenu: () => setState(() => _menuOpen = true),
+      tournamentBanner: _pendingJoinRequests > 0
+          ? PendingRequestsBanner(
+              count: _pendingJoinRequests,
+              onOpen: _openTournaments,
+            )
+          : null,
     ),
     1 => CalendarScreen(
       matches: _matches,
@@ -241,6 +281,7 @@ class _KickoffShellState extends State<KickoffShell> {
             _BallMenuOverlay(
               onDismiss: () => setState(() => _menuOpen = false),
               onSelect: _openPlaceholder,
+              onTournaments: _openTournaments,
             ),
         ],
       ),
@@ -259,10 +300,15 @@ class _KickoffShellState extends State<KickoffShell> {
 }
 
 class _BallMenuOverlay extends StatelessWidget {
-  const _BallMenuOverlay({required this.onDismiss, required this.onSelect});
+  const _BallMenuOverlay({
+    required this.onDismiss,
+    required this.onSelect,
+    required this.onTournaments,
+  });
 
   final VoidCallback onDismiss;
   final void Function(String title, IconData icon) onSelect;
+  final VoidCallback onTournaments;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +363,7 @@ class _BallMenuOverlay extends StatelessWidget {
               bottomColor: KickoffColors.blueDark,
               foreground: Colors.white,
               delay: 100,
-              onTap: () => onSelect('Tournament', Icons.emoji_events_rounded),
+              onTap: onTournaments,
             ),
           ],
         ),

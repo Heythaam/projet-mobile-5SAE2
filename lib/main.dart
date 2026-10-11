@@ -69,9 +69,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
-            color: selected
-                ? const Color(0xFFFFD21F)
-                : const Color(0xFFB9C3EE),
+            color: selected ? const Color(0xFFFFD21F) : const Color(0xFFB9C3EE),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           );

@@ -8,6 +8,5 @@ class EmptyMatchRepository implements MatchRepository {
   const EmptyMatchRepository();
 
   @override
-  Future<List<FootballMatch>> listMatches() async =>
-      const <FootballMatch>[];
+  Future<List<FootballMatch>> listMatches() async => const <FootballMatch>[];
 }

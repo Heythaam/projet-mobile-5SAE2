@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 double kickoffScale(BuildContext context) =>
     (MediaQuery.sizeOf(context).width / 360).clamp(1.0, 1.3);
@@ -137,12 +138,16 @@ class _ChunkyButtonState extends State<ChunkyButton> {
                         ),
                         SizedBox(width: 6 * scale),
                       ],
-                      Text(
-                        widget.label,
-                        style: TextStyle(
-                          color: widget.foregroundColor,
-                          fontSize: 17 * scale,
-                          fontWeight: FontWeight.w600,
+                      Flexible(
+                        child: Text(
+                          widget.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: widget.foregroundColor,
+                            fontSize: 17 * scale,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -166,6 +171,9 @@ class PillField extends StatelessWidget {
     this.suffix,
     this.onSubmitted,
     this.enabled = true,
+    this.inputFormatters,
+    this.textCapitalization = TextCapitalization.none,
+    this.autofocus = false,
     super.key,
   });
 
@@ -179,6 +187,9 @@ class PillField extends StatelessWidget {
   final Widget? suffix;
   final ValueChanged<String>? onSubmitted;
   final bool enabled;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextCapitalization textCapitalization;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +207,9 @@ class PillField extends StatelessWidget {
       validator: validator,
       onFieldSubmitted: onSubmitted,
       enabled: enabled,
+      inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization,
+      autofocus: autofocus,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(

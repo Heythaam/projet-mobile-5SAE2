@@ -132,6 +132,14 @@ class ApiClient {
 
   Future<void> logout() => _storage.delete(key: _tokenKey);
 
+  /// Sends a bearer-authenticated request for feature services (for example
+  /// `TournamentService`) that keep their own endpoint paths and parsing.
+  Future<Map<String, dynamic>> sendAuthenticated(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) => _authenticated(method, path, body: body);
+
   Future<void> _saveSession(Map<String, dynamic> response) async {
     final token = response['token'];
     if (token is! String || token.isEmpty) {

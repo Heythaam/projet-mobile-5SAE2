@@ -86,6 +86,49 @@ void main() {
     expect(find.text('Create'), findsOneWidget);
   });
 
+  testWidgets('ball menu opens tournaments', (WidgetTester tester) async {
+    await tester.pumpWidget(_shell());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Open ball menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.emoji_events_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tournaments'), findsOneWidget);
+    expect(find.text('No tournaments yet'), findsOneWidget);
+  });
+
+  testWidgets('home shows waiting join requests and opens tournaments', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeApiClient(pendingRequests: 2);
+    await tester.pumpWidget(_shell(api: api));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 join requests waiting'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home_join_requests')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tournaments'), findsOneWidget);
+
+    // Coming back refreshes the count, since requests may have been answered.
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(
+      api.calls.where((call) => call == 'GET /me/tournament-requests'),
+      hasLength(2),
+    );
+  });
+
+  testWidgets('home hides the requests banner when none are waiting', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_shell());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('home_join_requests')), findsNothing);
+  });
+
   testWidgets('shell fits phone sizes and text scales without clipping', (
     WidgetTester tester,
   ) async {
@@ -248,7 +291,12 @@ void main() {
   });
 }
 
-Widget _shell({Key? key, double textScale = 1}) => MaterialApp(
+Widget _shell({
+  Key? key,
+  double textScale = 1,
+  int pendingRequests = 0,
+  _FakeApiClient? api,
+}) => MaterialApp(
   key: key,
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context)
@@ -256,7 +304,7 @@ Widget _shell({Key? key, double textScale = 1}) => MaterialApp(
     child: child!,
   ),
   home: KickoffShell(
-    api: _FakeApiClient(),
+    api: api ?? _FakeApiClient(pendingRequests: pendingRequests),
     user: const UserAccount(id: 1, username: 'player', email: 'p@example.com'),
     onLogout: () {},
     matchRepository: const EmptyMatchRepository(),
@@ -264,6 +312,11 @@ Widget _shell({Key? key, double textScale = 1}) => MaterialApp(
 );
 
 class _FakeApiClient extends Fake implements ApiClient {
+  _FakeApiClient({this.pendingRequests = 0});
+
+  final int pendingRequests;
+  final calls = <String>[];
+
   @override
   Future<GamificationProfile> getGamificationProfile() async =>
       const GamificationProfile(
@@ -277,4 +330,16 @@ class _FakeApiClient extends Fake implements ApiClient {
         sentMessages: 0,
         achievements: [],
       );
+
+  @override
+  Future<Map<String, dynamic>> sendAuthenticated(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    calls.add('$method $path');
+    return path == '/me/tournament-requests'
+        ? {'pendingRequests': pendingRequests}
+        : {'tournaments': <Object>[]};
+  }
 }

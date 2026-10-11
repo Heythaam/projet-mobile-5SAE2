@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'achievement_icons.dart';
 import 'api_client.dart';
 import 'chat_screen.dart';
 import 'models.dart';
@@ -1581,16 +1582,7 @@ class _AchievementCard extends StatelessWidget {
     Color(0xFFFFD45E),
   ];
 
-  IconData get _icon => switch (achievement.icon) {
-    'whistle' => Icons.sports_rounded,
-    'team' => Icons.groups_2_rounded,
-    'formation' => Icons.grid_view_rounded,
-    'chat' => Icons.forum_rounded,
-    'star' => Icons.stars_rounded,
-    'flame' => Icons.local_fire_department_rounded,
-    'crown' => Icons.workspace_premium_rounded,
-    _ => Icons.military_tech_rounded,
-  };
+  IconData get _icon => achievementIcon(achievement.icon);
 
   @override
   Widget build(BuildContext context) {
