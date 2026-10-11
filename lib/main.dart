@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'api_client.dart';
 import 'auth_screen.dart';
-import 'home_screen.dart';
 import 'models.dart';
+import 'screens/kickoff_shell.dart';
 
 void main() {
   runApp(const FootballMatchApp());
@@ -57,21 +57,23 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF0866F5),
-        primary: const Color(0xFF0866F5),
-        secondary: const Color(0xFFFFD21E),
-        surface: const Color(0xFF17194F),
-        onSurface: const Color(0xFFEAF0E8),
+        seedColor: const Color(0xFF0B5FE8),
+        primary: const Color(0xFF0B5FE8),
+        secondary: const Color(0xFFFFD21F),
+        surface: const Color(0xFF1A1A4E),
+        onSurface: Colors.white,
       ),
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFF17194F),
+      scaffoldBackgroundColor: const Color(0xFF1A1A4E),
       navigationBarTheme: NavigationBarThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
-            color: selected ? const Color(0xFF164A35) : const Color(0xFF78827A),
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            color: selected
+                ? const Color(0xFFFFD21F)
+                : const Color(0xFFB9C3EE),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
           );
         }),
       ),
@@ -99,7 +101,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               setState(() => _user = user);
             },
           )
-        : HomeScreen(api: _api, user: _user!, onLogout: _logout),
+        : KickoffShell(api: _api, user: _user!, onLogout: _logout),
   );
 }
 

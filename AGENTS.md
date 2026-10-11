@@ -35,31 +35,36 @@ booking is part of the product direction but is not implemented yet.
 - XP/achievements are awarded for defined events (registration, accepted
   friendship, messages, and streak milestones). Keep rewards grounded in
   persisted events; do not invent progress from presentation-only state.
+- The three-item app shell presents a calendar repository interface with an
+  empty implementation until match/stadium endpoints exist. Never add sample
+  matches or locally persisted gamification values as if they were real.
 
 ## UI direction
 
-The current reference direction is a football-themed arcade/party game:
-
-- Deep indigo patterned backdrop, vivid blue cabinet/panel surfaces, warm yellow
-  controls, bold outlines, compact playful football details, and chunky button
-  treatments.
-- Make the next social action obvious; keep squad/invitation status easy to
-  scan. Preserve clear touch targets and legible contrast.
+- The core screen reference is `docs/design/kickoff_core_screens_prototypes.html`.
+  Match its flat 360-dp layouts and tokens: solid `#1A1A4E` background,
+  `#2D3A7A` panels, vivid blue match cards, warm yellow controls, and a single
+  thicker bottom edge for chunky fills. Avoid background patterns, gradients,
+  full panel outlines, and offset shadows. Use 500/600 weights, readable text,
+  and icon-first navigation with accessible 48-dp touch targets.
 - Sporcle Party and Kalak are mood/interaction references only. Use original
   Kickoff copy, football iconography, and compositions; do not copy their names,
   logos, characters, artwork, or exact screens.
-- Keep UX consistent across sign-in, team, invites, awards, profile, and chat.
+- Keep auth, home, calendar, and profile consistent with the supplied mockups.
 - Gamification should reflect real backend state. Do not imply a mission grants
   XP unless the API actually awards it.
 
 ## Key files
 
-- `lib/main.dart`: app setup, theme, session restoration and auth/home routing.
+- `lib/main.dart`: app setup, theme, session restoration and auth/shell routing.
 - `lib/api_client.dart`, `lib/models.dart`: typed client API and response
   models.
 - `lib/auth_screen.dart`: registration and sign-in.
-- `lib/home_screen.dart`: team, invitations, career dashboard, achievements,
-  profile.
+- `lib/screens/kickoff_shell.dart`: three-item navigation, menu, profile and
+  server-backed gamification loading.
+- `lib/screens/`, `lib/matches/`: core screen widgets and the match model/
+  repository boundary.
+- `lib/home_screen.dart`: team and invitations.
 - `lib/chat_screen.dart`: one-to-one chat.
 - `backend/lib/app.dart`: Shelf routes and handlers.
 - `backend/lib/database.dart`: SQLite schema and migrations.

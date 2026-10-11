@@ -7,12 +7,12 @@ booking remain future product work.
 
 ## Interface direction
 
-Kickoff uses a football-themed arcade/party-game style: an indigo patterned
-backdrop, vivid blue panels, warm yellow controls, chunky outlined buttons, and
-clear social actions. Progress and rewards shown in the interface come from the
-API rather than local presentation-only calculations. Sporcle Party and Kalak
-are visual/interaction references; Kickoff uses its own football identity and
-original artwork.
+Kickoff's core screens follow `docs/design/kickoff_core_screens_prototypes.html`:
+a flat indigo background, vivid blue match cards, warm yellow controls, and
+chunky fills with a single darker bottom edge. Progress and rewards shown in
+the interface come from the API rather than local presentation-only
+calculations. Sporcle Party and Kalak are visual/interaction references;
+Kickoff uses its own football identity and original artwork.
 
 ## User module
 
@@ -22,6 +22,10 @@ original artwork.
   every few seconds.
 - Passwords are hashed by the API. Session tokens are stored in the app's
   platform secure storage.
+- The arcade app shell includes a calendar, home dashboard, ball-action menu,
+  and profile. XP and streaks are read from `GET /gamification`; match/calendar
+  data uses an empty repository until match endpoints are available, so no
+  sample match data is presented.
 
 ## Run the API
 

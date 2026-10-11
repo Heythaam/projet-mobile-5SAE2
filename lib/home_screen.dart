@@ -19,12 +19,14 @@ class HomeScreen extends StatefulWidget {
     required this.api,
     required this.user,
     required this.onLogout,
+    this.showNavigation = true,
     super.key,
   });
 
   final ApiClient api;
   final UserAccount user;
   final VoidCallback onLogout;
+  final bool showNavigation;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -173,7 +175,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ? _ErrorPanel(message: _loadError!, onRetry: _refresh)
               : _loading && _friends.isEmpty && _requests.isEmpty
               ? const Center(child: CircularProgressIndicator(color: _pitch))
-              : IndexedStack(
+              : widget.showNavigation
+              ? IndexedStack(
                   index: _tab,
                   children: [
                     _teamTab(),
@@ -181,9 +184,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     _achievementsTab(),
                     _accountTab(),
                   ],
-                ),
+                )
+              : _teamTab(),
         ),
-        bottomNavigationBar: _navigation(),
+        bottomNavigationBar: widget.showNavigation ? _navigation() : null,
       ),
     );
   }
@@ -225,21 +229,29 @@ class _HomeScreenState extends State<HomeScreen> {
     padding: const EdgeInsets.fromLTRB(22, 15, 22, 17),
     child: Row(
       children: [
-        Container(
-          height: 42,
-          width: 42,
-          decoration: BoxDecoration(
-            color: _lime,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _ink, width: 3),
-            boxShadow: [const BoxShadow(color: _ink, offset: Offset(0, 4))],
-          ),
-          child: const Icon(
-            Icons.sports_soccer_rounded,
-            color: _night,
-            size: 25,
-          ),
-        ),
+        widget.showNavigation
+            ? Container(
+                height: 42,
+                width: 42,
+                decoration: BoxDecoration(
+                  color: _lime,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _ink, width: 3),
+                  boxShadow: [
+                    const BoxShadow(color: _ink, offset: Offset(0, 4)),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.sports_soccer_rounded,
+                  color: _night,
+                  size: 25,
+                ),
+              )
+            : IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded, color: _nightText),
+              ),
         const SizedBox(width: 10),
         const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
