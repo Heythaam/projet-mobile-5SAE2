@@ -44,10 +44,10 @@ defined server-side events and exposed through `GET /gamification`.
 
 ## Seed data
 
-`tool/seed_tournaments.dart` and `tool/seed_champions_league.dart` insert test
-tournaments, skipping ones that already exist. Run them with
-`dart run tool/<name>.dart` while the API is stopped, or build them with
-`dart build cli` while it runs; see
+`bin/seed.dart` restores the seed accounts (password `Test1234!`), test
+tournaments and the Champions League bracket from scratch, keeping other
+accounts. Run it with `dart run bin/seed.dart` while the API is stopped, or
+build it with `dart build cli` while it runs; see
 [../docs/tournaments.md](../docs/tournaments.md#seed-data).
 
 ## Test

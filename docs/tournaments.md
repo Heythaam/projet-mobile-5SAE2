@@ -301,19 +301,25 @@ Never add sample tournaments or results on the client.
 
 ## Seed data
 
-Scripts in `backend/tool/` insert test data and skip anything that already
-exists, so they can be rerun. `DB_PATH` overrides the database, as for the
+`backend/bin/seed.dart` restores the test data from scratch. Each run deletes
+the seed accounts (emails `@kickoff.test`, plus `@seed.kickoff.invalid`
+accounts from older seed scripts) and the four seed tournaments by name, whose
+teams, matches and requests cascade, then inserts everything again in one
+transaction, checks the row counts and prints what it inserted. Other accounts
+are kept; if one of them already uses a seed username, the script stops
+without changing anything. `DB_PATH` overrides the database, as for the
 server.
 
-| Script | Inserts |
+| Data | Contents |
 |---|---|
-| `seed_tournaments.dart` | Champions Cup (knockout, active), City League (league, upcoming), Summer Cup (round robin, finished) |
-| `seed_champions_league.dart` | Champions League (knockout, active, 8 teams): quarter-finals played (PSG through on penalties) and semi-finals scheduled. PSG, Liverpool, Juventus and AC Milan are captained by seed accounts `cl_psg`, `cl_liverpool`, `cl_juventus` and `cl_milan`, which have random passwords and cannot sign in |
+| Users | `alice`, `bob`, `carlos`, `diana`, `cl_psg`, `cl_liv`, `cl_juve`, `cl_milan`, emails `<username>@kickoff.test`, password `Test1234!` |
+| Tournaments | Champions Cup (knockout, active), City League (league, upcoming), Summer Cup (round robin, finished), Champions League (knockout, active) |
+| Champions League | 8 teams (Real Madrid/alice, Barcelona/bob, Manchester City/carlos, Bayern Munich/diana, PSG/cl_psg, Liverpool/cl_liv, Juventus/cl_juve, AC Milan/cl_milan); quarter-finals played (PSG through on penalties) and semi-finals scheduled |
 
 Run from `backend/`:
 
 ```powershell
-dart run tool/seed_tournaments.dart
+dart run bin/seed.dart
 ```
 
 While the API is running on Windows, `dart run` cannot replace the locked
@@ -321,8 +327,8 @@ While the API is running on Windows, `dart run` cannot replace the locked
 into another folder and run the executable:
 
 ```powershell
-dart build cli -t tool/seed_champions_league.dart -o $env:TEMP\kickoff_seed
-& "$env:TEMP\kickoff_seed\bundle\bin\seed_champions_league.exe"
+dart build cli -t bin/seed.dart -o $env:TEMP\kickoff_seed
+& "$env:TEMP\kickoff_seed\bundle\bin\seed.exe"
 ```
 
 The same lock affects `dart test`; stop the API before running backend tests.

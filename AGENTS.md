@@ -144,7 +144,8 @@ booking is part of the product direction but is not implemented yet.
 - `backend/test/tournaments_test.dart`, `join_requests_test.dart`,
   `team_management_test.dart`, `bracket_test.dart`: tournament routes, rules
   and schema migrations.
-- `backend/tool/`: seed scripts for test tournaments.
+- `backend/bin/seed.dart`: restores seed accounts, test tournaments and the
+  Champions League bracket from scratch.
 - `android/build.gradle.kts`: uses Flutter's NDK when installed, otherwise the
   newest installed NDK, for the app and every plugin.
 - `test/`, `backend/test/`: Flutter widget and API/database tests.
@@ -184,7 +185,7 @@ manual testing: `5TQ489FYO7S8EMSO`. Establish `adb reverse` before launching a
 build that targets `127.0.0.1:8080`.
 
 On Windows the running API locks `backend/.dart_tool/lib/sqlite3.dll`, so
-`dart test` and `dart run tool/...` fail while it runs. Stop the API, run the
+`dart test` and `dart run bin/seed.dart` fail while it runs. Stop the API, run the
 tests from a copy of `backend/lib`, `backend/test` and the pubspec files, or
 build tools with `dart build cli`.
 

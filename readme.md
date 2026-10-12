@@ -56,7 +56,8 @@ The API listens on port `8080` and creates `backend/data/football_matches.sqlite
 automatically, migrating older schemas on start. Set `PORT` or `DB_PATH`
 before starting the server to override these defaults.
 
-Test tournaments can be added with the seed scripts in `backend/tool/`; see
+Test accounts and tournaments are restored with `dart run bin/seed.dart` from
+`backend/`; see
 [docs/tournaments.md](docs/tournaments.md#seed-data).
 
 ## Run the Flutter app
