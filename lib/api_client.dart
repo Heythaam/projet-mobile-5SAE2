@@ -6,10 +6,13 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(this.message, {this.statusCode, this.code});
 
   final String message;
   final int? statusCode;
+
+  /// Machine-readable reason sent by the API for some failures.
+  final String? code;
 
   @override
   String toString() => message;
@@ -41,7 +44,10 @@ class ApiClient {
       final response = await _send('GET', '/me', token: token);
       return UserAccount.fromJson(response);
     } on ApiException catch (error) {
-      if (error.statusCode == 401) {
+      // An expired token, or one for an account that no longer exists (for
+      // example after the database was reseeded), cannot be retried: sign in
+      // again instead.
+      if (error.statusCode == 401 || error.statusCode == 404) {
         await _storage.delete(key: _tokenKey);
         return null;
       }
@@ -188,6 +194,7 @@ class ApiClient {
       throw ApiException(
         decoded['error'] as String? ?? 'Request failed.',
         statusCode: response.statusCode,
+        code: decoded['code'] as String?,
       );
     }
     return decoded;

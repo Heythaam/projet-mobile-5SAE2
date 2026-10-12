@@ -4,6 +4,7 @@ import 'api_client.dart';
 import 'auth_screen.dart';
 import 'models.dart';
 import 'screens/kickoff_shell.dart';
+import 'app_route_observer.dart';
 
 void main() {
   runApp(const FootballMatchApp());
@@ -55,6 +56,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Kickoff',
     debugShowCheckedModeBanner: false,
+    navigatorObservers: [appRouteObserver],
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF0B5FE8),

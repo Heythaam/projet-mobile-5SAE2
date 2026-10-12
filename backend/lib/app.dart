@@ -10,10 +10,13 @@ import 'database.dart';
 import 'gamification.dart';
 
 class ApiException implements Exception {
-  ApiException(this.status, this.message);
+  ApiException(this.status, this.message, {this.code});
 
   final int status;
   final String message;
+
+  /// Machine-readable reason for clients that react to specific failures.
+  final String? code;
 }
 
 Handler createApp({required AppDatabase database, required String jwtSecret}) {
@@ -73,6 +76,10 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
       _authenticated(database, jwtSecret, _leaveTournament),
     )
     ..post(
+      '/tournaments/<tournamentId>/transfer-captaincy',
+      _authenticated(database, jwtSecret, _transferCaptaincy),
+    )
+    ..post(
       '/tournaments/<tournamentId>/teams/<teamId>/request',
       _authenticated(database, jwtSecret, _requestToJoinTeam),
     )
@@ -91,6 +98,10 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
     ..put(
       '/tournaments/<tournamentId>/requests/<requestId>',
       _authenticated(database, jwtSecret, _answerJoinRequest),
+    )
+    ..delete(
+      '/tournaments/<tournamentId>/disband-notice',
+      _authenticated(database, jwtSecret, _dismissDisbandNotice),
     )
     ..get(
       '/tournaments/<tournamentId>/standings',
@@ -112,7 +123,10 @@ Middleware get _errors =>
       try {
         return await inner(request);
       } on ApiException catch (error) {
-        return _json({'error': error.message}, status: error.status);
+        return _json({
+          'error': error.message,
+          if (error.code != null) 'code': error.code,
+        }, status: error.status);
       } on FormatException {
         return _json({
           'error': 'Request body must be valid JSON.',
@@ -482,33 +496,42 @@ const _teamNameMaxLength = 30;
 final _teamNamePattern = RegExp(r"^[\p{L}\p{M}\p{N} '._-]+$", unicode: true);
 final _teamNameAlphanumeric = RegExp(r'[\p{L}\p{N}]', unicode: true);
 
+/// The team the signed-in user (`?1`) plays for in tournament `t`, as the
+/// captain of an active team or as an accepted player.
+const _myTeamId = '''
+  COALESCE(
+    (SELECT tt.id FROM tournament_teams tt
+      WHERE tt.tournament_id = t.id AND tt.captain_id = ?1
+        AND tt.status = 'active'),
+    (SELECT jr.team_id FROM join_requests jr
+      WHERE jr.tournament_id = t.id AND jr.requester_id = ?1
+        AND jr.status = 'accepted'))
+''';
+
 /// Selects tournament summaries. The first parameter is the signed-in user,
-/// used (as `?1`) for their team, requests and whether they can leave. Later
-/// plain `?` placeholders continue numbering from 2.
-const _tournamentSelect = '''
+/// used (as `?1`) for their team and requests. Later plain `?` placeholders
+/// continue numbering from 2. Teams that left are not counted.
+const _tournamentSelect =
+    '''
   SELECT t.id, t.name, t.description, t.format, t.status, t.start_date,
     t.end_date, t.max_teams, t.team_size, t.location, t.prize,
     u.username AS created_by,
     (SELECT COUNT(*) FROM tournament_teams tt
-      WHERE tt.tournament_id = t.id) AS current_teams,
+      WHERE tt.tournament_id = t.id AND tt.status = 'active') AS current_teams,
     EXISTS (SELECT 1 FROM tournament_teams tt
-      WHERE tt.tournament_id = t.id AND tt.captain_id = ?1) AS joined,
-    COALESCE(
-      (SELECT tt.id FROM tournament_teams tt
-        WHERE tt.tournament_id = t.id AND tt.captain_id = ?1),
-      (SELECT jr.team_id FROM join_requests jr
-        WHERE jr.tournament_id = t.id AND jr.requester_id = ?1
-          AND jr.status = 'accepted')) AS my_team_id,
+      WHERE tt.tournament_id = t.id AND tt.captain_id = ?1
+        AND tt.status = 'active') AS joined,
+    $_myTeamId AS my_team_id,
+    (SELECT COUNT(*) FROM join_requests jr
+      WHERE jr.team_id = $_myTeamId AND jr.status = 'accepted')
+      AS my_team_players,
+    EXISTS (SELECT 1 FROM tournament_matches m
+      WHERE m.home_team_id = $_myTeamId OR m.away_team_id = $_myTeamId)
+      AS my_team_has_matches,
     (SELECT COUNT(*) FROM join_requests jr
       JOIN tournament_teams tt ON tt.id = jr.team_id
       WHERE jr.tournament_id = t.id AND tt.captain_id = ?1
-        AND jr.status = 'pending') AS pending_requests,
-    t.status = 'upcoming' AND EXISTS (SELECT 1 FROM tournament_teams tt
-      WHERE tt.tournament_id = t.id AND tt.captain_id = ?1
-        AND NOT EXISTS (SELECT 1 FROM tournament_matches m
-          WHERE m.home_team_id = tt.id OR m.away_team_id = tt.id)
-        AND NOT EXISTS (SELECT 1 FROM join_requests jr
-          WHERE jr.team_id = tt.id AND jr.status = 'accepted')) AS can_leave
+        AND tt.status = 'active' AND jr.status = 'pending') AS pending_requests
   FROM tournaments t
   LEFT JOIN users u ON u.id = t.created_by
 ''';
@@ -563,6 +586,7 @@ Future<Response> _joinTournament(Request request) async {
     '''
       SELECT id FROM tournament_teams
       WHERE tournament_id = ? AND name = ? COLLATE NOCASE
+        AND status = 'active'
     ''',
     [tournamentId, teamName],
   );
@@ -579,7 +603,8 @@ Future<Response> _joinTournament(Request request) async {
           FROM tournaments t
           WHERE t.id = ?3 AND t.status = 'upcoming'
             AND (SELECT COUNT(*) FROM tournament_teams tt
-              WHERE tt.tournament_id = t.id) < t.max_teams
+              WHERE tt.tournament_id = t.id AND tt.status = 'active')
+              < t.max_teams
             AND NOT EXISTS (SELECT 1 FROM join_requests jr
               WHERE jr.tournament_id = t.id AND jr.requester_id = ?1
                 AND jr.status = 'accepted')
@@ -641,63 +666,232 @@ String _teamName(Map<String, dynamic> body) {
 ApiException _teamNameTaken() =>
     ApiException(409, 'That team name is already taken in this tournament.');
 
-/// Withdraws the captain's team while registration is open. The team row is
-/// deleted, freeing its spot and name; nothing else references it yet.
+/// Withdraws the signed-in user while registration is open.
+///
+/// A player's membership is marked `left`. A captain's team is kept as
+/// `left`, with `left_at`, freeing its spot and name; pending requests to it
+/// are cancelled. A team with players is only withdrawn with
+/// `?disband=true`, which marks it `disbanded` and frees its players.
 Response _leaveTournament(Request request) {
   final database = _database(request);
   final userId = _userId(request);
   final tournamentId = _tournamentId(request);
+  final disband = request.url.queryParameters['disband'] == 'true';
   final tournament = _findTournament(database, tournamentId, userId);
+  if (tournament['my_team_id'] == null) throw _notJoined();
+  if (tournament['status'] != 'upcoming') throw _leaveClosed();
   if (tournament['joined'] != 1) {
-    throw ApiException(409, 'You have not joined this tournament.');
-  }
-  if (tournament['status'] != 'upcoming') {
-    throw _leaveClosed();
-  }
-
-  // Status, fixtures and players are checked again inside the delete, so a
-  // team that gains matches or players meanwhile is kept. Pending requests to
-  // the team are deleted with it.
-  database.db.execute(
-    '''
-      DELETE FROM tournament_teams
-      WHERE tournament_id = ? AND captain_id = ?
-        AND EXISTS (SELECT 1 FROM tournaments t
-          WHERE t.id = tournament_teams.tournament_id
-            AND t.status = 'upcoming')
-        AND NOT EXISTS (SELECT 1 FROM tournament_matches m
-          WHERE m.home_team_id = tournament_teams.id
-            OR m.away_team_id = tournament_teams.id)
-        AND NOT EXISTS (SELECT 1 FROM join_requests jr
-          WHERE jr.team_id = tournament_teams.id AND jr.status = 'accepted')
-    ''',
-    [tournamentId, userId],
-  );
-  if (database.db.updatedRows == 0) {
-    final current = _findTournament(database, tournamentId, userId);
-    if (current['joined'] != 1) {
-      throw ApiException(409, 'You have not joined this tournament.');
-    }
-    if (current['status'] != 'upcoming') throw _leaveClosed();
-    final players = database.db.select(
-      '''
-        SELECT 1 FROM join_requests
-        WHERE team_id = ? AND status = 'accepted'
-      ''',
-      [current['my_team_id']],
-    );
-    if (players.isNotEmpty) {
-      throw ApiException(409, 'Your team has players and cannot leave.');
-    }
-    throw ApiException(
-      409,
-      'Your team already has scheduled matches and cannot leave.',
-    );
+    _leaveTeamAsPlayer(database, tournamentId, userId);
+  } else {
+    _withdrawTeam(database, tournamentId, userId, disband: disband);
   }
   return _json({
     'tournament': _tournamentDetailJson(database, tournamentId, userId),
   });
 }
+
+void _leaveTeamAsPlayer(AppDatabase database, int tournamentId, int userId) {
+  database.db.execute(
+    '''
+      UPDATE join_requests
+      SET status = 'left', responded_at = CURRENT_TIMESTAMP
+      WHERE tournament_id = ?1 AND requester_id = ?2 AND status = 'accepted'
+        AND EXISTS (SELECT 1 FROM tournaments t
+          WHERE t.id = ?1 AND t.status = 'upcoming')
+    ''',
+    [tournamentId, userId],
+  );
+  if (database.db.updatedRows == 0) {
+    final current = _findTournament(database, tournamentId, userId);
+    if (current['my_team_id'] == null) throw _notJoined();
+    throw _leaveClosed();
+  }
+}
+
+void _withdrawTeam(
+  AppDatabase database,
+  int tournamentId,
+  int userId, {
+  required bool disband,
+}) {
+  _inTransaction(database, () {
+    final teams = database.db.select(
+      '''
+        SELECT id FROM tournament_teams
+        WHERE tournament_id = ? AND captain_id = ? AND status = 'active'
+      ''',
+      [tournamentId, userId],
+    );
+    if (teams.isEmpty) throw _notJoined();
+    final teamId = teams.first['id'] as int;
+    // Status, fixtures and players are checked again inside the update, so
+    // a team that gains matches or players meanwhile is kept.
+    database.db.execute(
+      '''
+        UPDATE tournament_teams
+        SET status = CASE WHEN EXISTS (SELECT 1 FROM join_requests jr
+              WHERE jr.team_id = ?1 AND jr.status = 'accepted')
+            THEN 'disbanded' ELSE 'left' END,
+          left_at = CURRENT_TIMESTAMP
+        WHERE id = ?1 AND status = 'active'
+          AND EXISTS (SELECT 1 FROM tournaments t
+            WHERE t.id = tournament_teams.tournament_id
+              AND t.status = 'upcoming')
+          AND NOT EXISTS (SELECT 1 FROM tournament_matches m
+            WHERE m.home_team_id = ?1 OR m.away_team_id = ?1)
+          AND (?2 OR NOT EXISTS (SELECT 1 FROM join_requests jr
+            WHERE jr.team_id = ?1 AND jr.status = 'accepted'))
+      ''',
+      [teamId, disband ? 1 : 0],
+    );
+    if (database.db.updatedRows == 0) {
+      final current = _findTournament(database, tournamentId, userId);
+      if (current['status'] != 'upcoming') throw _leaveClosed();
+      if (current['my_team_has_matches'] == 1) {
+        throw ApiException(
+          409,
+          'Your team already has scheduled matches and cannot leave.',
+        );
+      }
+      throw ApiException(
+        409,
+        'Your team has players. Transfer captaincy or disband the team.',
+      );
+    }
+    // The team's players are free to join another team and are told why
+    // the next time they open the tournament (`teamDisbanded`). Requests to
+    // the team can no longer be answered.
+    database.db.execute(
+      '''
+        UPDATE join_requests
+        SET status = CASE status WHEN 'accepted' THEN 'disbanded'
+            ELSE 'cancelled' END,
+          responded_at = CURRENT_TIMESTAMP
+        WHERE team_id = ? AND status IN ('pending', 'accepted')
+      ''',
+      [teamId],
+    );
+  });
+}
+
+/// Makes a player of the signed-in captain's team its captain before
+/// kickoff. The former captain stays on the team as a player.
+Future<Response> _transferCaptaincy(Request request) async {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  final newCaptainId = (await _body(request))['newCaptainId'];
+  if (newCaptainId is! int) {
+    throw ApiException(400, 'The "newCaptainId" field is required.');
+  }
+  if (newCaptainId == userId) {
+    throw ApiException(400, 'You are already the captain.');
+  }
+
+  // Everything is checked under the write lock, so a team withdrawn or a
+  // tournament started by a concurrent request is reported as such.
+  _inTransaction(database, () {
+    final tournament = _findTournament(database, tournamentId, userId);
+    if (tournament['joined'] != 1) {
+      throw _transferBlocked(database, tournamentId, userId, tournament);
+    }
+    if (tournament['status'] != 'upcoming') throw _transferClosed();
+    final teamId = tournament['my_team_id'] as int;
+    database.db.execute(
+      '''
+        UPDATE join_requests
+        SET status = 'promoted', responded_at = CURRENT_TIMESTAMP
+        WHERE team_id = ? AND requester_id = ? AND status = 'accepted'
+      ''',
+      [teamId, newCaptainId],
+    );
+    if (database.db.updatedRows == 0) {
+      throw ApiException(
+        404,
+        'Player not found on this team.',
+        code: 'player_not_on_team',
+      );
+    }
+    database.db.execute(
+      'UPDATE tournament_teams SET captain_id = ? WHERE id = ?',
+      [newCaptainId, teamId],
+    );
+    database.db.execute(
+      '''
+        INSERT INTO join_requests
+          (tournament_id, team_id, requester_id, status, responded_at)
+        VALUES (?, ?, ?, 'accepted', CURRENT_TIMESTAMP)
+      ''',
+      [tournamentId, teamId, userId],
+    );
+  });
+  return _json({
+    'tournament': _tournamentDetailJson(database, tournamentId, userId),
+  });
+}
+
+/// Why a user who does not captain an active team cannot transfer: their
+/// team was withdrawn, captaincy already moved, or they never captained one.
+ApiException _transferBlocked(
+  AppDatabase database,
+  int tournamentId,
+  int userId,
+  Row tournament,
+) {
+  if (tournament['my_team_id'] != null) {
+    return ApiException(
+      403,
+      'You are no longer the captain of this team.',
+      code: 'not_captain',
+    );
+  }
+  final withdrawn = database.db.select(
+    '''
+      SELECT 1 FROM tournament_teams
+      WHERE tournament_id = ? AND captain_id = ? AND status != 'active'
+    ''',
+    [tournamentId, userId],
+  );
+  if (withdrawn.isNotEmpty) {
+    return ApiException(
+      409,
+      'Your team is no longer in this tournament.',
+      code: 'team_withdrawn',
+    );
+  }
+  return ApiException(
+    403,
+    'Only the team captain can transfer captaincy.',
+    code: 'not_captain',
+  );
+}
+
+ApiException _transferClosed() => ApiException(
+  409,
+  'Captaincy can only be transferred before the tournament starts.',
+  code: 'transfer_closed',
+);
+
+/// Records that the user saw that their team was disbanded, so
+/// `teamDisbanded` stops being reported on every device.
+Response _dismissDisbandNotice(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _findTournament(database, tournamentId, userId);
+  database.db.execute(
+    '''
+      UPDATE join_requests SET notice_seen_at = CURRENT_TIMESTAMP
+      WHERE tournament_id = ? AND requester_id = ? AND status = 'disbanded'
+        AND notice_seen_at IS NULL
+    ''',
+    [tournamentId, userId],
+  );
+  return Response(204);
+}
+
+ApiException _notJoined() =>
+    ApiException(409, 'You have not joined this tournament.');
 
 ApiException _leaveClosed() =>
     ApiException(409, 'You can only leave before the tournament starts.');
@@ -727,8 +921,10 @@ Response _requestToJoinTeam(Request request) {
         FROM tournament_teams tt
         JOIN tournaments t ON t.id = tt.tournament_id
         WHERE tt.id = ?2 AND t.id = ?3 AND t.status = 'upcoming'
+          AND tt.status = 'active'
           AND NOT EXISTS (SELECT 1 FROM tournament_teams c
-            WHERE c.tournament_id = t.id AND c.captain_id = ?1)
+            WHERE c.tournament_id = t.id AND c.captain_id = ?1
+              AND c.status = 'active')
           AND 1 + (SELECT COUNT(*) FROM join_requests a
             WHERE a.team_id = tt.id AND a.status = 'accepted') < t.team_size
       ''',
@@ -763,7 +959,7 @@ void _checkCanRequest(
       SELECT 1 + (SELECT COUNT(*) FROM join_requests jr
           WHERE jr.team_id = tt.id AND jr.status = 'accepted') AS players
       FROM tournament_teams tt
-      WHERE tt.id = ? AND tt.tournament_id = ?
+      WHERE tt.id = ? AND tt.tournament_id = ? AND tt.status = 'active'
     ''',
     [teamId, tournamentId],
   );
@@ -812,7 +1008,7 @@ Response _teamJoinRequests(Request request) {
     '''
       $_joinRequestSelect
       WHERE tt.tournament_id = ? AND tt.captain_id = ?
-        AND jr.status = 'pending'
+        AND tt.status = 'active' AND jr.status = 'pending'
       ORDER BY jr.created_at, jr.id
     ''',
     [tournamentId, userId],
@@ -844,7 +1040,7 @@ Future<Response> _answerJoinRequest(Request request) async {
       SET status = ?1, responded_at = CURRENT_TIMESTAMP
       WHERE id = ?2 AND tournament_id = ?3 AND status = 'pending'
         AND team_id IN (SELECT id FROM tournament_teams
-          WHERE tournament_id = ?3 AND captain_id = ?4)
+          WHERE tournament_id = ?3 AND captain_id = ?4 AND status = 'active')
         AND EXISTS (SELECT 1 FROM tournaments t
           WHERE t.id = ?3 AND t.status = 'upcoming')
         AND (?1 = 'declined' OR (
@@ -853,7 +1049,7 @@ Future<Response> _answerJoinRequest(Request request) async {
               AND a.status = 'accepted')
             < (SELECT team_size FROM tournaments WHERE id = ?3)
           AND NOT EXISTS (SELECT 1 FROM tournament_teams c
-            WHERE c.tournament_id = ?3
+            WHERE c.tournament_id = ?3 AND c.status = 'active'
               AND c.captain_id = join_requests.requester_id)))
     ''',
     [status, requestId, tournamentId, userId],
@@ -864,7 +1060,10 @@ Future<Response> _answerJoinRequest(Request request) async {
     final latest = _findTournament(database, tournamentId, userId);
     if (latest['status'] != 'upcoming') throw _registrationClosed();
     final requesterTeams = database.db.select(
-      'SELECT 1 FROM tournament_teams WHERE tournament_id = ? AND captain_id = ?',
+      '''
+        SELECT 1 FROM tournament_teams
+        WHERE tournament_id = ? AND captain_id = ? AND status = 'active'
+      ''',
       [tournamentId, current['requester_id']],
     );
     if (requesterTeams.isNotEmpty) {
@@ -899,6 +1098,7 @@ Row _findJoinRequest(
     '''
       $_joinRequestSelect
       WHERE jr.id = ? AND jr.tournament_id = ? AND tt.captain_id = ?
+        AND tt.status = 'active'
     ''',
     [requestId, tournamentId, captainId],
   );
@@ -943,7 +1143,7 @@ Response _tournamentStandings(Request request) {
   final teams = database.db.select(
     '''
       SELECT id, name, group_label FROM tournament_teams
-      WHERE tournament_id = ?
+      WHERE tournament_id = ? AND status = 'active'
     ''',
     [tournamentId],
   );
@@ -1249,7 +1449,7 @@ Map<String, Object?> _tournamentDetailJson(
       SELECT tt.id, tt.name, 1 + (SELECT COUNT(*) FROM join_requests jr
           WHERE jr.team_id = tt.id AND jr.status = 'accepted') AS players
       FROM tournament_teams tt
-      WHERE tt.tournament_id = ?
+      WHERE tt.tournament_id = ? AND tt.status = 'active'
       ORDER BY tt.joined_at, tt.id
     ''',
     [tournamentId],
@@ -1257,14 +1457,25 @@ Map<String, Object?> _tournamentDetailJson(
   final myRequests = database.db.select(
     '''
       SELECT team_id, status FROM join_requests
-      WHERE tournament_id = ? AND requester_id = ? AND status != 'cancelled'
+      WHERE tournament_id = ? AND requester_id = ?
+        AND status NOT IN ('cancelled', 'left', 'promoted', 'disbanded')
       ORDER BY id
     ''',
     [tournamentId, userId],
   );
   final isOpen = tournament['status'] == 'upcoming';
+  final unseenDisbands = database.db.select(
+    '''
+      SELECT 1 FROM join_requests
+      WHERE tournament_id = ? AND requester_id = ? AND status = 'disbanded'
+        AND notice_seen_at IS NULL
+    ''',
+    [tournamentId, userId],
+  );
   return {
     ..._tournamentJson(tournament),
+    // A team the user played for was disbanded and they have not been told.
+    'teamDisbanded': unseenDisbands.isNotEmpty,
     'teams': teams
         .map(
           (team) => {
@@ -1288,31 +1499,54 @@ Map<String, Object?> _tournamentDetailJson(
   };
 }
 
-Map<String, Object?> _tournamentJson(Row row) => {
-  'id': row['id'],
-  'name': row['name'],
-  'description': row['description'],
-  'format': row['format'],
-  'status': row['status'],
-  'startDate': row['start_date'],
-  'endDate': row['end_date'],
-  'maxTeams': row['max_teams'],
-  'teamSize': row['team_size'],
-  'currentTeams': row['current_teams'],
-  'location': row['location'],
-  'prize': row['prize'],
-  'createdBy': row['created_by'] ?? '',
-  'joined': row['joined'] == 1,
-  'canLeave': row['can_leave'] == 1,
-  'myTeamId': row['my_team_id'],
-  'pendingRequests': row['pending_requests'],
-};
+/// What the signed-in user may do with their team while registration is
+/// open. Captains leave alone only without players or matches; with players
+/// they transfer captaincy or disband. Players can always leave before
+/// kickoff, which keeps the team's fixtures.
+({bool canLeave, bool canTransfer, bool canDisband}) _teamActions(Row row) {
+  final isOpen = row['status'] == 'upcoming';
+  final isCaptain = row['joined'] == 1;
+  final isPlayer = !isCaptain && row['my_team_id'] != null;
+  final hasPlayers = (row['my_team_players'] as int) > 0;
+  final hasMatches = row['my_team_has_matches'] == 1;
+  return (
+    canLeave: isOpen && (isPlayer || (isCaptain && !hasPlayers && !hasMatches)),
+    canTransfer: isOpen && isCaptain && hasPlayers,
+    canDisband: isOpen && isCaptain && hasPlayers && !hasMatches,
+  );
+}
+
+Map<String, Object?> _tournamentJson(Row row) {
+  final actions = _teamActions(row);
+  return {
+    'id': row['id'],
+    'name': row['name'],
+    'description': row['description'],
+    'format': row['format'],
+    'status': row['status'],
+    'startDate': row['start_date'],
+    'endDate': row['end_date'],
+    'maxTeams': row['max_teams'],
+    'teamSize': row['team_size'],
+    'currentTeams': row['current_teams'],
+    'location': row['location'],
+    'prize': row['prize'],
+    'createdBy': row['created_by'] ?? '',
+    'joined': row['joined'] == 1,
+    'canLeave': actions.canLeave,
+    'canTransfer': actions.canTransfer,
+    'canDisband': actions.canDisband,
+    'myTeamId': row['my_team_id'],
+    'pendingRequests': row['pending_requests'],
+  };
+}
 
 const _profileMatchLimit = 10;
 
 /// Users taking part in each tournament: captains, players and requesters.
 const _tournamentParticipants = '''
   (SELECT tournament_id, captain_id AS user_id FROM tournament_teams
+    WHERE status = 'active'
     UNION
     SELECT tournament_id, requester_id FROM join_requests
     WHERE status IN ('pending', 'accepted'))
@@ -1325,8 +1559,8 @@ Response _myTournamentRequests(Request request) {
       SELECT COUNT(*) AS count FROM join_requests jr
       JOIN tournament_teams tt ON tt.id = jr.team_id
       JOIN tournaments t ON t.id = jr.tournament_id
-      WHERE tt.captain_id = ? AND jr.status = 'pending'
-        AND t.status = 'upcoming'
+      WHERE tt.captain_id = ? AND tt.status = 'active'
+        AND jr.status = 'pending' AND t.status = 'upcoming'
     ''',
     [_userId(request)],
   );
@@ -1354,7 +1588,10 @@ Response _removeTeamMember(Request request) {
   if (memberId == null) throw ApiException(400, 'Invalid player.');
   final tournament = _findTournament(database, tournamentId, userId);
   final teams = database.db.select(
-    'SELECT captain_id FROM tournament_teams WHERE id = ? AND tournament_id = ?',
+    '''
+      SELECT captain_id FROM tournament_teams
+      WHERE id = ? AND tournament_id = ? AND status = 'active'
+    ''',
     [teamId, tournamentId],
   );
   // Other captains' teams are reported as missing.
@@ -1364,7 +1601,7 @@ Response _removeTeamMember(Request request) {
   if (memberId == userId) {
     throw ApiException(
       400,
-      'Captains cannot remove themselves. Leave the tournament instead.',
+      'Captains cannot remove themselves. Transfer captaincy or leave instead.',
     );
   }
   if (tournament['status'] != 'upcoming') throw _rosterLocked();
@@ -1376,7 +1613,8 @@ Response _removeTeamMember(Request request) {
       WHERE team_id = ?1 AND requester_id = ?2 AND status = 'accepted'
         AND EXISTS (SELECT 1 FROM tournament_teams tt
           JOIN tournaments t ON t.id = tt.tournament_id
-          WHERE tt.id = ?1 AND tt.captain_id = ?3 AND t.status = 'upcoming')
+          WHERE tt.id = ?1 AND tt.captain_id = ?3 AND tt.status = 'active'
+            AND t.status = 'upcoming')
     ''',
     [teamId, memberId, userId],
   );
@@ -1412,7 +1650,7 @@ Map<String, Object?> _teamDetailJson(
       SELECT tt.id, tt.name, tt.captain_id, u.username AS captain_name
       FROM tournament_teams tt
       JOIN users u ON u.id = tt.captain_id
-      WHERE tt.id = ? AND tt.tournament_id = ?
+      WHERE tt.id = ? AND tt.tournament_id = ? AND tt.status = 'active'
     ''',
     [teamId, tournament['id']],
   );

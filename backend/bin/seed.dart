@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:backend/database.dart';
+import 'package:backend/database_path.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -98,8 +99,12 @@ const _matches = <(int, int, String, String, int?, int?, String?)>[
 ];
 
 void main() {
-  final path =
-      Platform.environment['DB_PATH'] ?? 'data/football_matches.sqlite';
+  final path = databasePath();
+  if (path == null) {
+    stderr.writeln(databasePathMissing);
+    exitCode = 1;
+    return;
+  }
   final database = AppDatabase(path);
   final db = database.db;
   // The running API holds its own connection; wait for its writes to finish.

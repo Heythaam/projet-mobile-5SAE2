@@ -92,17 +92,7 @@ class AppDatabase {
         CHECK (end_date >= start_date)
       )
     ''');
-    db.execute('''
-      CREATE TABLE IF NOT EXISTS tournament_teams (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tournament_id INTEGER NOT NULL
-          REFERENCES tournaments(id) ON DELETE CASCADE,
-        captain_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (tournament_id, captain_id)
-      )
-    ''');
+    db.execute(_tournamentTeamsTable('tournament_teams'));
     // Knockout rows may leave a team open (TBD) or give a bye; group rows
     // always name both teams.
     db.execute(_tournamentMatchesTable('tournament_matches'));
@@ -131,10 +121,27 @@ class AppDatabase {
       // Group of a groups + knockout tournament ("A", "B", ...).
       db.execute('ALTER TABLE tournament_teams ADD COLUMN group_label TEXT');
     }
-    // Team names are chosen by captains; keep them distinct per tournament.
+    // Teams that leave keep their row with a status and `left_at`, so the
+    // older inline UNIQUE (tournament_id, captain_id) gives way to partial
+    // indexes over active teams.
+    _rebuildIfMissing(
+      table: 'tournament_teams',
+      marker: "'disbanded'",
+      createSql: _tournamentTeamsTable('tournament_teams_new'),
+      copiedColumns:
+          'id, tournament_id, captain_id, name, joined_at, group_label',
+    );
+    db.execute('DROP INDEX IF EXISTS tournament_teams_name_idx');
+    // Active teams have distinct names and one captain team per user.
     db.execute('''
-      CREATE UNIQUE INDEX IF NOT EXISTS tournament_teams_name_idx
+      CREATE UNIQUE INDEX IF NOT EXISTS tournament_teams_active_name_idx
       ON tournament_teams(tournament_id, name COLLATE NOCASE)
+      WHERE status = 'active'
+    ''');
+    db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS tournament_teams_active_captain_idx
+      ON tournament_teams(tournament_id, captain_id)
+      WHERE status = 'active'
     ''');
     // Players per team, captain included.
     final tournamentColumns = db
@@ -148,11 +155,13 @@ class AppDatabase {
       );
     }
     // An accepted request makes the requester a player of that team; a
-    // captain removing them marks it `removed`.
+    // captain removing them marks it `removed`, a player leaving `left`, a
+    // player made captain `promoted`, and disbanding the team `disbanded`
+    // (with `notice_seen_at` once the player has seen that news).
     db.execute(_joinRequestsTable('join_requests'));
     _rebuildIfMissing(
       table: 'join_requests',
-      marker: "'removed'",
+      marker: "'disbanded'",
       createSql: _joinRequestsTable('join_requests_new'),
       copiedColumns:
           'id, tournament_id, team_id, requester_id, status, created_at, '
@@ -174,9 +183,11 @@ class AppDatabase {
 
   void close() => db.close();
 
-  /// SQLite cannot change NOT NULL or CHECK constraints, so a table whose
-  /// schema lacks [marker] is copied into one created by [createSql]. Nothing
-  /// references the rebuilt tables; their indexes are recreated afterwards.
+  /// SQLite cannot change NOT NULL, CHECK or inline UNIQUE constraints, so a
+  /// table whose schema lacks [marker] is copied into one created by
+  /// [createSql]. Foreign keys are off meanwhile, so dropping a referenced
+  /// table does not cascade into its children; they are checked before the
+  /// commit. Indexes are recreated afterwards.
   void _rebuildIfMissing({
     required String table,
     required String marker,
@@ -189,6 +200,7 @@ class AppDatabase {
             ]).first['sql']
             as String;
     if (sql.contains(marker)) return;
+    db.execute('PRAGMA foreign_keys = OFF');
     db.execute('BEGIN IMMEDIATE');
     try {
       db.execute(createSql);
@@ -198,12 +210,37 @@ class AppDatabase {
       ''');
       db.execute('DROP TABLE $table');
       db.execute('ALTER TABLE ${table}_new RENAME TO $table');
+      if (db.select('PRAGMA foreign_key_check').isNotEmpty) {
+        throw StateError('Rebuilding $table broke a foreign key.');
+      }
       db.execute('COMMIT');
     } catch (_) {
       db.execute('ROLLBACK');
       rethrow;
+    } finally {
+      db.execute('PRAGMA foreign_keys = ON');
     }
   }
+
+  /// A team that leaves is kept with status `left` (or `disbanded` when it
+  /// had players) and the time it left.
+  static String _tournamentTeamsTable(String name) =>
+      '''
+    CREATE TABLE IF NOT EXISTS $name (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id INTEGER NOT NULL
+        REFERENCES tournaments(id) ON DELETE CASCADE,
+      captain_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      group_label TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (
+        status IN ('active', 'left', 'disbanded')
+      ),
+      left_at TEXT,
+      CHECK ((status = 'active') = (left_at IS NULL))
+    )
+  ''';
 
   static String _tournamentMatchesTable(String name) =>
       '''
@@ -248,10 +285,12 @@ class AppDatabase {
         REFERENCES tournament_teams(id) ON DELETE CASCADE,
       requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status TEXT NOT NULL DEFAULT 'pending' CHECK (
-        status IN ('pending', 'accepted', 'declined', 'cancelled', 'removed')
+        status IN ('pending', 'accepted', 'declined', 'cancelled', 'removed',
+          'left', 'promoted', 'disbanded')
       ),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      responded_at TEXT
+      responded_at TEXT,
+      notice_seen_at TEXT
     )
   ''';
 }

@@ -17,7 +17,10 @@ dart run bin/server.dart
 ```
 
 `JWT_SECRET` is required and must be at least 32 characters. Set `PORT` or
-`DB_PATH` before starting to change the listening port or database path.
+`DB_PATH` before starting to change the listening port or database path. The
+default database is `backend/data/football_matches.sqlite`, found from the
+script's own location, so the server and `bin/seed.dart` use the same file from
+any working directory; a compiled executable needs `DB_PATH`.
 
 ## Routes
 

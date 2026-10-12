@@ -10,10 +10,13 @@ import '../models/tournament.dart';
 import '../tournament_constants.dart';
 
 class TournamentException implements Exception {
-  const TournamentException(this.message, {this.statusCode});
+  const TournamentException(this.message, {this.statusCode, this.code});
 
   final String message;
   final int? statusCode;
+
+  /// API reason code, see [TournamentErrorCodes].
+  final String? code;
 
   bool get requiresSignIn => statusCode == 401;
 
@@ -51,7 +54,6 @@ class TournamentService {
         );
       });
 
-  /// Registers the signed-in user and returns the updated tournament.
   /// Registers the signed-in user as captain of a team named [teamName].
   Future<Tournament> joinTournament(int id, String teamName) =>
       _guard(TournamentStrings.ERROR_JOIN, () async {
@@ -65,7 +67,8 @@ class TournamentService {
         );
       });
 
-  /// Withdraws the signed-in user's team; allowed before the tournament starts.
+  /// Withdraws the signed-in user's team, or takes a player off their team;
+  /// allowed before the tournament starts.
   Future<Tournament> leaveTournament(int id) =>
       _guard(TournamentStrings.ERROR_LEAVE, () async {
         final response = await _api.sendAuthenticated(
@@ -74,6 +77,41 @@ class TournamentService {
         );
         return Tournament.fromJson(
           response['tournament'] as Map<String, dynamic>,
+        );
+      });
+
+  /// Withdraws the signed-in captain's team and frees its players.
+  Future<Tournament> disbandTeam(int id) =>
+      _guard(TournamentStrings.ERROR_DISBAND, () async {
+        final response = await _api.sendAuthenticated(
+          'DELETE',
+          TournamentEndpoints.disband(id),
+        );
+        return Tournament.fromJson(
+          response['tournament'] as Map<String, dynamic>,
+        );
+      });
+
+  /// Makes [newCaptainId], a player of the signed-in captain's team, its
+  /// captain. The former captain stays on the team as a player.
+  Future<Tournament> transferCaptaincy(int id, int newCaptainId) =>
+      _guard(TournamentStrings.ERROR_TRANSFER, () async {
+        final response = await _api.sendAuthenticated(
+          'POST',
+          TournamentEndpoints.transferCaptaincy(id),
+          body: {'newCaptainId': newCaptainId},
+        );
+        return Tournament.fromJson(
+          response['tournament'] as Map<String, dynamic>,
+        );
+      });
+
+  /// Stops reporting that the user's team was disbanded, on every device.
+  Future<void> dismissDisbandNotice(int id) =>
+      _guard(TournamentStrings.ERROR_DISMISS_NOTICE, () async {
+        await _api.sendAuthenticated(
+          'DELETE',
+          TournamentEndpoints.disbandNotice(id),
         );
       });
 
@@ -205,7 +243,11 @@ class TournamentService {
       return await request().timeout(TournamentEndpoints.REQUEST_TIMEOUT);
     } on ApiException catch (error) {
       // API errors carry messages written for players by the backend.
-      throw TournamentException(error.message, statusCode: error.statusCode);
+      throw TournamentException(
+        error.message,
+        statusCode: error.statusCode,
+        code: error.code,
+      );
     } on TimeoutException {
       throw const TournamentException(TournamentStrings.ERROR_TIMEOUT);
     } on FormatException catch (error) {

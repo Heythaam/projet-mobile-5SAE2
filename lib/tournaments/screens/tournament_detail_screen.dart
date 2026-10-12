@@ -8,7 +8,9 @@ import '../widgets/join_requests_sheet.dart';
 import '../widgets/join_team_sheet.dart';
 import '../widgets/confirm_action_sheet.dart';
 import '../widgets/team_details_sheet.dart';
+import '../widgets/team_disbanded_banner.dart';
 import '../widgets/team_tile.dart';
+import '../widgets/transfer_captaincy_sheet.dart';
 import '../widgets/tournament_card.dart';
 import '../widgets/tournament_states.dart';
 import 'tournament_bracket_view.dart';
@@ -39,6 +41,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   /// Team whose join request is being sent.
   int? _requestingTeamId;
+
+  /// Hides the "team disbanded" notice while its dismissal is being saved.
+  bool _disbandNoticeHidden = false;
 
   @override
   void initState() {
@@ -169,32 +174,135 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   Future<void> _confirmAndLeave(Tournament tournament) async {
     var leaveFailed = false;
-    final left = await showLeaveTournamentSheet(
-      context,
-      tournamentName: tournament.name,
-      onLeave: () async {
-        try {
-          final updated = await widget.service.leaveTournament(tournament.id);
-          if (mounted) setState(() => _tournament = updated);
-          return null;
-        } on TournamentException catch (error) {
-          leaveFailed = true;
-          return error.requiresSignIn
-              ? TournamentStrings.SIGN_IN_TO_LEAVE
-              : error.message;
-        }
-      },
-    );
+    Future<String?> leave() async {
+      try {
+        final updated = await widget.service.leaveTournament(tournament.id);
+        if (mounted) setState(() => _tournament = updated);
+        return null;
+      } on TournamentException catch (error) {
+        leaveFailed = true;
+        return error.requiresSignIn
+            ? TournamentStrings.SIGN_IN_TO_LEAVE
+            : error.message;
+      }
+    }
+
+    // Players leave their team; captains withdraw it from the tournament.
+    final teamName = tournament.myTeam?.name;
+    final left = tournament.isTeamPlayer && teamName != null
+        ? await showLeaveTeamSheet(context, teamName: teamName, onLeave: leave)
+        : await showLeaveTournamentSheet(
+            context,
+            tournamentName: tournament.name,
+            onLeave: leave,
+          );
     if (!mounted) return;
     if (left) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(TournamentStrings.LEAVE_SUCCESS)),
+      _showMessage(
+        tournament.isTeamPlayer
+            ? TournamentStrings.LEAVE_TEAM_SUCCESS
+            : TournamentStrings.LEAVE_SUCCESS,
       );
     } else if (leaveFailed) {
       // The tournament may have started while the sheet was open.
       await _loadTournament(showLoading: false);
     }
   }
+
+  Future<void> _transferCaptaincy(Tournament tournament) async {
+    final teamId = tournament.myTeamId;
+    if (teamId == null) return;
+    var transferFailed = false;
+    await showTransferCaptaincySheet(
+      context,
+      service: widget.service,
+      tournamentId: tournament.id,
+      teamId: teamId,
+      onTransfer: (player) async {
+        try {
+          final updated = await widget.service.transferCaptaincy(
+            tournament.id,
+            player.id,
+          );
+          if (!mounted) return null;
+          setState(() => _tournament = updated);
+          // Shown here rather than after the sheet closes, so it appears
+          // however the sheet goes away.
+          _showMessage(TournamentStrings.transferSuccess(player.username));
+          return null;
+        } on TournamentException catch (error) {
+          transferFailed = true;
+          return _transferErrorMessage(error);
+        }
+      },
+    );
+    if (!mounted) return;
+    if (transferFailed) {
+      // The roster, the team or the tournament changed meanwhile.
+      await _loadTournament(showLoading: false);
+    }
+  }
+
+  /// App copy for the reasons the API gives; its own message otherwise.
+  static String _transferErrorMessage(TournamentException error) {
+    if (error.requiresSignIn) return TournamentStrings.SIGN_IN_AGAIN;
+    return switch (error.code) {
+      TournamentErrorCodes.TEAM_WITHDRAWN =>
+        TournamentStrings.TRANSFER_TEAM_WITHDRAWN,
+      TournamentErrorCodes.NOT_CAPTAIN =>
+        TournamentStrings.TRANSFER_NOT_CAPTAIN,
+      TournamentErrorCodes.TRANSFER_CLOSED => TournamentStrings.TRANSFER_CLOSED,
+      TournamentErrorCodes.PLAYER_NOT_ON_TEAM =>
+        TournamentStrings.TRANSFER_PLAYER_GONE,
+      _ => error.message,
+    };
+  }
+
+  /// Hides the notice at once; the API remembers it so it is not shown
+  /// again. If that fails the notice comes back with the reason.
+  Future<void> _dismissDisbandNotice(Tournament tournament) async {
+    setState(() => _disbandNoticeHidden = true);
+    try {
+      await widget.service.dismissDisbandNotice(tournament.id);
+    } on TournamentException catch (error) {
+      if (!mounted) return;
+      setState(() => _disbandNoticeHidden = false);
+      _showMessage(error.message);
+    }
+  }
+
+  Future<void> _confirmAndDisband(Tournament tournament) async {
+    var disbandFailed = false;
+    final team = tournament.myTeam;
+    final disbanded = await showDisbandTeamSheet(
+      context,
+      teamName: team?.name ?? TournamentStrings.YOUR_TEAM,
+      // The count includes the captain.
+      players: (team?.players ?? 1) - 1,
+      onDisband: () async {
+        try {
+          final updated = await widget.service.disbandTeam(tournament.id);
+          if (mounted) setState(() => _tournament = updated);
+          return null;
+        } on TournamentException catch (error) {
+          disbandFailed = true;
+          return error.requiresSignIn
+              ? TournamentStrings.SIGN_IN_AGAIN
+              : error.message;
+        }
+      },
+    );
+    if (!mounted) return;
+    if (disbanded) {
+      _showMessage(TournamentStrings.DISBAND_SUCCESS);
+    } else if (disbandFailed) {
+      await _loadTournament(showLoading: false);
+    }
+  }
+
+  void _showMessage(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -263,6 +371,18 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       length: tabs.length,
       child: Column(
         children: [
+          if (tournament.teamDisbanded && !_disbandNoticeHidden)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12 * scale,
+                0,
+                12 * scale,
+                8 * scale,
+              ),
+              child: TeamDisbandedBanner(
+                onDismiss: () => _dismissDisbandNotice(tournament),
+              ),
+            ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 12 * scale),
             child: _Hero(tournament: tournament),
@@ -309,11 +429,18 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   ),
                   SizedBox(height: 8 * scale),
                 ],
-                _RegistrationButton(
-                  tournament: tournament,
-                  onJoin: () => _joinWithTeamName(tournament),
-                  onLeave: () => _confirmAndLeave(tournament),
-                ),
+                if (tournament.canTransfer || tournament.canDisband)
+                  _CaptainActions(
+                    tournament: tournament,
+                    onTransfer: () => _transferCaptaincy(tournament),
+                    onDisband: () => _confirmAndDisband(tournament),
+                  )
+                else
+                  _RegistrationButton(
+                    tournament: tournament,
+                    onJoin: () => _joinWithTeamName(tournament),
+                    onLeave: () => _confirmAndLeave(tournament),
+                  ),
               ],
             ),
           ),
@@ -673,7 +800,9 @@ class _RegistrationButton extends StatelessWidget {
     if (tournament.canLeave) {
       return ChunkyButton(
         key: const ValueKey('tournament_leave'),
-        label: TournamentStrings.LEAVE,
+        label: tournament.isTeamPlayer
+            ? TournamentStrings.LEAVE_TEAM
+            : TournamentStrings.LEAVE,
         icon: Icons.logout_rounded,
         onPressed: onLeave,
         backgroundColor: KickoffColors.panel,
@@ -719,6 +848,57 @@ class _RegistrationButton extends StatelessWidget {
       label: TournamentStrings.JOIN,
       icon: Icons.add_rounded,
       onPressed: onJoin,
+    );
+  }
+}
+
+/// A captain whose team has players hands it over or disbands it instead of
+/// leaving alone. Disband is the quieter, destructive option.
+class _CaptainActions extends StatelessWidget {
+  const _CaptainActions({
+    required this.tournament,
+    required this.onTransfer,
+    required this.onDisband,
+  });
+
+  final Tournament tournament;
+  final VoidCallback onTransfer;
+  final VoidCallback onDisband;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = kickoffScale(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (tournament.canTransfer)
+          ChunkyButton(
+            key: const ValueKey('tournament_transfer'),
+            label: TournamentStrings.TRANSFER_CAPTAINCY,
+            icon: Icons.swap_horiz_rounded,
+            onPressed: onTransfer,
+            backgroundColor: KickoffColors.panel,
+            bottomColor: KickoffColors.panelDark,
+            foregroundColor: Colors.white,
+          ),
+        if (tournament.canDisband)
+          TextButton.icon(
+            key: const ValueKey('tournament_disband'),
+            style: TextButton.styleFrom(
+              foregroundColor: TournamentColors.ERROR_TEXT,
+              minimumSize: Size.fromHeight(TournamentSizes.MIN_TAP * scale),
+            ),
+            onPressed: onDisband,
+            icon: Icon(Icons.group_off_rounded, size: 20 * scale),
+            label: Text(
+              TournamentStrings.DISBAND_TEAM,
+              style: TextStyle(
+                fontSize: TournamentSizes.BODY * scale,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../app_route_observer.dart';
 import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
@@ -33,7 +34,7 @@ class KickoffShell extends StatefulWidget {
   State<KickoffShell> createState() => _KickoffShellState();
 }
 
-class _KickoffShellState extends State<KickoffShell> {
+class _KickoffShellState extends State<KickoffShell> with RouteAware {
   int _tab = 0;
   bool _menuOpen = false;
   bool _loadingProfile = true;
@@ -46,14 +47,46 @@ class _KickoffShellState extends State<KickoffShell> {
 
   /// Join requests waiting for this captain; the home banner hides at zero.
   int _pendingJoinRequests = 0;
+  int _latestPendingLoad = 0;
   late final _tournamentService = TournamentService(widget.api);
+  ModalRoute<void>? _route;
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _refreshIfHomeVisible);
     _refreshProfile();
     _loadPendingJoinRequests();
     _loadMatches();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      if (_route != null) appRouteObserver.unsubscribe(this);
+      _route = route;
+      if (route != null) appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  /// Back from any screen pushed above the shell (tournaments, friends,
+  /// awards...): requests may have arrived or been answered meanwhile.
+  @override
+  void didPopNext() => _refreshIfHomeVisible();
+
+  /// The banner lives on the Home tab, so only that tab refreshes it.
+  void _refreshIfHomeVisible() {
+    if (_tab == 0 && (_route?.isCurrent ?? true)) _loadPendingJoinRequests();
   }
 
   Future<void> _refreshProfile() async {
@@ -80,11 +113,18 @@ class _KickoffShellState extends State<KickoffShell> {
   /// The banner is a shortcut, so a failure only hides it; the service logs
   /// the cause and the tournaments screens show their own errors.
   Future<void> _loadPendingJoinRequests() async {
+    // Only the latest load may update the banner, so a slow earlier answer
+    // cannot overwrite a newer count.
+    final load = ++_latestPendingLoad;
     try {
       final count = await _tournamentService.getPendingRequestCount();
-      if (mounted) setState(() => _pendingJoinRequests = count);
+      if (mounted && load == _latestPendingLoad) {
+        setState(() => _pendingJoinRequests = count);
+      }
     } on TournamentException {
-      if (mounted) setState(() => _pendingJoinRequests = 0);
+      if (mounted && load == _latestPendingLoad) {
+        setState(() => _pendingJoinRequests = 0);
+      }
     }
   }
 
@@ -122,15 +162,14 @@ class _KickoffShellState extends State<KickoffShell> {
     );
   }
 
-  Future<void> _openTournaments() async {
+  /// The banner refreshes in [didPopNext] once the tournaments close.
+  void _openTournaments() {
     setState(() => _menuOpen = false);
-    await Navigator.of(context).push<void>(
+    Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => TournamentsListScreen(service: _tournamentService),
       ),
     );
-    // Requests may have been answered in the tournaments screens.
-    if (mounted) await _loadPendingJoinRequests();
   }
 
   void _openFriends() {
@@ -217,6 +256,8 @@ class _KickoffShellState extends State<KickoffShell> {
       _tab = _tab == 1 ? 0 : 1;
       _showHistoryOnCalendar = false;
     });
+    // Back on Home: the banner may be out of date.
+    if (_tab == 0) _loadPendingJoinRequests();
   }
 
   Widget _screen() => switch (_tab) {

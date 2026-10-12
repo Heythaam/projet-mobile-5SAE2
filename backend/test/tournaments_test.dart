@@ -270,11 +270,18 @@ void main() {
     }
     expect((await leave(alice, 999)).statusCode, 404);
     expect((await leave(alice, 0)).statusCode, 404);
-    final count = database.db.select(
-      'SELECT COUNT(*) AS teams FROM tournament_teams WHERE tournament_id = ?',
+    // The team that left is kept as history, with when it left.
+    final rows = database.db.select(
+      '''
+        SELECT name, status, left_at FROM tournament_teams
+        WHERE tournament_id = ? ORDER BY id
+      ''',
       [id],
     );
-    expect(count.first['teams'], 2);
+    expect(rows.map((row) => row['status']), ['left', 'active', 'active']);
+    expect(rows.first['name'], 'Red Lions');
+    expect(rows.first['left_at'], isNotNull);
+    expect(rows.skip(1).map((row) => row['left_at']), [null, null]);
   });
 
   test('standings are computed from played matches only', () async {

@@ -13,6 +13,13 @@ abstract final class TournamentEndpoints {
 
   /// POST joins and DELETE leaves.
   static String join(int id) => '$LIST/$id/join';
+
+  /// DELETE withdraws a captain's team together with its players.
+  static String disband(int id) => '${join(id)}?disband=true';
+  static String transferCaptaincy(int id) => '$LIST/$id/transfer-captaincy';
+
+  /// DELETE marks the "team disbanded" notice as seen.
+  static String disbandNotice(int id) => '$LIST/$id/disband-notice';
   static String standings(int id) => '$LIST/$id/standings';
   static String bracket(int id) => '$LIST/$id/bracket';
   static String teamRequest(int id, int teamId) =>
@@ -25,6 +32,14 @@ abstract final class TournamentEndpoints {
       '$LIST/$id/teams/$teamId/members/$memberId';
   static String profile(int userId) => '/users/$userId/profile';
   static const PENDING_REQUESTS = '/me/tournament-requests';
+}
+
+/// Reason codes the API sends with some errors (`{"error", "code"}`).
+abstract final class TournamentErrorCodes {
+  static const TEAM_WITHDRAWN = 'team_withdrawn';
+  static const NOT_CAPTAIN = 'not_captain';
+  static const TRANSFER_CLOSED = 'transfer_closed';
+  static const PLAYER_NOT_ON_TEAM = 'player_not_on_team';
 }
 
 /// Status colours from agents/ux-designer.md, used on the Kickoff palette
@@ -141,6 +156,29 @@ abstract final class TournamentStrings {
   static const STAY = 'Stay';
   static const LEAVE_SUCCESS = 'You left the tournament.';
   static const SIGN_IN_TO_LEAVE = 'Sign in again to leave this tournament.';
+  static const LEAVE_TEAM = 'Leave team';
+  static const LEAVE_TEAM_TITLE = 'Leave your team?';
+  static const LEAVE_TEAM_SUCCESS = 'You left your team.';
+  static const TRANSFER_CAPTAINCY = 'Transfer captaincy';
+  static const TRANSFER_HINT =
+      'Pick the player who will lead the team. You stay on it as a player.';
+  static const TRANSFER_EMPTY = 'No players to choose from';
+  static const TRANSFER_EMPTY_HINT =
+      'Only players already on your team can become captain.';
+  static const DISBAND_TEAM = 'Disband team';
+  static const DISBAND_TITLE = 'Disband your team?';
+  static const CONFIRM_DISBAND = 'Disband';
+  static const DISBAND_SUCCESS = 'Your team was disbanded.';
+  static const TEAM_DISBANDED_NOTICE = 'Your team was disbanded by the captain';
+  static const TEAM_DISBANDED_HINT =
+      'You can join another team or create your own. Tap to dismiss.';
+  static const TRANSFER_TEAM_WITHDRAWN =
+      'Your team is no longer in this tournament.';
+  static const TRANSFER_NOT_CAPTAIN = 'You are no longer the captain.';
+  static const TRANSFER_CLOSED =
+      'The tournament has started, so captaincy can no longer change.';
+  static const TRANSFER_PLAYER_GONE =
+      'That player is no longer on your team. Pick someone else.';
   static const SIGN_IN_AGAIN = 'Sign in again to continue.';
 
   static const REQUEST_TO_JOIN = 'Request to join';
@@ -224,6 +262,9 @@ abstract final class TournamentStrings {
   static const ERROR_ANSWER = 'Could not answer this request.';
   static const ERROR_LOAD_TEAM = 'Could not load this team.';
   static const ERROR_REMOVE = 'Could not remove this player.';
+  static const ERROR_TRANSFER = 'Could not transfer captaincy.';
+  static const ERROR_DISBAND = 'Could not disband your team.';
+  static const ERROR_DISMISS_NOTICE = 'Could not dismiss this notice.';
   static const ERROR_LOAD_PROFILE = 'Could not load this profile.';
   static const ERROR_PENDING_COUNT = 'Could not load join requests.';
   static const ERROR_TIMEOUT = 'The server took too long to respond.';
@@ -335,6 +376,18 @@ abstract final class TournamentStrings {
 
   static String confirmJoinMessage(String name) =>
       'You will captain this team in $name. Other teams will see its name.';
+
+  static String confirmLeaveTeamMessage(String team) =>
+      'You will leave $team. You can ask a team to take you while '
+      'registration is open.';
+
+  static String confirmDisbandMessage(String team, int players) =>
+      'All ${players == 1 ? '1 player' : '$players players'} will be '
+      'removed and $team withdrawn from the tournament. This cannot be undone.';
+
+  static String makeCaptain(String player) => 'Make $player captain';
+
+  static String transferSuccess(String player) => '$player is now the captain.';
 
   static String confirmLeaveMessage(String name) =>
       'Your team will be removed from $name and its spot freed. '

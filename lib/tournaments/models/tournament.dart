@@ -69,6 +69,15 @@ enum JoinRequestStatus {
   /// The captain removed the player from the team.
   removed('removed'),
 
+  /// The player left the team.
+  left('left'),
+
+  /// The player became the team's captain.
+  promoted('promoted'),
+
+  /// The captain disbanded the player's team.
+  disbanded('disbanded'),
+
   /// Reported for a pending request once registration has closed.
   expired('expired');
 
@@ -159,6 +168,9 @@ class Tournament {
     required this.createdBy,
     required this.joined,
     required this.canLeave,
+    this.canTransfer = false,
+    this.canDisband = false,
+    this.teamDisbanded = false,
     this.teamSize = 1,
     this.myTeamId,
     this.pendingRequests = 0,
@@ -182,9 +194,19 @@ class Tournament {
   /// Whether the signed-in user is already registered, as reported by the API.
   final bool joined;
 
-  /// Whether the API allows withdrawing: registration is open and the team
-  /// has no matches yet.
+  /// Whether the API allows withdrawing: registration is open and, for a
+  /// captain, the team has no players or matches yet.
   final bool canLeave;
+
+  /// Whether the captain may hand the team to one of its players.
+  final bool canTransfer;
+
+  /// Whether the captain may withdraw the team together with its players.
+  final bool canDisband;
+
+  /// A team the user played for was disbanded and they have not dismissed
+  /// the notice yet; detail endpoint only.
+  final bool teamDisbanded;
 
   /// Players per team, captain included.
   final int teamSize;
@@ -205,6 +227,13 @@ class Tournament {
   bool get isFull => currentTeams >= maxTeams;
   bool get isOpen => status == TournamentStatus.upcoming;
   bool get hasTeam => myTeamId != null;
+
+  /// A player on someone else's team (captains are [joined]).
+  bool get isTeamPlayer => hasTeam && !joined;
+
+  /// The user's team, when the detail endpoint listed it.
+  TournamentTeam? get myTeam =>
+      teams.where((team) => team.id == myTeamId).firstOrNull;
   bool get canJoin => isOpen && !isFull && !hasTeam;
   int get spotsLeft => (maxTeams - currentTeams).clamp(0, maxTeams);
 
@@ -252,6 +281,9 @@ class Tournament {
     createdBy: json['createdBy'] as String? ?? '',
     joined: json['joined'] as bool? ?? false,
     canLeave: json['canLeave'] as bool? ?? false,
+    canTransfer: json['canTransfer'] as bool? ?? false,
+    canDisband: json['canDisband'] as bool? ?? false,
+    teamDisbanded: json['teamDisbanded'] as bool? ?? false,
     teamSize: json['teamSize'] as int? ?? 1,
     myTeamId: json['myTeamId'] as int?,
     pendingRequests: json['pendingRequests'] as int? ?? 0,

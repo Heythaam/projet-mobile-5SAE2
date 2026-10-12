@@ -23,7 +23,9 @@ tournaments, matches or results.
 8. [Seed data](#seed-data)
 9. [Code layout](#code-layout)
 10. [Testing](#testing)
-11. [Known limitations](#known-limitations)
+11. [Troubleshooting](#troubleshooting)
+12. [Known limitations](#known-limitations)
+13. [Change history](#change-history)
 
 ## What players can do
 
@@ -31,8 +33,8 @@ tournaments, matches or results.
 |---|---|
 | Any signed-in player | Browse, search and filter tournaments; view details, teams, standings and brackets; open any team's roster |
 | Player without a team | Register a new team with a chosen name, or send a request to join an existing team |
-| Captain | Answer join requests, view requesters' profiles, remove players, leave the tournament |
-| Team member | See their team highlighted in the Teams tab and standings |
+| Captain | Answer join requests, view requesters' profiles, remove players, transfer captaincy, disband the team, leave the tournament |
+| Team member | See their team highlighted in the Teams tab and standings, leave the team |
 
 Tournaments open from the ball menu's **Tournament** option. Captains also
 see waiting join requests on the home screen and on list cards.
@@ -54,12 +56,38 @@ see waiting join requests on the home screen and on list cards.
   warns about this first.
 - Joining awards no XP.
 
-### Leaving
+### Leaving, transferring and disbanding
 
-A captain can withdraw while the tournament is `upcoming`, the team has no
-matches (byes included) and no accepted players. The team row is deleted,
-freeing the spot and the name. The tournament JSON reports this as
-`canLeave`; the app only offers **Leave tournament** when it is true.
+Everything here needs the tournament to be `upcoming`. Teams are never
+deleted: a team that leaves keeps its row with `status` `left` (or
+`disbanded`) and `left_at`, which frees its spot and name. Teams that left are
+hidden from every list, count, table and roster.
+
+- **Captain without players**: withdraws (`DELETE /join`) if the team has no
+  matches (byes included). The team becomes `left`; pending requests to it
+  become `cancelled`. Reported as `canLeave`; the app shows
+  **Leave tournament**.
+- **Captain with players**: cannot leave alone. The app shows
+  **Transfer captaincy** and **Disband team** instead of Leave.
+  - Transfer (`POST /transfer-captaincy`, `canTransfer`) hands the team to an
+    accepted player and is allowed even with fixtures. The new captain's
+    membership becomes `promoted` and the former captain gets an `accepted`
+    membership, so they stay on the team as a player. Pending requests follow
+    the team to the new captain.
+  - Disband (`DELETE /join?disband=true`, `canDisband`) needs no matches. The
+    team becomes `disbanded`; its players' memberships become `disbanded`
+    and pending requests to it `cancelled`, so they can join or create
+    another team. Without `disband=true`, a team with players is refused
+    with 409.
+  - Former players learn about it the next time they open the tournament:
+    the detail JSON reports `teamDisbanded: true` until they tap the
+    "Your team was disbanded by the captain" banner, which calls
+    `DELETE /disband-notice` (stored in `join_requests.notice_seen_at`, so it
+    is not shown again on any device). If that call fails the banner comes
+    back with the error.
+- **Player**: leaves their team (`DELETE /join`, `canLeave`, **Leave team**).
+  The membership becomes `left`; the team and its fixtures stay, and the
+  player may ask that team again.
 
 ### Join requests
 
@@ -114,15 +142,33 @@ retry) and empty states, and is tested on a 360 dp phone at 1.3× text.
 - **List** (`TournamentsListScreen`): search, filter chips (All, Active,
   Upcoming, Finished), skeleton cards, pull to refresh. Cards show dates,
   format, team count, status badge, a pending-requests badge for captains, and
-  **Join now** / **View details**.
+  **Join now** / **View details**. The list reloads in place (no skeleton)
+  whenever a screen above it closes (`RouteAware.didPopNext` through
+  `appRouteObserver` in `lib/app_route_observer.dart`, registered in
+  `MaterialApp.navigatorObservers`) and when the app returns to the
+  foreground with the list on top.
 - **Detail** (`TournamentDetailScreen`): hero with status and progress, tabs by
   format, and a bottom area with **Join requests** (captains, with count) and
-  the registration button (Join / Leave / Joined / Team member / Full /
-  Registration closed). Four tabs scroll sideways rather than squeezing labels.
+  the registration button (Join / Leave tournament / Leave team / Joined /
+  Team member / Full / Registration closed). Captains with players get
+  **Transfer captaincy** and a quieter red **Disband team** instead. Four tabs
+  scroll sideways rather than squeezing labels.
 - **Join sheet**: team name field with live validation and counter; warns when
   a pending request will be cancelled; server errors stay in the sheet.
-- **Leave / remove confirmation**: shared `ConfirmActionSheet` with a red
-  confirm button and inline errors.
+- **Leave / disband / remove confirmation**: shared `ConfirmActionSheet` with
+  a red confirm button and inline errors. Disband names the team and how many
+  players it removes.
+- **Transfer sheet**: the team's players (not the captain) as a single-choice
+  list; **Make {player} captain** stays disabled until one is picked, and
+  server errors stay in the sheet, worded from the API's error `code`
+  (team withdrawn, no longer captain, tournament started, player gone). The
+  sheet cannot be swiped away while the request runs (a modal sheet's drag
+  bypasses `PopScope`, so the sheet claims vertical drags meanwhile); the
+  success snackbar comes from the detail screen.
+- **Disbanded notice**: a former player of a disbanded team sees "Your team
+  was disbanded by the captain" above the hero on the detail screen
+  (`TeamDisbandedBanner`). Tapping anywhere on it hides it and records it as
+  seen on the server.
 - **Teams tab**: each team shows players `n/size`, the player's relation to it
   (Your team, Request pending ⏳, Declined, Removed, Request expired, Team full),
   **Request to join** when allowed, and **View team**.
@@ -137,12 +183,16 @@ retry) and empty states, and is tested on a 360 dp phone at 1.3× text.
   and a status line (date, Full time, Won on penalties, Advances, Cancelled,
   Not scheduled). Scrolls in both directions.
 - **Home**: banner "N join requests waiting" for captains, refreshed on pull to
-  refresh and after leaving the tournaments screens.
+  refresh and whenever Home becomes visible again: a screen above the shell
+  closes (`appRouteObserver`), the Home tab is selected again, or the app
+  resumes with Home on top. Only the latest load updates the banner.
 
 ## API reference
 
 All routes require `Authorization: Bearer <token>`. Errors are
-`{"error": "message"}`; messages are written to be shown to players. JSON is
+`{"error": "message"}`, plus `"code"` where the app reacts to a specific
+reason (transfer: `team_withdrawn`, `not_captain`, `transfer_closed`,
+`player_not_on_team`); messages are written to be shown to players. JSON is
 camelCase.
 
 ### Tournaments
@@ -152,18 +202,22 @@ camelCase.
 | `GET /tournaments[?status=]` | — | `{tournaments: [Tournament]}` (active, upcoming, finished, cancelled; max 100) | 400 invalid status |
 | `GET /tournaments/:id` | — | `{tournament: TournamentDetail}` | 400, 404 |
 | `POST /tournaments/:id/join` | `{"name": "Red Lions"}` | `{tournament}` | 400 name rules, 404, 409 already joined / on a team / closed / full / name taken |
-| `DELETE /tournaments/:id/join` | — | `{tournament}` | 404, 409 not joined / started / has players / has matches |
+| `DELETE /tournaments/:id/join[?disband=true]` | — | `{tournament}` | 404, 409 not joined / started / has players (without `disband`) / has matches |
+| `POST /tournaments/:id/transfer-captaincy` | `{"newCaptainId": 12}` | `{tournament}` | 400 missing id / yourself, 403 `not_captain`, 404 `player_not_on_team`, 409 `team_withdrawn` / `transfer_closed` (a withdrawn team is reported first) |
+| `DELETE /tournaments/:id/disband-notice` | — | 204 | 404 |
 | `GET /tournaments/:id/standings` | — | `{standings: [StandingRow]}` | 404 |
 | `GET /tournaments/:id/bracket` | — | `{bracket: {rounds: [BracketRound]}}` | 404 |
 
 `Tournament` fields: `id, name, description, format, status, startDate,
 endDate, maxTeams, teamSize, currentTeams, location, prize, createdBy,
-joined` (captain here), `canLeave`, `myTeamId` (team played for, as captain or
-member), `pendingRequests` (for captains).
+joined` (captain here), `canLeave`, `canTransfer`, `canDisband` (see
+Leaving), `myTeamId` (team played for, as captain or member),
+`pendingRequests` (for captains).
 
 `TournamentDetail` adds `teams: [{id, name, players}]` and
 `myRequests: [{teamId, status}]` (`pending`, `accepted`, `declined`,
-`removed`, or `expired` after registration closes).
+`removed`, or `expired` after registration closes; `cancelled`, `left`,
+`promoted` and `disbanded` rows are omitted) and `teamDisbanded`.
 
 `StandingRow`: `position, teamId, teamName, played, wins, draws, losses,
 goalsFor, goalsAgainst, goalDifference, points, isUserTeam, group`.
@@ -220,8 +274,8 @@ createdAt` (SQLite UTC, `YYYY-MM-DD HH:MM:SS`).
 | Table | Purpose | Key columns and constraints |
 |---|---|---|
 | `tournaments` | Tournament settings | `format` (`knockout`, `league`, `groups_knockout`, `round_robin`), `status` (`upcoming`, `active`, `finished`, `cancelled`), `start_date ≤ end_date`, `max_teams ≥ 2`, `team_size ≥ 1` (default 5, captain included), `created_by` → users (set null) |
-| `tournament_teams` | Registered teams | `captain_id` → users; `UNIQUE (tournament_id, captain_id)`; name unique per tournament ignoring ASCII case; `group_label` (nullable, e.g. `A`) |
-| `join_requests` | Requests and memberships | `status`: `pending`, `accepted` (membership), `declined`, `cancelled`, `removed`; one `pending`/`accepted` row per (tournament, requester); index on (team, status) |
+| `tournament_teams` | Registered teams, including ones that left | `captain_id` → users; `status` (`active`, `left`, `disbanded`) with `left_at` set exactly when not `active`; among active teams one per captain and names unique per tournament ignoring ASCII case (partial unique indexes); `group_label` (nullable, e.g. `A`) |
+| `join_requests` | Requests and memberships | `status`: `pending`, `accepted` (membership), `declined`, `cancelled`, `removed`, `left` (player left), `promoted` (player became captain), `disbanded` (the captain disbanded the player's team; `notice_seen_at` once seen); one `pending`/`accepted` row per (tournament, requester); index on (team, status) |
 | `tournament_matches` | Fixtures and results | `stage` (`group` default, `knockout`), `round ≥ 1`, `bracket_position ≥ 1` (unique per tournament, stage and round), scores ≥ 0, `winner_team_id` (one of the two teams), `status` (`scheduled`, `played`, `cancelled`, `bye`) |
 
 Match constraints, enforced by SQLite:
@@ -237,11 +291,13 @@ Match constraints, enforced by SQLite:
 
 - New columns use `ALTER TABLE … ADD COLUMN` when missing (`team_size`,
   `group_label`).
-- SQLite cannot change `NOT NULL` or `CHECK` constraints, so
-  `join_requests` and `tournament_matches` are rebuilt once
-  (`_rebuildIfMissing`) when their schema lacks the newest status: rows are
-  copied into a new table in one transaction and indexes recreated. Nothing
-  references these tables, so the rebuild is safe.
+- SQLite cannot change `NOT NULL`, `CHECK` or inline `UNIQUE` constraints,
+  so `tournament_teams`, `join_requests` and `tournament_matches` are rebuilt
+  once (`_rebuildIfMissing`) when their schema lacks the newest status: rows
+  are copied into a new table in one transaction and indexes recreated.
+  Foreign keys are switched off during the rebuild so dropping
+  `tournament_teams` does not cascade into matches and requests, and
+  `PRAGMA foreign_key_check` must pass before the commit.
 
 Migrations are covered by tests that start from the older schemas.
 
@@ -307,8 +363,9 @@ accounts from older seed scripts) and the four seed tournaments by name, whose
 teams, matches and requests cascade, then inserts everything again in one
 transaction, checks the row counts and prints what it inserted. Other accounts
 are kept; if one of them already uses a seed username, the script stops
-without changing anything. `DB_PATH` overrides the database, as for the
-server.
+without changing anything. Like the server, it uses
+`backend/data/football_matches.sqlite` (found from the script's own location,
+whatever the working directory) unless `DB_PATH` is set.
 
 | Data | Contents |
 |---|---|
@@ -316,7 +373,7 @@ server.
 | Tournaments | Champions Cup (knockout, active), City League (league, upcoming), Summer Cup (round robin, finished), Champions League (knockout, active) |
 | Champions League | 8 teams (Real Madrid/alice, Barcelona/bob, Manchester City/carlos, Bayern Munich/diana, PSG/cl_psg, Liverpool/cl_liv, Juventus/cl_juve, AC Milan/cl_milan); quarter-finals played (PSG through on penalties) and semi-finals scheduled |
 
-Run from `backend/`:
+Run from `backend/` (or from anywhere, with the script's path):
 
 ```powershell
 dart run bin/seed.dart
@@ -324,11 +381,15 @@ dart run bin/seed.dart
 
 While the API is running on Windows, `dart run` cannot replace the locked
 `.dart_tool/lib/sqlite3.dll`. Either stop the API first or build the script
-into another folder and run the executable:
+into another folder and run the executable. A compiled executable cannot
+find the backend folder from its own location, so it refuses to run without
+`DB_PATH`:
 
 ```powershell
 dart build cli -t bin/seed.dart -o $env:TEMP\kickoff_seed
+$env:DB_PATH = (Resolve-Path data\football_matches.sqlite).Path
 & "$env:TEMP\kickoff_seed\bundle\bin\seed.exe"
+Remove-Item Env:DB_PATH
 ```
 
 The same lock affects `dart test`; stop the API before running backend tests.
@@ -347,7 +408,8 @@ lib/tournaments/
 │   └── tournament_service.dart every API call, with timeout and friendly errors
 ├── screens/
 │   ├── tournaments_list_screen.dart
-│   ├── tournament_detail_screen.dart  tabs by format, join/leave/requests
+│   ├── tournament_detail_screen.dart  tabs by format, join/leave/transfer/
+│   │                                  disband/requests
 │   ├── tournament_standings_screen.dart  standings view, per group
 │   └── tournament_bracket_view.dart
 └── widgets/
@@ -355,7 +417,8 @@ lib/tournaments/
     ├── standings_widget.dart, bracket_widget.dart
     ├── team_tile.dart, team_details_sheet.dart, player_profile_sheet.dart
     ├── join_team_sheet.dart, join_requests_sheet.dart
-    ├── confirm_action_sheet.dart (leave, remove), sheet_frame.dart
+    ├── confirm_action_sheet.dart (leave, disband, remove), sheet_frame.dart
+    ├── transfer_captaincy_sheet.dart, team_disbanded_banner.dart
     └── tournament_states.dart (header, loading, skeleton, error, empty)
 ```
 
@@ -372,7 +435,7 @@ profile screen and the tournaments profile sheet.
 
 ```powershell
 flutter analyze
-flutter test                      # test/tournaments_test.dart, test/widget_test.dart
+flutter test                      # every file in test/
 Set-Location backend
 dart analyze
 dart test                         # stop the API first on Windows
@@ -380,20 +443,38 @@ dart test                         # stop the API first on Windows
 
 | File | Covers |
 |---|---|
-| `backend/test/tournaments_test.dart` | list, detail, join (names, capacity, status), leave, standings |
+| `backend/test/tournaments_test.dart` | list, detail, join (names, capacity, status), leave and its history row, standings |
 | `backend/test/join_requests_test.dart` | sending, answering, capacity, expiry, ownership |
 | `backend/test/team_management_test.dart` | team details, removing players, pending totals, profile access, `removed` migration |
+| `backend/test/captaincy_test.dart` | transfer and its error codes, disband and its notice, player leave, `tournament_teams` migration |
 | `backend/test/bracket_test.dart` | bracket shape, winners, penalties, byes, positions, group tables, match constraints, `tournament_matches` migration |
-| `test/tournaments_test.dart` | service parsing, every sheet and tab, format-based tabs, bracket drawing, 360 dp / 1.3× layouts, 48 dp targets |
-| `test/widget_test.dart` | ball menu entry and home requests banner |
+| `test/tournaments_test.dart` | service parsing, every sheet and tab, format-based tabs, bracket drawing, transfer / disband / leave-team flows, transfer error codes, swipe guard, disbanded notice, list refresh on return and resume, 360 dp / 1.3× layouts, 48 dp targets |
+| `test/widget_test.dart` | ball menu entry, home requests banner and its refresh (back from any screen, Home tab selected again, app resumed) |
+| `test/api_client_test.dart` | session restore: 401 and 404 clear the token, other errors keep it |
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A new screen, banner or button is missing after restarting the app | The installed APK is older than the code; restarting relaunches the old build | Rebuild and reinstall (`flutter build apk --debug`, then `adb install -r`), or use `flutter run` |
+| "Could not restore your session" with only **Try again** | The saved token belongs to an account that no longer exists, for example after reseeding | Fixed: `ApiClient.restoreSession` treats 404 like 401, clears the token and shows sign-in |
+| Database changes don't show in the app | The API and the seed use different files: a `DB_PATH` set in one shell but not the other, or an API started before the path fix from the repo root (it used `<root>/data/`) | Restart the API; without `DB_PATH` both scripts now use `backend/data/football_matches.sqlite` from any working directory |
+| `dart test` or `dart run bin/seed.dart` fails with `PathAccessException` on `sqlite3.dll` | The running API locks `backend/.dart_tool/lib/sqlite3.dll` on Windows | Stop the API, run from a copy of `backend/` (`lib`, `bin`, `test`, pubspec files), or build the script with `dart build cli` |
+| A new status or column is missing from the database | The API was not restarted | Restart the API; `AppDatabase` migrates on start |
+
+To check the disband notice end to end against a running API: seed, have
+alice create a team in City League, have bob ask to join and alice accept,
+call `DELETE /tournaments/:id/join?disband=true` as alice, then
+`GET /tournaments/:id` as bob. The response carries `"teamDisbanded":true`
+until bob calls `DELETE /tournaments/:id/disband-notice`.
 
 ## Known limitations
 
 - No admin routes to create tournaments, schedule matches, record results or
   assign groups; use SQLite (see above).
-- No push notifications; captains see counts in the app.
-- Members cannot leave a team, and captains with players cannot leave until
-  they remove them.
+- No push notifications; captains see counts in the app, and players of a
+  disbanded team see a banner only when they open that tournament.
+- Once a tournament starts, nobody can leave, transfer or disband.
 - Any player can see profiles of everyone in a tournament they join or request
   to join (game stats only); team rosters with XP and streaks are visible to
   all signed-in players.
@@ -401,3 +482,65 @@ dart test                         # stop the API first on Windows
   slot TBD.
 - On small phones a fourth tab can sit just past the edge of the tab bar.
 - Name uniqueness ignores ASCII case only (`Équipe` and `équipe` both pass).
+- A transfer request sent for a team that was then withdrawn could, in
+  theory, move captaincy of a new team the same captain created afterwards,
+  if the chosen player is also on it.
+- The transfer success snackbar shows briefly behind the sheet as it closes.
+- Closing any popup over the home shell (for example Settings) also refreshes
+  the home banner: one small extra request.
+- Error codes are written twice, in `TournamentErrorCodes` (app) and in the
+  API; keep them in sync.
+- Players who leave a team drop out of profile visibility for that
+  tournament, and their past matches with that team no longer appear in their
+  profile.
+
+## Change history
+
+Newest first. Each round ran as brainstorm, then implementation, then code
+review, following `agents/`; critical and high review findings were fixed
+before the round closed.
+
+### 2026-10-12: disbanded notice missing on the device
+
+- **Reported**: the "Your team was disbanded by the captain" banner did not
+  show after a full restart.
+- **Checked**: the API returned `"teamDisbanded":true` for the disbanded
+  player; `Tournament.fromJson` parses it; the detail screen shows
+  `TeamDisbandedBanner` when it is true and not dismissed; temporary debug
+  prints confirmed the value reached the widget.
+- **Cause**: the APK on the device was built before the banner code was
+  written, so restarting relaunched the old build. After rebuilding, the
+  banner showed, and dismissing it recorded `notice_seen_at`.
+- **Also fixed**: after reseeding, a saved token pointed at a deleted
+  account; `GET /me` answered 404 and the app stayed on a retry screen that
+  could never succeed. `restoreSession` now clears the token on 404 as on 401
+  (`test/api_client_test.dart`).
+- **Found**: the API had been started from the repo root and used
+  `<root>/data/football_matches.sqlite` instead of `backend/data/`. Fixed
+  afterwards: `bin/server.dart` and `bin/seed.dart` resolve the default from
+  their own location (`databasePath()` in `backend/lib/database_path.dart`),
+  and compiled executables require `DB_PATH`. The stray root `data/` folder
+  was removed.
+
+### 2026-10-12: review follow-ups
+
+| Issue | Root cause | Fix |
+|---|---|---|
+| A transfer after the team was withdrawn said the tournament had started | Checks ran before the transaction, and any failure of the captain update was reported as "closed" | All checks run under the write lock; errors carry a `code` (`team_withdrawn`, `not_captain`, `transfer_closed`, `player_not_on_team`), a withdrawn team reported first; the app words each code from `TournamentStrings` |
+| The transfer sheet could be swiped closed mid-request, losing the success message | A modal sheet's drag calls `Navigator.pop` directly and skips `PopScope`; `isDismissible` only covers barrier taps | While a request runs the sheet claims vertical drags itself (swiping works again after); the detail screen shows the success snackbar |
+| Players of a disbanded team got no notice | Disbanding turned memberships into `cancelled`, indistinguishable from withdrawn requests | Memberships become `disbanded`; detail JSON adds `teamDisbanded`; `DELETE /disband-notice` stores `notice_seen_at`, so the banner shows once across devices |
+| The home banner refreshed only after leaving the tournaments screens | The shell reloaded the count only after that one push | The route observer moved to `lib/app_route_observer.dart`; the shell is `RouteAware` and refreshes on `didPopNext`, when the Home tab is selected again, and on app resume; only the latest load applies |
+
+### 2026-10-12: captaincy, team history and list refresh
+
+| Issue | Fix |
+|---|---|
+| A captain with players could not leave | `POST /transfer-captaincy` hands the team to an accepted player (the old captain stays as a player); `DELETE /join?disband=true` withdraws the team and frees its players; players can leave their team themselves, so a former captain can then leave |
+| Leaving deleted the team row | `tournament_teams.status` (`active`, `left`, `disbanded`) and `left_at`; the inline `UNIQUE (tournament_id, captain_id)` and the name index became partial unique indexes over active teams, so captains can rejoin and names can be reused; every team query filters `status = 'active'`; the table rebuild runs with foreign keys off so matches and requests are not cascaded away |
+| The list's pending-requests badge refreshed only on pull to refresh | The list is `RouteAware` and reloads in place whenever a screen above it closes, and when the app resumes with the list on top |
+
+UI added in this round: **Transfer captaincy** (picker sheet; its confirm
+button stays greyed out until a player is chosen), a quieter red
+**Disband team** with a confirmation naming how many players are removed,
+and **Leave team** for players. Tournament JSON gained `canTransfer` and
+`canDisband`; `join_requests` gained the `left` and `promoted` statuses.

@@ -11,7 +11,10 @@ import 'package:football_match_app/tournaments/screens/tournament_standings_scre
 import 'package:football_match_app/tournaments/screens/tournaments_list_screen.dart';
 import 'package:football_match_app/tournaments/services/tournament_service.dart';
 import 'package:football_match_app/tournaments/tournament_constants.dart';
+import 'package:football_match_app/app_route_observer.dart';
 import 'package:football_match_app/tournaments/widgets/bracket_widget.dart';
+import 'package:football_match_app/tournaments/widgets/sheet_frame.dart';
+import 'package:football_match_app/tournaments/widgets/tournament_states.dart';
 
 void main() {
   group('TeamName', () {
@@ -667,6 +670,468 @@ void main() {
         greaterThanOrEqualTo(TournamentSizes.MIN_TAP),
       );
     }
+  });
+
+  testWidgets('list badges refresh when coming back from another screen', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments': {
+        'tournaments': [_tournamentJson(joined: true, pendingRequests: 1)],
+      },
+    });
+    await tester.pumpWidget(
+      _app(TournamentsListScreen(service: _service(api))),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.pendingRequestsLabel(1)), findsOne);
+
+    // Any screen pushed above the list, not only the detail screen.
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    navigator.push<void>(
+      MaterialPageRoute<void>(builder: (_) => const Scaffold()),
+    );
+    await tester.pumpAndSettle();
+    api.responses['GET /tournaments'] = {
+      'tournaments': [_tournamentJson(joined: true, pendingRequests: 3)],
+    };
+    navigator.pop();
+    await tester.pump();
+    // Refreshed in place, without the skeleton.
+    expect(find.byType(TournamentSkeletonList), findsNothing);
+    await tester.pumpAndSettle();
+
+    expect(api.calls.where((call) => call == 'GET /tournaments'), hasLength(2));
+    expect(find.text(TournamentStrings.pendingRequestsLabel(3)), findsOne);
+  });
+
+  testWidgets('the list refreshes when the app comes back to the front', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments': {
+        'tournaments': [_tournamentJson(joined: true, pendingRequests: 1)],
+      },
+    });
+    await tester.pumpWidget(
+      _app(TournamentsListScreen(service: _service(api))),
+    );
+    await tester.pumpAndSettle();
+    api.responses['GET /tournaments'] = {
+      'tournaments': [_tournamentJson(joined: true, pendingRequests: 2)],
+    };
+
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.pendingRequestsLabel(2)), findsOne);
+  });
+
+  testWidgets('captains with players transfer or disband instead of leave', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+          canDisband: true,
+        ),
+      },
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('tournament_leave')), findsNothing);
+    expect(find.byKey(const ValueKey('tournament_transfer')), findsOne);
+    expect(find.byKey(const ValueKey('tournament_disband')), findsOne);
+  });
+
+  testWidgets('a captain hands the team to a player and becomes one', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+          canDisband: true,
+        ),
+      },
+      'GET /tournaments/7/teams/1': {'team': _teamDetailsJson()},
+      'POST /tournaments/7/transfer-captaincy': {
+        'tournament': _tournamentJson(myTeamId: 1, canLeave: true),
+      },
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_transfer')));
+    await tester.pumpAndSettle();
+
+    // The captain is not offered, and nothing is sent before a choice.
+    expect(find.byKey(const ValueKey('transfer_player_10')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('transfer_confirm')));
+    await tester.pumpAndSettle();
+    expect(
+      api.calls,
+      isNot(contains('POST /tournaments/7/transfer-captaincy')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('transfer_player_11')));
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.makeCaptain('erling')), findsOne);
+    await tester.tap(find.byKey(const ValueKey('transfer_confirm')));
+    await tester.pumpAndSettle();
+
+    expect(api.bodies['POST /tournaments/7/transfer-captaincy'], {
+      'newCaptainId': 11,
+    });
+    expect(find.text(TournamentStrings.transferSuccess('erling')), findsOne);
+    // Now a player: captain controls are gone and Leave team is offered.
+    expect(find.byKey(const ValueKey('tournament_transfer')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('tournament_join_requests')),
+      findsNothing,
+    );
+    expect(find.text(TournamentStrings.LEAVE_TEAM), findsOne);
+  });
+
+  testWidgets('a refused transfer stays in the sheet, then refreshes', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+        ),
+      },
+      'GET /tournaments/7/teams/1': {'team': _teamDetailsJson()},
+      'POST /tournaments/7/transfer-captaincy': const ApiException(
+        'Player not found on this team.',
+        statusCode: 404,
+      ),
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_transfer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('transfer_player_11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('transfer_confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Player not found on this team.'), findsOne);
+    await tester.tap(find.byTooltip(TournamentStrings.CLOSE));
+    await tester.pumpAndSettle();
+    expect(
+      api.calls.where((call) => call == 'GET /tournaments/7'),
+      hasLength(2),
+    );
+  });
+
+  testWidgets('a captain disbands the team after confirming', (tester) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+          canDisband: true,
+          teams: [
+            {'id': 1, 'name': 'Blue Lions', 'players': 3},
+          ],
+        ),
+      },
+      'DELETE /tournaments/7/join?disband=true': {
+        'tournament': _tournamentJson(currentTeams: 3, teams: []),
+      },
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_disband')));
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.DISBAND_TITLE), findsOne);
+    expect(
+      find.text(TournamentStrings.confirmDisbandMessage('Blue Lions', 2)),
+      findsOne,
+    );
+
+    await tester.tap(find.text(TournamentStrings.KEEP));
+    await tester.pumpAndSettle();
+    expect(api.calls.where((call) => call.startsWith('DELETE')), isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('tournament_disband')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_confirm_disband')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('DELETE /tournaments/7/join?disband=true'));
+    expect(find.text(TournamentStrings.DISBAND_SUCCESS), findsOne);
+    expect(find.byKey(const ValueKey('tournament_join')), findsOne);
+  });
+
+  testWidgets('players leave their team, not the tournament', (tester) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(myTeamId: 1, canLeave: true),
+      },
+      'DELETE /tournaments/7/join': {'tournament': _tournamentJson()},
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.LEAVE_TEAM), findsOne);
+    await tester.tap(find.byKey(const ValueKey('tournament_leave')));
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.LEAVE_TEAM_TITLE), findsOne);
+    expect(
+      find.text(TournamentStrings.confirmLeaveTeamMessage('Blue Lions')),
+      findsOne,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('tournament_confirm_leave_team')),
+    );
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('DELETE /tournaments/7/join'));
+    expect(find.text(TournamentStrings.LEAVE_TEAM_SUCCESS), findsOne);
+  });
+
+  testWidgets('captain controls are thumb sized on a 360-dp phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+          canDisband: true,
+          pendingRequests: 2,
+        ),
+      },
+      'GET /tournaments/7/teams/1': {'team': _teamDetailsJson()},
+    });
+    await tester.pumpWidget(
+      _app(
+        TournamentDetailScreen(service: _service(api), tournamentId: 7),
+        textScale: 1.3,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    for (final key in ['tournament_transfer', 'tournament_disband']) {
+      expect(
+        tester.getSize(find.byKey(ValueKey(key))).height,
+        greaterThanOrEqualTo(TournamentSizes.MIN_TAP),
+        reason: key,
+      );
+    }
+
+    await tester.tap(find.byKey(const ValueKey('tournament_transfer')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    for (final key in ['transfer_player_11', 'transfer_confirm']) {
+      expect(
+        tester.getSize(find.byKey(ValueKey(key))).height,
+        greaterThanOrEqualTo(TournamentSizes.MIN_TAP),
+        reason: key,
+      );
+    }
+  });
+
+  testWidgets('a transfer to a withdrawn team explains the real reason', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+        ),
+      },
+      'GET /tournaments/7/teams/1': {'team': _teamDetailsJson()},
+      'POST /tournaments/7/transfer-captaincy': const ApiException(
+        'Your team is no longer in this tournament.',
+        statusCode: 409,
+        code: TournamentErrorCodes.TEAM_WITHDRAWN,
+      ),
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_transfer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('transfer_player_11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('transfer_confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text(TournamentStrings.TRANSFER_TEAM_WITHDRAWN), findsOne);
+    expect(find.text(TournamentStrings.TRANSFER_CLOSED), findsNothing);
+  });
+
+  testWidgets('the transfer sheet cannot be swiped away mid-request', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+        ),
+      },
+      'GET /tournaments/7/teams/1': {'team': _teamDetailsJson()},
+      'POST /tournaments/7/transfer-captaincy': {
+        'tournament': _tournamentJson(myTeamId: 1, canLeave: true),
+      },
+    });
+    final gate = api.gates['POST /tournaments/7/transfer-captaincy'] =
+        Completer<void>();
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_transfer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('transfer_player_11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('transfer_confirm')));
+    await tester.pump();
+
+    await tester.fling(_transferSheetTitle, const Offset(0, 500), 2000);
+    // The spinner keeps animating, so pump a fixed time well under the
+    // request timeout instead of settling.
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text(TournamentStrings.TRANSFER_HINT), findsOne);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.TRANSFER_HINT), findsNothing);
+    expect(find.text(TournamentStrings.transferSuccess('erling')), findsOne);
+  });
+
+  testWidgets('the transfer sheet can be swiped away when idle', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(
+          joined: true,
+          canLeave: false,
+          canTransfer: true,
+        ),
+      },
+      'GET /tournaments/7/teams/1': {'team': _teamDetailsJson()},
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_transfer')));
+    await tester.pumpAndSettle();
+    await tester.fling(_transferSheetTitle, const Offset(0, 500), 2000);
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.TRANSFER_HINT), findsNothing);
+  });
+
+  testWidgets('former players see once that their team was disbanded', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(teamDisbanded: true),
+      },
+      'DELETE /tournaments/7/disband-notice': <String, Object?>{},
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.TEAM_DISBANDED_NOTICE), findsOne);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('tournament_disbanded_notice')))
+          .height,
+      greaterThanOrEqualTo(TournamentSizes.MIN_TAP),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('tournament_disbanded_notice')));
+    await tester.pumpAndSettle();
+    expect(api.calls, contains('DELETE /tournaments/7/disband-notice'));
+    expect(find.text(TournamentStrings.TEAM_DISBANDED_NOTICE), findsNothing);
+  });
+
+  testWidgets('a notice that fails to dismiss comes back with the reason', (
+    tester,
+  ) async {
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(teamDisbanded: true),
+      },
+      'DELETE /tournaments/7/disband-notice': const ApiException(
+        'Tournament not found.',
+        statusCode: 404,
+      ),
+    });
+    await tester.pumpWidget(
+      _app(TournamentDetailScreen(service: _service(api), tournamentId: 7)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tournament_disbanded_notice')));
+    await tester.pumpAndSettle();
+    expect(find.text(TournamentStrings.TEAM_DISBANDED_NOTICE), findsOne);
+    expect(find.text('Tournament not found.'), findsOne);
+  });
+
+  testWidgets('the disbanded notice fits a 360-dp phone at large text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = _FakeApi({
+      'GET /tournaments/7': {
+        'tournament': _tournamentJson(teamDisbanded: true),
+      },
+    });
+    await tester.pumpWidget(
+      _app(
+        TournamentDetailScreen(service: _service(api), tournamentId: 7),
+        textScale: 1.3,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text(TournamentStrings.TEAM_DISBANDED_NOTICE), findsOne);
+    expect(find.byKey(const ValueKey('tournament_join')), findsOne);
   });
 
   testWidgets('a player requests to join a team and sees it pending', (
@@ -1563,12 +2028,22 @@ void main() {
 
 TournamentService _service(_FakeApi api) => TournamentService(api);
 
+/// The transfer sheet's title, outside its scrolling list (the disabled
+/// confirm button shares the label, below it).
+Finder get _transferSheetTitle => find
+    .descendant(
+      of: find.byType(TournamentSheetFrame),
+      matching: find.text(TournamentStrings.TRANSFER_CAPTAINCY),
+    )
+    .first;
+
 Finder get _teamNameField => find.descendant(
   of: find.byKey(const ValueKey('tournament_team_name')),
   matching: find.byType(EditableText),
 );
 
 Widget _app(Widget home, {double textScale = 1}) => MaterialApp(
+  navigatorObservers: [appRouteObserver],
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context)
         .copyWith(textScaler: TextScaler.linear(textScale)),
@@ -1585,6 +2060,9 @@ Map<String, Object?> _tournamentJson({
   int currentTeams = 4,
   bool joined = false,
   bool? canLeave,
+  bool canTransfer = false,
+  bool canDisband = false,
+  bool teamDisbanded = false,
   int? myTeamId,
   int pendingRequests = 0,
   int teamSize = 5,
@@ -1604,6 +2082,9 @@ Map<String, Object?> _tournamentJson({
   'createdBy': 'organizer',
   'joined': joined,
   'canLeave': canLeave ?? (joined && status == 'upcoming'),
+  'canTransfer': canTransfer,
+  'canDisband': canDisband,
+  'teamDisbanded': teamDisbanded,
   'teamSize': teamSize,
   'myTeamId': myTeamId ?? (joined ? 1 : null),
   'pendingRequests': pendingRequests,

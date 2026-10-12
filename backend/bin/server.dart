@@ -4,6 +4,7 @@ import 'package:shelf/shelf_io.dart';
 
 import 'package:backend/app.dart';
 import 'package:backend/database.dart';
+import 'package:backend/database_path.dart';
 
 void main(List<String> args) async {
   final secret = Platform.environment['JWT_SECRET'];
@@ -14,9 +15,13 @@ void main(List<String> args) async {
     exitCode = 1;
     return;
   }
-  final database = AppDatabase(
-    Platform.environment['DB_PATH'] ?? 'data/football_matches.sqlite',
-  );
+  final path = databasePath();
+  if (path == null) {
+    stderr.writeln(databasePathMissing);
+    exitCode = 1;
+    return;
+  }
+  final database = AppDatabase(path);
   final port = int.parse(Platform.environment['PORT'] ?? '8080');
   final server = await serve(
     createApp(database: database, jwtSecret: secret),

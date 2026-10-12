@@ -19,6 +19,39 @@ Future<bool> showLeaveTournamentSheet(
   onConfirm: onLeave,
 );
 
+/// Confirms a player leaving [teamName]; the team stays in the tournament.
+Future<bool> showLeaveTeamSheet(
+  BuildContext context, {
+  required String teamName,
+  required Future<String?> Function() onLeave,
+}) => showConfirmActionSheet(
+  context,
+  title: TournamentStrings.LEAVE_TEAM_TITLE,
+  message: TournamentStrings.confirmLeaveTeamMessage(teamName),
+  confirmLabel: TournamentStrings.CONFIRM_LEAVE,
+  confirmIcon: Icons.logout_rounded,
+  cancelLabel: TournamentStrings.STAY,
+  confirmKey: const ValueKey('tournament_confirm_leave_team'),
+  onConfirm: onLeave,
+);
+
+/// Confirms withdrawing the captain's team with its [players].
+Future<bool> showDisbandTeamSheet(
+  BuildContext context, {
+  required String teamName,
+  required int players,
+  required Future<String?> Function() onDisband,
+}) => showConfirmActionSheet(
+  context,
+  title: TournamentStrings.DISBAND_TITLE,
+  message: TournamentStrings.confirmDisbandMessage(teamName, players),
+  confirmLabel: TournamentStrings.CONFIRM_DISBAND,
+  confirmIcon: Icons.group_off_rounded,
+  cancelLabel: TournamentStrings.KEEP,
+  confirmKey: const ValueKey('tournament_confirm_disband'),
+  onConfirm: onDisband,
+);
+
 /// Confirms removing [playerName] from the captain's team.
 Future<bool> showRemovePlayerSheet(
   BuildContext context, {

@@ -12,7 +12,10 @@ booking is part of the product direction but is not implemented yet.
 - Flutter client: `lib/`
 - Dart Shelf API: `backend/`
 - Shared central SQLite database, defaulting to
-  `backend/data/football_matches.sqlite`
+  `backend/data/football_matches.sqlite`, resolved from the script's location
+  (`databasePath()` in `backend/lib/database_path.dart`), so the working
+  directory does not matter. Compiled executables (`dart build cli`) need
+  `DB_PATH`.
 - The app calls the API; do not add a second client-side source of truth for
   accounts, friends, messages, or XP.
 - Password hashing and authenticated bearer-token routes belong on the API.
@@ -27,7 +30,8 @@ booking is part of the product direction but is not implemented yet.
 ## Implemented behavior
 
 - Auth endpoints: registration, login, session restoration (`GET /me`), logout
-  on the client.
+  on the client. A stored token answered with 401 (expired) or 404 (account
+  gone, e.g. after reseeding) is cleared and the app shows sign-in.
 - Social endpoints: friends, friend requests, request acceptance/removal, and
   direct messages with incremental polling.
 - `GET /gamification` returns server-owned XP, level/rank, progress, daily and
@@ -41,13 +45,21 @@ booking is part of the product direction but is not implemented yet.
   open). Full reference: `docs/tournaments.md`. Authenticated routes:
   `GET /tournaments[?status=]`, `GET /tournaments/:id` (adds `teams`),
   `POST /tournaments/:id/join` (body `{"name"}`),
-  `DELETE /tournaments/:id/join` (leave; only while `upcoming` and before the
-  team has matches, deleting the team row; tournament JSON reports this as
-  `canLeave`, which the app uses to offer Leave) and
+  `DELETE /tournaments/:id/join` (leave; only while `upcoming`; a captain's
+  team is kept with `status` `left`/`disbanded` and `left_at` rather than
+  deleted, and only without matches; a player's membership becomes `left`;
+  tournament JSON reports this as `canLeave`, which the app uses to offer
+  Leave),
+  `POST /tournaments/:id/transfer-captaincy` (body `{"newCaptainId"}`, an
+  accepted player; `canTransfer`), `DELETE /tournaments/:id/join?disband=true`
+  (captain with players, no matches; `canDisband`; players' memberships
+  become `disbanded` and the detail JSON reports `teamDisbanded` until
+  `DELETE /tournaments/:id/disband-notice`), and
   `GET /tournaments/:id/standings`, returning camelCase JSON as
   `{tournaments}`, `{tournament}` and `{standings}`.
-  Tables: `tournaments`, `tournament_teams` (one entry per captain, with a
-  captain-chosen name unique per tournament, ignoring ASCII case) and
+  Tables: `tournaments`, `tournament_teams` (one active entry per captain,
+  with a captain-chosen name unique among active teams per tournament,
+  ignoring ASCII case; every team query filters `status = 'active'`) and
   `tournament_matches`. Team names are trimmed with spaces collapsed, 3-30
   characters of letters, numbers, spaces and `' . _ -`; the rules live in
   `_teamName` (API) and `TeamName` (app) and must stay in sync. Joining
@@ -69,11 +81,19 @@ booking is part of the product direction but is not implemented yet.
   players. Requests and answers need `upcoming` status; pending requests are
   reported as `expired` afterwards. A declined team cannot be asked again,
   creating your own team cancels your pending request, members cannot create a
-  team, and captains with players cannot leave. Tournament JSON adds
+  team, and captains with players transfer captaincy (they stay as a player;
+  the new captain's membership row becomes `promoted`) or disband instead of
+  leaving. Tournament JSON adds
   `teamSize`, `myTeamId`, `pendingRequests`, `myRequests` and `teams[].players`.
   There is no push notification yet; captains see pending counts on the detail
   screen, on list cards and in a home banner (`GET /me/tournament-requests`
-  returns the total for open tournaments).
+  returns the total for open tournaments). The list screen reloads through
+  `appRouteObserver` (`lib/app_route_observer.dart`, registered in
+  `MaterialApp.navigatorObservers`) whenever a screen above it closes and when
+  the app resumes; the shell refreshes the home banner the same way and when
+  the Home tab is selected again. API errors may carry a `code` (transfer:
+  `team_withdrawn`, `not_captain`, `transfer_closed`, `player_not_on_team`),
+  exposed as `ApiException.code` / `TournamentException.code`.
 - Detail tabs follow the format: `league`/`round_robin` show Standings,
   `knockout` shows Bracket, `groups_knockout` shows both (Standings has one
   table per `tournament_teams.group_label`, counting only `stage = 'group'`
@@ -142,8 +162,8 @@ booking is part of the product direction but is not implemented yet.
 - `backend/lib/database.dart`: SQLite schema and migrations.
 - `backend/lib/gamification.dart`: XP and achievement rules.
 - `backend/test/tournaments_test.dart`, `join_requests_test.dart`,
-  `team_management_test.dart`, `bracket_test.dart`: tournament routes, rules
-  and schema migrations.
+  `team_management_test.dart`, `captaincy_test.dart`, `bracket_test.dart`:
+  tournament routes, rules and schema migrations.
 - `backend/bin/seed.dart`: restores seed accounts, test tournaments and the
   Champions League bracket from scratch.
 - `android/build.gradle.kts`: uses Flutter's NDK when installed, otherwise the

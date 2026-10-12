@@ -127,6 +127,9 @@ class TeamTile extends StatelessWidget {
         return (TournamentStrings.REQUEST_REMOVED, TournamentColors.ERROR);
       case JoinRequestStatus.accepted:
       case JoinRequestStatus.cancelled:
+      case JoinRequestStatus.left:
+      case JoinRequestStatus.promoted:
+      case JoinRequestStatus.disbanded:
       case null:
         break;
     }

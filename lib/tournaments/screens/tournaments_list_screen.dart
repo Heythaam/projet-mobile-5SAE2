@@ -4,6 +4,7 @@ import '../../screens/kickoff_style.dart';
 import '../models/tournament.dart';
 import '../services/tournament_service.dart';
 import '../tournament_constants.dart';
+import '../../app_route_observer.dart';
 import '../widgets/tournament_card.dart';
 import '../widgets/tournament_states.dart';
 import 'tournament_detail_screen.dart';
@@ -17,7 +18,8 @@ class TournamentsListScreen extends StatefulWidget {
   State<TournamentsListScreen> createState() => _TournamentsListScreenState();
 }
 
-class _TournamentsListScreenState extends State<TournamentsListScreen> {
+class _TournamentsListScreenState extends State<TournamentsListScreen>
+    with RouteAware {
   static const _filters = <TournamentStatus?>[
     null,
     TournamentStatus.active,
@@ -32,18 +34,45 @@ class _TournamentsListScreenState extends State<TournamentsListScreen> {
   List<Tournament> _tournaments = const [];
   TournamentStatus? _filter;
   int _latestRequest = 0;
+  ModalRoute<void>? _route;
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _lifecycle = AppLifecycleListener(onResume: _refreshIfVisible);
     _loadTournaments();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      final previous = _route;
+      if (previous != null) appRouteObserver.unsubscribe(this);
+      _route = route;
+      if (route != null) appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
+    _lifecycle.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Back from any screen above this one: join state, team counts and
+  /// pending request badges may have changed there.
+  @override
+  void didPopNext() => _loadTournaments(showSkeleton: false);
+
+  /// Back from another app, while this screen is on top.
+  void _refreshIfVisible() {
+    if (_route?.isCurrent ?? true) _loadTournaments(showSkeleton: false);
   }
 
   void _onSearchChanged() => setState(() {});
@@ -85,11 +114,9 @@ class _TournamentsListScreenState extends State<TournamentsListScreen> {
     if (!_isSearching) _searchController.clear();
   }
 
-  Future<void> _openTournament(
-    Tournament tournament, {
-    bool promptJoin = false,
-  }) async {
-    await Navigator.of(context).push<void>(
+  /// The list refreshes in [didPopNext] once the detail screen closes.
+  void _openTournament(Tournament tournament, {bool promptJoin = false}) {
+    Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => TournamentDetailScreen(
           service: widget.service,
@@ -98,8 +125,6 @@ class _TournamentsListScreenState extends State<TournamentsListScreen> {
         ),
       ),
     );
-    // Join state or team counts may have changed on the detail screen.
-    if (mounted) _loadTournaments(showSkeleton: false);
   }
 
   List<Tournament> get _visibleTournaments {
