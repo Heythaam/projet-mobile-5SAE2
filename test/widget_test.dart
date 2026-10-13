@@ -18,6 +18,7 @@ void main() {
         home: AuthScreen(
           api: ApiClient(),
           onAuthenticated: (user) => signedInUser = user,
+          onGuest: () {},
         ),
       ),
     );
@@ -84,6 +85,53 @@ void main() {
 
     expect(find.text('Challenge'), findsNothing);
     expect(find.text('Create'), findsOneWidget);
+  });
+
+  testWidgets('guest shell exposes demo data and profile actions', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_guestShell());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Blue Arena'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Calendar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Blue Arena'), findsOneWidget);
+    expect(find.text('North Park'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lv 3 · Striker'), findsOneWidget);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(find.text('Awards'), findsOneWidget);
+    await tester.tap(find.text('Awards'));
+    await tester.pumpAndSettle();
+    expect(find.text('First Kick'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('guest ball menu opens every existing destination', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_guestShell());
+    await tester.pumpAndSettle();
+
+    final destinations = <String, IconData>{
+      'Challenge': Icons.flash_on_rounded,
+      'Match': Icons.sports_soccer_rounded,
+      'Tournament': Icons.emoji_events_rounded,
+    };
+    for (final destination in destinations.entries) {
+      await tester.tap(find.bySemanticsLabel('Open ball menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(destination.value));
+      await tester.pumpAndSettle();
+      expect(find.text(destination.key), findsOneWidget);
+      expect(find.text('Coming soon'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
   });
 
   testWidgets('shell fits phone sizes and text scales without clipping', (
@@ -153,7 +201,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     await tester.pumpWidget(
       MaterialApp(
-        home: AuthScreen(api: ApiClient(), onAuthenticated: (_) {}),
+        home: AuthScreen(
+          api: ApiClient(),
+          onAuthenticated: (_) {},
+          onGuest: () {},
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -263,6 +315,17 @@ Widget _shell({Key? key, double textScale = 1}) => MaterialApp(
   ),
 );
 
+Widget _guestShell() => MaterialApp(
+  home: KickoffShell(
+    api: _GuestApiClient(),
+    user: const UserAccount(id: 0, username: 'guest', email: 'guest@local'),
+    isGuest: true,
+    onLogout: () {},
+    onOpenAuth: () {},
+    matchRepository: const EmptyMatchRepository(),
+  ),
+);
+
 class _FakeApiClient extends Fake implements ApiClient {
   @override
   Future<GamificationProfile> getGamificationProfile() async =>
@@ -278,3 +341,5 @@ class _FakeApiClient extends Fake implements ApiClient {
         achievements: [],
       );
 }
+
+class _GuestApiClient extends Fake implements ApiClient {}

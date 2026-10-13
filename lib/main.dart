@@ -19,6 +19,7 @@ class FootballMatchApp extends StatefulWidget {
 class _FootballMatchAppState extends State<FootballMatchApp> {
   final _api = ApiClient();
   UserAccount? _user;
+  bool _guest = false;
   Object? _startupError;
   bool _starting = true;
 
@@ -34,6 +35,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
       if (!mounted) return;
       setState(() {
         _user = user;
+        _guest = user == null;
         _startupError = null;
         _starting = false;
       });
@@ -48,7 +50,12 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
 
   Future<void> _logout() async {
     await _api.logout();
-    if (mounted) setState(() => _user = null);
+    if (mounted) {
+      setState(() {
+        _user = null;
+        _guest = false;
+      });
+    }
   }
 
   @override
@@ -94,16 +101,39 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               _restoreSession();
             },
           )
-        : _user == null
+        : _user == null && !_guest
         ? AuthScreen(
             api: _api,
             onAuthenticated: (user) {
-              setState(() => _user = user);
+              setState(() {
+                _user = user;
+                _guest = false;
+              });
             },
+            onGuest: () => setState(() {
+              _user = null;
+              _guest = true;
+              _startupError = null;
+            }),
           )
-        : KickoffShell(api: _api, user: _user!, onLogout: _logout),
+        : KickoffShell(
+            api: _api,
+            user: _user ?? _guestUser,
+            isGuest: _guest,
+            onLogout: _logout,
+            onOpenAuth: () => setState(() {
+              _guest = false;
+              _user = null;
+            }),
+          ),
   );
 }
+
+const _guestUser = UserAccount(
+  id: 0,
+  username: 'guest',
+  email: 'guest@local',
+);
 
 class _StartupError extends StatelessWidget {
   const _StartupError({required this.error, required this.onRetry});
