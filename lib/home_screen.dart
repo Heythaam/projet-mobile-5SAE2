@@ -19,6 +19,7 @@ class HomeScreen extends StatefulWidget {
     required this.api,
     required this.user,
     required this.onLogout,
+    this.isGuest = false,
     this.showNavigation = true,
     super.key,
   });
@@ -26,6 +27,7 @@ class HomeScreen extends StatefulWidget {
   final ApiClient api;
   final UserAccount user;
   final VoidCallback onLogout;
+  final bool isGuest;
   final bool showNavigation;
 
   @override
@@ -43,7 +45,23 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _refresh();
+    if (widget.isGuest) {
+      _loading = false;
+      _friends = const [
+        Friend(id: 101, username: 'alex'),
+        Friend(id: 102, username: 'samira'),
+        Friend(id: 103, username: 'mike'),
+      ];
+      _requests = const [
+        FriendRequest(
+          id: 201,
+          user: Friend(id: 104, username: 'noah'),
+          createdAt: 'demo',
+        ),
+      ];
+    } else {
+      _refresh();
+    }
   }
 
   Future<void> _refresh() async {
@@ -74,6 +92,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _inviteFriend() async {
+    if (widget.isGuest) {
+      _showGuestNotice();
+      return;
+    }
     final username = await showDialog<String>(
       context: context,
       builder: (context) => const _InviteDialog(),
@@ -95,6 +117,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _acceptRequest(FriendRequest request) async {
+    if (widget.isGuest) {
+      _showGuestNotice();
+      return;
+    }
     try {
       await widget.api.acceptFriendRequest(request.id);
       await _refresh();
@@ -104,6 +130,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _removeFriend(Friend friend) async {
+    if (widget.isGuest) {
+      _showGuestNotice();
+      return;
+    }
     final shouldRemove = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -136,6 +166,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openChat(Friend friend) async {
+    if (widget.isGuest) {
+      _showGuestNotice();
+      return;
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => ChatScreen(
@@ -152,6 +186,15 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(error.toString()),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showGuestNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sign in to use teammate actions.'),
         behavior: SnackBarBehavior.floating,
       ),
     );

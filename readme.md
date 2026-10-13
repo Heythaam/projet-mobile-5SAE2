@@ -26,6 +26,10 @@ Kickoff uses its own football identity and original artwork.
   and profile. XP and streaks are read from `GET /gamification`; match/calendar
   data uses an empty repository until match endpoints are available, so no
   sample match data is presented.
+- A fresh install opens in Guest Mode so the complete presentation shell can be
+  explored without credentials. Guest screens use empty states and read-only
+  defaults; teammate mutations and other server-backed actions ask the visitor
+  to sign in. Authenticated sessions retain the normal API-backed behavior.
 
 ## Run the API
 
