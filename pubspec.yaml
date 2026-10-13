@@ -36,6 +36,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   flutter_secure_storage: ^11.2.0
+  sqflite: ^2.4.4+2
+  path: ^1.9.1
+  share_plus: ^13.3.1
+  intl: ^0.20.3
+  flutter_tabler_icons: ^1.43.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -46,6 +51,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
