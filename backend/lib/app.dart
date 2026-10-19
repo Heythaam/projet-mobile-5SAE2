@@ -63,9 +63,17 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
       _authenticated(database, jwtSecret, _sendMessage),
     )
     ..get('/tournaments', _authenticated(database, jwtSecret, _tournaments))
+    ..post(
+      '/tournaments',
+      _authenticated(database, jwtSecret, _createTournament),
+    )
     ..get(
       '/tournaments/<tournamentId>',
       _authenticated(database, jwtSecret, _tournament),
+    )
+    ..patch(
+      '/tournaments/<tournamentId>',
+      _authenticated(database, jwtSecret, _editTournament),
     )
     ..post(
       '/tournaments/<tournamentId>/join',
@@ -488,6 +496,12 @@ Future<Response> _sendMessage(Request request) async {
 }
 
 const _tournamentStatuses = {'upcoming', 'active', 'finished', 'cancelled'};
+const _tournamentFormats = {
+  'knockout',
+  'league',
+  'groups_knockout',
+  'round_robin',
+};
 const _tournamentListLimit = 100;
 const _winPoints = 3;
 const _drawPoints = 1;
@@ -495,6 +509,21 @@ const _teamNameMinLength = 3;
 const _teamNameMaxLength = 30;
 final _teamNamePattern = RegExp(r"^[\p{L}\p{M}\p{N} '._-]+$", unicode: true);
 final _teamNameAlphanumeric = RegExp(r'[\p{L}\p{N}]', unicode: true);
+
+// Create and edit rules, mirrored by `TournamentFormRules` in the app.
+const _tournamentNameMinLength = 3;
+const _tournamentNameMaxLength = 60;
+const _descriptionMaxLength = 300;
+const _locationMaxLength = 100;
+const _prizeMaxLength = 100;
+const _allowedMaxTeams = [2, 4, 8, 16, 32];
+const _teamSizeMin = 1;
+const _teamSizeMax = 11;
+
+/// Control characters, tab and the newline pair excepted.
+final _controlCharacters = RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]');
+final _whitespaceRun = RegExp(r'\s+');
+final _fractionalSeconds = RegExp(r'\.\d+Z$');
 
 /// The team the signed-in user (`?1`) plays for in tournament `t`, as the
 /// captain of an active team or as an accepted player.
@@ -521,6 +550,7 @@ const _tournamentSelect =
     EXISTS (SELECT 1 FROM tournament_teams tt
       WHERE tt.tournament_id = t.id AND tt.captain_id = ?1
         AND tt.status = 'active') AS joined,
+    COALESCE(t.created_by = ?1, 0) AS is_organizer,
     $_myTeamId AS my_team_id,
     (SELECT COUNT(*) FROM join_requests jr
       WHERE jr.team_id = $_myTeamId AND jr.status = 'accepted')
