@@ -6,6 +6,7 @@ import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
 import '../models.dart';
+import '../stadium/stadium_module.dart';
 import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
@@ -296,8 +297,20 @@ class _KickoffShellState extends State<KickoffShell> {
       onAwards: _openAwards,
       onFriends: _openFriends,
       onSettings: _showSettings,
+      onStadiums: _openStadiums,
     ),
   };
+
+  void _openStadiums() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StadiumModule(
+          isGuest: widget.isGuest,
+          onSignIn: widget.onOpenAuth,
+        ),
+      ),
+    );
+  }
 
   FootballMatch? get _nextMatch {
     final now = DateTime.now();

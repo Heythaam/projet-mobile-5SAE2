@@ -11,6 +11,7 @@ class ProfileScreen extends StatelessWidget {
     required this.onAwards,
     required this.onFriends,
     required this.onSettings,
+    this.onStadiums,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback onAwards;
   final VoidCallback onFriends;
   final VoidCallback onSettings;
+  final VoidCallback? onStadiums;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +158,14 @@ class ProfileScreen extends StatelessWidget {
                       title: 'Friends',
                       onTap: onFriends,
                     ),
+                    if (onStadiums != null) ...[
+                      SizedBox(height: 8 * scale),
+                      _ProfileRow(
+                        icon: Icons.stadium_rounded,
+                        title: 'My stadiums',
+                        onTap: onStadiums!,
+                      ),
+                    ],
                     SizedBox(height: 8 * scale),
                     _ProfileRow(
                       icon: Icons.settings_rounded,

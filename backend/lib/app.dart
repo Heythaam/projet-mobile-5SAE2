@@ -8,6 +8,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'database.dart';
 import 'gamification.dart';
+import 'stadium.dart';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message);
@@ -51,6 +52,10 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
       '/friends/<friendId>/messages',
       _authenticated(database, jwtSecret, _sendMessage),
     );
+  mountStadiumRoutes(
+    router,
+    authenticated: (handler) => _authenticated(database, jwtSecret, handler),
+  );
 
   return Pipeline()
       .addMiddleware(logRequests())

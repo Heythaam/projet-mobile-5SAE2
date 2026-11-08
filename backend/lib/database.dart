@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart';
 
+import 'stadium.dart';
+
 class AppDatabase {
   AppDatabase(String path) {
     File(path).parent.createSync(recursive: true);
@@ -71,6 +73,7 @@ class AppDatabase {
       CREATE INDEX IF NOT EXISTS messages_conversation_idx
       ON messages(sender_id, recipient_id, id)
     ''');
+    createStadiumTables(db);
   }
 
   late final Database db;

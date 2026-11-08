@@ -35,8 +35,13 @@ booking is part of the product direction but is not implemented yet.
 - XP/achievements are awarded for defined events (registration, accepted
   friendship, messages, and streak milestones). Keep rewards grounded in
   persisted events; do not invent progress from presentation-only state.
+- Stadium module (owner side): owners add stadiums with lettered pitches
+  (5v5/7v7/11v11; turf/grass/indoor), features, open days, opening hours, slot
+  length, hourly price and an evening surcharge; they see availability per
+  pitch and day, block slots, pause or delete a stadium, and accept or decline
+  bookings (or auto-confirm them). It is opened from Profile → My stadiums.
 - The three-item app shell presents a calendar repository interface with an
-  empty implementation until match/stadium endpoints exist. Never add sample
+  empty implementation until match endpoints exist. Never add sample
   matches or locally persisted gamification values as if they were real.
 
 ## UI direction
@@ -69,6 +74,17 @@ booking is part of the product direction but is not implemented yet.
 - `backend/lib/app.dart`: Shelf routes and handlers.
 - `backend/lib/database.dart`: SQLite schema and migrations.
 - `backend/lib/gamification.dart`: XP and achievement rules.
+- Stadium module, kept isolated so its owner can work on it alone:
+  - `lib/stadium/stadium_module.dart`: the whole client side (models,
+    `StadiumApi`, all owner screens).
+  - `backend/lib/stadium.dart`: the whole server side (tables, validation,
+    routes). Shared files only call `createStadiumTables` (database.dart),
+    `mountStadiumRoutes` (app.dart) and open `StadiumModule` (kickoff_shell.dart).
+  - Stadium tables never reference users/XP/friends; owners and hosts are
+    opaque ids. Other modules use only `GET /stadiums`,
+    `GET /stadiums/<id>/slots?date=`, `POST /stadiums/<id>/bookings` and
+    `DELETE /stadium-bookings/<id>`. Owner screens use `/owner/...` routes.
+  - Tests: `backend/test/stadium_test.dart`, `test/stadium_test.dart`.
 - `test/`, `backend/test/`: Flutter widget and API/database tests.
 
 ## Development and validation (PowerShell)
