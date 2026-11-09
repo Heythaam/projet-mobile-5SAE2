@@ -217,14 +217,6 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                   onPressed: _creatingFromEmpty ? null : _startCreateFromEmpty,
                   child: const Text('Create one'),
                 ),
-                TextButton(
-                  key: const ValueKey('load_demo_matches'),
-                  onPressed: () async {
-                    await widget.controller.loadDemoMatches();
-                    if (mounted) setState(() {});
-                  },
-                  child: const Text('Add sample matches'),
-                ),
               ],
             ),
           )
@@ -340,6 +332,18 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                 ),
               ),
           ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const ValueKey('load_demo_matches'),
+              onPressed: () async {
+                await widget.controller.loadDemoMatches();
+                if (mounted) setState(() {});
+              },
+              icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+              label: const Text('Add sample matches'),
+            ),
+          ),
         ],
       ),
     );
