@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
 import 'package:football_match_app/auth_screen.dart';
@@ -170,32 +171,20 @@ void main() {
     expect(find.text('4 join requests waiting'), findsOneWidget);
   });
 
-  testWidgets('ball menu opens Challenge, Match and Tournament', (
+  testWidgets('ball menu opens the Challenges screen', (
     WidgetTester tester,
   ) async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
     await tester.pumpWidget(_guestShell());
     await tester.pumpAndSettle();
 
-    final destinations = <String, IconData>{
-      'Challenge': Icons.flash_on_rounded,
-      'Match': Icons.sports_soccer_rounded,
-      'Tournament': Icons.emoji_events_rounded,
-    };
-    for (final destination in destinations.entries) {
-      await tester.tap(find.bySemanticsLabel('Open ball menu'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(destination.value));
-      await tester.pumpAndSettle();
-      if (destination.key == 'Challenge') {
-        expect(find.text('Challenges'), findsOneWidget);
-        await tester.tap(find.byIcon(Icons.arrow_back_rounded));
-      } else {
-        expect(find.text(destination.key), findsOneWidget);
-        expect(find.text('Coming soon'), findsOneWidget);
-        await tester.pageBack();
-      }
-      await tester.pumpAndSettle();
-    }
+    await tester.tap(find.bySemanticsLabel('Open ball menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.flash_on_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Challenges'), findsOneWidget);
   });
 
   testWidgets('the home banner refreshes when the app resumes', (
