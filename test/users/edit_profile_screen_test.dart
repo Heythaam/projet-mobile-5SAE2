@@ -75,6 +75,28 @@ void main() {
     await tester.runAsync(db.close);
   });
 
+  testWidgets('choosing an avatar from the pop-up is saved', (tester) async {
+    tall(tester);
+    final (db, controller) = (await tester.runAsync(setup))!;
+    await tester.pumpWidget(
+      MaterialApp(home: EditProfileScreen(controller: controller)),
+    );
+    await tester.tap(find.byKey(const ValueKey('avatar_choose')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('avatar_grid')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('avatar_choice_3')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('avatar_grid')), findsNothing);
+
+    await tester.tap(find.text('Save'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.profile?.avatarId, 3 * 6);
+    await tester.runAsync(db.close);
+  });
+
   testWidgets('a taken username shows the error and stays open', (
     tester,
   ) async {

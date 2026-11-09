@@ -1,10 +1,9 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../local/user_local_store.dart';
 import '../users/avatar_palette.dart';
+import '../users/avatar_picker.dart';
 import '../users/country_picker.dart';
 import '../users/country_service.dart';
 import '../users/photo_source.dart';
@@ -138,6 +137,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (picked != null && mounted) setState(() => _country = picked.code);
   }
 
+  Future<void> _chooseAvatar() async {
+    final name = _username.text.trim().isEmpty
+        ? '?'
+        : _username.text.trim().toLowerCase();
+    final look = await pickAvatarLook(
+      context,
+      username: name,
+      colour: _avatarId % avatarColors.length,
+      currentLook: avatarLook(_avatarId),
+    );
+    if (look == null || !mounted) return;
+    setState(
+      () => _avatarId =
+          look * avatarColors.length + _avatarId % avatarColors.length,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final initial = _username.text.trim().isEmpty
@@ -246,15 +262,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (_photoPath == null)
                       Center(
                         child: TextButton.icon(
-                          key: const ValueKey('avatar_shuffle'),
-                          onPressed: () => setState(
-                            () => _avatarId =
-                                (1 + Random().nextInt(9999)) *
-                                    avatarColors.length +
-                                _avatarId % avatarColors.length,
-                          ),
-                          icon: const Icon(Icons.shuffle_rounded),
-                          label: const Text('New look'),
+                          key: const ValueKey('avatar_choose'),
+                          onPressed: _chooseAvatar,
+                          icon: const Icon(Icons.face_rounded),
+                          label: const Text('Choose avatar'),
                         ),
                       ),
                     const SizedBox(height: 20),
