@@ -242,17 +242,12 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     } else {
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => PlaceholderScreen(title: title, icon: icon),
+          builder: (_) => title == 'Match'
+              ? MatchHomeScreen(controller: _matchDemoController)
+              : PlaceholderScreen(title: title, icon: icon),
         ),
       );
     }
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => title == 'Match'
-            ? MatchHomeScreen(controller: _matchDemoController)
-            : PlaceholderScreen(title: title, icon: icon),
-      ),
-    );
   }
 
   /// The banner refreshes in [didPopNext] once the tournaments close.
