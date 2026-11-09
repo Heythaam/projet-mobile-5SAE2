@@ -63,6 +63,7 @@ void main() {
     setUp(() async {
       testCount++;
       final dbName = 'test_db_crud_$testCount.db';
+      await databaseFactoryFfi.deleteDatabase(dbName);
       final inMemoryDb = await databaseFactoryFfi.openDatabase(dbName);
       db = ChallengeDatabase(inMemoryDb);
 
@@ -240,6 +241,7 @@ void main() {
     testWidgets('ChallengesDashboardScreen switches tabs', (
       WidgetTester tester,
     ) async {
+      await databaseFactoryFfi.deleteDatabase('widget_db_2.db');
       final inMemoryDb = await databaseFactoryFfi.openDatabase('widget_db_2.db');
       await inMemoryDb.execute('''
         CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT, color TEXT, icon TEXT);
