@@ -13,7 +13,7 @@ class LocalDatabase {
 
   /// Bump this and add an `if (oldVersion < N)` step in [onUpgrade] whenever
   /// the schema changes.
-  static const version = 2;
+  static const version = 3;
 
   /// [factory] and [path] exist so tests can open an in-memory database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -93,6 +93,11 @@ class LocalDatabase {
       await db.execute(
         'CREATE INDEX idx_matches_public_time ON matches(is_public, scheduled_at)',
       );
+    }
+    if (oldVersion < 3 && newVersion >= 3) {
+      // The Stadium module's booking for this match, when the match was made
+      // in a real stadium. Lets the host release the slot on cancel.
+      await db.execute('ALTER TABLE matches ADD COLUMN booking_id INTEGER');
     }
   }
 }

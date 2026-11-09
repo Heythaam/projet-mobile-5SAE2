@@ -50,4 +50,36 @@ void main() {
     final version = await v2.rawQuery('PRAGMA user_version');
     expect(version.first['user_version'], LocalDatabase.version);
   });
+
+  test('upgrading from version 2 adds booking_id and keeps matches', () async {
+    final dir = await Directory.systemTemp.createTemp('kickoff_local_db_');
+    final path = '${dir.path}/upgrade2.db';
+    addTearDown(() => dir.delete(recursive: true));
+
+    final v2 = await databaseFactoryFfi.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 2,
+        onConfigure: LocalDatabase.onConfigure,
+        onCreate: (db, version) => LocalDatabase.onUpgrade(db, 0, version),
+      ),
+    );
+    await v2.insert('matches', {
+      'code': 'ABCDE',
+      'host_uid': 'host',
+      'stadium': 'Green Arena',
+      'scheduled_at': 1,
+      'capacity': 10,
+      'is_public': 0,
+      'created_at': 1,
+      'updated_at': 1,
+    });
+    await v2.close();
+
+    final v3 = await LocalDatabase.open(factory: databaseFactoryFfi, path: path);
+    addTearDown(v3.close);
+    final rows = await v3.query('matches');
+    expect(rows.single['code'], 'ABCDE');
+    expect(rows.single['booking_id'], isNull);
+  });
 }

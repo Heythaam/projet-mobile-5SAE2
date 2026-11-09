@@ -95,6 +95,33 @@ void main() {
       expect(without.latitude, isNull);
     });
 
+    test('keeps the stadium booking of the match', () async {
+      final match = await store.create(
+        hostUid: 'host',
+        stadium: 'Arena Nord',
+        scheduledAt: inHours(24),
+        capacity: 10,
+        bookingId: 42,
+      );
+      expect(match.bookingId, 42);
+      expect((await seed(host: 'x')).bookingId, isNull);
+    });
+
+    test('only the host can set or clear the booking', () async {
+      final match = await seed();
+      final set = await store.setBookingId(match.code, 'host', 7);
+      expect(set.bookingId, 7);
+      await expectLater(
+        store.setBookingId(match.code, 'stranger', 8),
+        throwsMatch(LocalMatchError.notHost),
+      );
+      expect((await store.setBookingId(match.code, 'host', null)).bookingId, isNull);
+      await expectLater(
+        store.setBookingId('ZZZZZ', 'host', 1),
+        throwsMatch(LocalMatchError.notFound),
+      );
+    });
+
     test('rejects a half or out of range location', () async {
       for (final place in [(36.0, null), (null, 10.0), (95.0, 10.0), (36.0, 200.0)]) {
         await expectLater(

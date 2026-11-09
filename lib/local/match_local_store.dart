@@ -42,6 +42,7 @@ class LocalMatch {
     required this.slotNames,
     this.latitude,
     this.longitude,
+    this.bookingId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -63,6 +64,9 @@ class LocalMatch {
   /// Where the match is played, when known.
   final double? latitude;
   final double? longitude;
+
+  /// The Stadium module's booking for this match, or null when it has none.
+  final int? bookingId;
 
   bool get hasLocation => latitude != null && longitude != null;
   int get players => slots.where((uid) => uid != null).length;
@@ -103,6 +107,7 @@ class MatchLocalStore {
     String hostName = '',
     double? latitude,
     double? longitude,
+    int? bookingId,
   }) async {
     if (hostUid.trim().isEmpty) {
       throw const LocalMatchException(
@@ -161,6 +166,7 @@ class MatchLocalStore {
         'is_public': isPublic ? 1 : 0,
         'latitude': latitude,
         'longitude': longitude,
+        'booking_id': bookingId,
         'created_at': ms,
         'updated_at': ms,
       });
@@ -275,6 +281,28 @@ class MatchLocalStore {
     });
   }
 
+  /// Remembers the Stadium booking that holds this match's slot. Only the host
+  /// can set it.
+  Future<LocalMatch> setBookingId(String code, String uid, int? bookingId) {
+    return _db.transaction((txn) async {
+      final match = await _load(txn, code);
+      if (match == null) throw _notFound();
+      if (match.hostUid != uid) {
+        throw const LocalMatchException(
+          LocalMatchError.notHost,
+          'Only the host can change this match.',
+        );
+      }
+      await txn.update(
+        'matches',
+        {'booking_id': bookingId},
+        where: 'code = ?',
+        whereArgs: [match.code],
+      );
+      return (await _load(txn, match.code))!;
+    });
+  }
+
   // ---- Delete -----------------------------------------------------------
 
   /// Removes the match and all its players. Only the host can do this.
@@ -379,6 +407,7 @@ class MatchLocalStore {
       slotNames: names,
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
+      bookingId: row['booking_id'] as int?,
       createdAt: _fromMs(row['created_at']! as int),
       updatedAt: _fromMs(row['updated_at']! as int),
     );
