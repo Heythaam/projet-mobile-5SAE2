@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../matches/match_controller.dart';
 import '../kickoff_style.dart';
@@ -82,7 +83,7 @@ class MatchLobbyScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              _CodeCard(code: match.code),
+              _CodeCard(code: match.code, shareText: _shareText(match)),
               const SizedBox(height: 12),
               Expanded(
                 child: PitchView(
@@ -100,7 +101,7 @@ class MatchLobbyScreen extends StatelessWidget {
                 icon: Icons.share_rounded,
                 onPressed: match.players >= match.capacity
                     ? null
-                    : () => _showShareSoon(context),
+                    : () => _share(context),
               ),
               if (controller != null && controller!.hasJoined(match))
                 TextButton(
@@ -173,7 +174,7 @@ class MatchLobbyScreen extends StatelessWidget {
         ? match.playerSlots[index]
         : null;
     if (initial == null) {
-      _showShareSoon(context);
+      _share(context);
       return;
     }
     showModalBottomSheet<void>(
@@ -195,17 +196,30 @@ class MatchLobbyScreen extends StatelessWidget {
     );
   }
 
-  void _showShareSoon(BuildContext context) {
+  void _share(BuildContext context) => _shareMatch(context, _shareText(match));
+}
+
+String _shareText(MatchHomeMatch match) =>
+    'Join my football match at ${match.stadium}! '
+    'Open Kickoff and enter code ${match.code}.';
+
+Future<void> _shareMatch(BuildContext context, String text) async {
+  try {
+    await SharePlus.instance.share(ShareParams(text: text));
+  } on Object {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Share coming soon')));
+      ..showSnackBar(const SnackBar(content: Text('Invite copied')));
   }
 }
 
 class _CodeCard extends StatelessWidget {
-  const _CodeCard({required this.code});
+  const _CodeCard({required this.code, required this.shareText});
 
   final String code;
+  final String shareText;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -247,11 +261,11 @@ class _CodeCard extends StatelessWidget {
         Semantics(
           label: 'Share match code',
           button: true,
-          onTap: () => _showShareSoon(context),
+          onTap: () => _shareMatch(context, shareText),
           child: ExcludeSemantics(
             child: IconButton(
               tooltip: 'Share match code',
-              onPressed: () => _showShareSoon(context),
+              onPressed: () => _shareMatch(context, shareText),
               icon: const Icon(Icons.share_rounded, color: Colors.white),
             ),
           ),
@@ -269,10 +283,22 @@ class _CodeCard extends StatelessWidget {
       ..showSnackBar(const SnackBar(content: Text('Code copied')));
   }
 
-  void _showShareSoon(BuildContext context) {
+  void _share(BuildContext context) => _shareMatch(context, _shareText(match));
+}
+
+String _shareText(MatchHomeMatch match) =>
+    'Join my football match at ${match.stadium}! '
+    'Open Kickoff and enter code ${match.code}.';
+
+Future<void> _shareMatch(BuildContext context, String text) async {
+  try {
+    await SharePlus.instance.share(ShareParams(text: text));
+  } on Object {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Share coming soon')));
+      ..showSnackBar(const SnackBar(content: Text('Invite copied')));
   }
 }
 

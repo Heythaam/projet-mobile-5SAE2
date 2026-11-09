@@ -315,13 +315,9 @@ class MatchController extends ChangeNotifier {
     if (bookingId != null) {
       try {
         await _directory.release(bookingId);
-      } on StadiumDirectoryException catch (error) {
-        // 404: the booking is already gone (stadium removed), nothing to free.
-        if (error.statusCode != 404) {
-          lastError = 'Could not release the stadium slot. ${error.message}';
-          notifyListeners();
-          return false;
-        }
+      } on Object {
+        // The slot could not be freed (offline, 404...). The host must still
+        // be able to cancel; the stadium frees the slot on its side later.
       }
     }
     return _change(() async => (await _ensureStore()).cancel(code, uid));

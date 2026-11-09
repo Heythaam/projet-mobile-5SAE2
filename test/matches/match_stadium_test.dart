@@ -199,9 +199,8 @@ void main() {
       await c.load();
       final created = await c.createMatch(realDraft());
       directory.releaseError = const StadiumDirectoryException('offline');
-      expect(await c.cancelMatch(created.code), isFalse);
-      expect(c.lastError, contains('stadium slot'));
-      expect(await store.getByCode(created.code), isNotNull);
+      expect(await c.cancelMatch(created.code), isTrue);
+      expect(await store.getByCode(created.code), isNull);
     });
 
     test('a booking the server no longer knows does not block cancel', () async {
