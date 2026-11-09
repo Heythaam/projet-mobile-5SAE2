@@ -120,12 +120,16 @@ class _ChunkyButtonState extends State<ChunkyButton> {
               decoration: BoxDecoration(
                 color: widget.backgroundColor,
                 borderRadius: BorderRadius.circular(radius),
-                border: Border(
-                  bottom: BorderSide(
-                    color: widget.bottomColor,
-                    width: _pressed ? 0 : edgeHeight,
-                  ),
-                ),
+                // A hairline (width 0) border with a radius asserts in debug,
+                // so the pressed button simply has no bottom edge.
+                border: _pressed
+                    ? null
+                    : Border(
+                        bottom: BorderSide(
+                          color: widget.bottomColor,
+                          width: edgeHeight,
+                        ),
+                      ),
               ),
               child: widget.busy
                   ? SizedBox(
