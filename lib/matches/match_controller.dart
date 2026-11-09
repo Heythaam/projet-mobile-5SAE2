@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../firebase/cloud_sync.dart';
 import '../sample_data/sample_data.dart';
 import '../local/local_database.dart';
 import '../location/player_location.dart';
@@ -35,6 +38,7 @@ class MatchController extends ChangeNotifier {
     WeatherService? weather,
     LocationSource? location,
     StadiumDirectory? stadiumDirectory,
+    this.cloud = const NoopCloudSync(),
   }) : _openStore = openStore ?? _openDefaultStore,
        weather = weather ?? WeatherService(),
        _location = location ?? const GeolocatorLocationSource(),
@@ -44,6 +48,9 @@ class MatchController extends ChangeNotifier {
   final String uid;
   final String username;
   final MatchStoreOpener _openStore;
+
+  /// Cloud copy of the matches; the phone stays the main copy.
+  final CloudSync cloud;
 
   /// Forecast for the match card. Needs a connection; shows nothing offline.
   final WeatherService weather;
@@ -257,6 +264,7 @@ class MatchController extends ChangeNotifier {
       final joined = await store.join(code, uid, name: username);
       await _refresh(focusCode: joined.code);
       notifyListeners();
+      unawaited(cloud.pushMatch(joined));
       return _toHome(joined);
     } on LocalMatchException catch (error) {
       if (error.error == LocalMatchError.alreadyJoined) {
@@ -305,6 +313,7 @@ class MatchController extends ChangeNotifier {
     }
     await _refresh(focusCode: created.code);
     notifyListeners();
+    unawaited(cloud.pushMatch(created));
     return _toHome(created);
   }
 
@@ -313,8 +322,13 @@ class MatchController extends ChangeNotifier {
       _byCode[match.code.toUpperCase()]?.hostUid == uid;
 
   /// Frees the player's place. The host cancels instead.
-  Future<bool> leaveMatch(String code) async =>
-      _change(() async => (await _ensureStore()).leave(code, uid));
+  Future<bool> leaveMatch(String code) async {
+    final done = await _change(
+      () async => (await _ensureStore()).leave(code, uid),
+    );
+    if (done) _pushCode(code);
+    return done;
+  }
 
   /// Removes the match and everyone in it. Only the host can do this. A
   /// stadium slot held for the match is released first; if that fails the
@@ -337,14 +351,28 @@ class MatchController extends ChangeNotifier {
         // be able to cancel; the stadium frees the slot on its side later.
       }
     }
-    return _change(() async => (await _ensureStore()).cancel(code, uid));
+    final done = await _change(
+      () async => (await _ensureStore()).cancel(code, uid),
+    );
+    if (done) unawaited(cloud.deleteMatch(code.trim().toUpperCase()));
+    return done;
   }
 
   /// Makes the match public or private. Only the host can.
-  Future<bool> setPublic(String code, {required bool isPublic}) => _change(
-    () async =>
-        (await _ensureStore()).setPublic(code, uid, isPublic: isPublic),
-  );
+  Future<bool> setPublic(String code, {required bool isPublic}) async {
+    final done = await _change(
+      () async =>
+          (await _ensureStore()).setPublic(code, uid, isPublic: isPublic),
+    );
+    if (done) _pushCode(code);
+    return done;
+  }
+
+  /// Sends the current phone copy of a match to the cloud, if it still exists.
+  void _pushCode(String code) {
+    final match = _byCode[code.trim().toUpperCase()];
+    if (match != null) unawaited(cloud.pushMatch(match));
+  }
 
   Future<bool> _change(Future<Object?> Function() action) async {
     lastError = null;

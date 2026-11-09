@@ -7,13 +7,19 @@ import 'security/app_lock.dart';
 import 'models.dart';
 import 'screens/kickoff_shell.dart';
 import 'app_route_observer.dart';
+import 'firebase/cloud_sync.dart';
+import 'firebase/firebase_cloud_sync.dart';
 
-void main() {
-  runApp(const FootballMatchApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cloud = await FirebaseCloudSync.start();
+  runApp(FootballMatchApp(cloud: cloud));
 }
 
 class FootballMatchApp extends StatefulWidget {
-  const FootballMatchApp({super.key});
+  const FootballMatchApp({this.cloud = const NoopCloudSync(), super.key});
+
+  final CloudSync cloud;
 
   @override
   State<FootballMatchApp> createState() => _FootballMatchAppState();
@@ -79,6 +85,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
 
   Future<void> _logout() async {
     await _api.logout();
+    await widget.cloud.signOut();
     await _remember(null);
     if (mounted) {
       setState(() {
@@ -144,6 +151,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         : _user == null && !_guest
         ? AuthScreen(
             api: _api,
+            cloud: widget.cloud,
             onAuthenticated: (user) {
               _remember(user);
               setState(() {
@@ -160,6 +168,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         : _locked(
             KickoffShell(
               api: _api,
+              cloud: widget.cloud,
               user: _user ?? _guestUser,
               isGuest: _guest,
               onLogout: _logout,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../firebase/cloud_sync.dart';
 import '../matches/match_controller.dart';
 import '../app_route_observer.dart';
 import '../home_screen.dart';
@@ -64,6 +65,7 @@ class KickoffShell extends StatefulWidget {
     required this.user,
     required this.onLogout,
     this.isGuest = false,
+    this.cloud = const NoopCloudSync(),
     this.onOpenAuth,
     this.matchRepository = const EmptyMatchRepository(),
     this.appLock,
@@ -77,6 +79,7 @@ class KickoffShell extends StatefulWidget {
   final Authenticator? authenticator;
 
   final ApiClient api;
+  final CloudSync cloud;
   final UserAccount user;
   final VoidCallback onLogout;
   final bool isGuest;
@@ -100,6 +103,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   late final _matchController = MatchController(
     uid: widget.isGuest ? 'guest' : '${widget.user.id}',
     username: widget.isGuest ? 'Guest' : widget.user.username,
+    cloud: widget.isGuest ? const NoopCloudSync() : widget.cloud,
   );
   static final _noChanges = ChangeNotifier();
   final _countries = CountryService();
@@ -111,6 +115,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
           uid: '${widget.user.id}',
           accountUsername: widget.user.username,
           email: widget.user.email,
+          cloud: widget.cloud,
         );
 
   /// Join requests waiting for this captain; the home banner hides at zero.

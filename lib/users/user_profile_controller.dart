@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../firebase/cloud_sync.dart';
 import '../local/local_database.dart';
 import '../local/user_local_store.dart';
 
@@ -16,12 +19,16 @@ class UserProfileController extends ChangeNotifier {
     required this.accountUsername,
     required this.email,
     UserStoreOpener? openStore,
+    this.cloud = const NoopCloudSync(),
   }) : _openStore = openStore ?? _openDefaultStore;
 
   final String uid;
   final String accountUsername;
   final String email;
   final UserStoreOpener _openStore;
+
+  /// Cloud copy of the profile; the phone stays the main copy.
+  final CloudSync cloud;
 
   LocalUser? profile;
   bool loaded = false;
@@ -90,6 +97,8 @@ class UserProfileController extends ChangeNotifier {
         clearPhoto: clearPhoto,
       );
       _notify();
+      final saved = profile;
+      if (saved != null) unawaited(cloud.pushProfile(saved));
       return true;
     } on LocalUserException catch (error) {
       lastError = error.message;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api_client.dart';
+import 'firebase/cloud_sync.dart';
 import 'models.dart';
 import 'screens/kickoff_style.dart';
 
@@ -10,10 +11,12 @@ class AuthScreen extends StatefulWidget {
     required this.api,
     required this.onAuthenticated,
     required this.onGuest,
+    this.cloud = const NoopCloudSync(),
     super.key,
   });
 
   final ApiClient api;
+  final CloudSync cloud;
   final ValueChanged<UserAccount> onAuthenticated;
   final VoidCallback onGuest;
 
@@ -73,6 +76,10 @@ class _AuthScreenState extends State<AuthScreen> {
               email: _email.text.trim(),
               password: _password.text,
             );
+      await widget.cloud.signIn(
+        email: _email.text.trim(),
+        password: _password.text,
+      );
       if (mounted) widget.onAuthenticated(user);
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
