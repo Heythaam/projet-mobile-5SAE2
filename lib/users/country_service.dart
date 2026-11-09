@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'builtin_countries.dart';
+
 class Country {
   const Country({required this.code, required this.name, required this.flagUrl});
 
@@ -40,17 +42,51 @@ class CountryService {
   final String _baseUrl;
   List<Country>? _cache;
 
-  /// Every country, sorted by name. Throws [CountryException] when the API
-  /// cannot be reached.
+  /// True when the last [all] could not use the API and answered from the
+  /// built-in list instead.
+  bool usingOfflineList = false;
+
+  /// Every country, sorted by name. When the API cannot be reached, or answers
+  /// with something unexpected, the built-in list is used so the picker still
+  /// works (without flag images; the emoji flag comes from the code).
   Future<List<Country>> all() async {
     final cached = _cache;
     if (cached != null) return cached;
-    final body = await _get('/all?fields=name,cca2,flags');
-    final list = [
-      for (final item in body as List<dynamic>)
-        Country.fromJson(item as Map<String, dynamic>),
-    ]..sort((a, b) => a.name.compareTo(b.name));
-    return _cache = list;
+    try {
+      final list = _parse(await _get('/all?fields=name,cca2,flags'))
+        ..sort((a, b) => a.name.compareTo(b.name));
+      usingOfflineList = false;
+      return _cache = list;
+    } on Object {
+      usingOfflineList = true;
+      return [
+        for (final (code, name) in builtInCountries)
+          Country(code: code, name: name, flagUrl: ''),
+      ];
+    }
+  }
+
+  /// The API normally answers with a list. Some answers wrap it in an object,
+  /// so the first list inside is used. Entries that do not parse are skipped.
+  List<Country> _parse(Object? body) {
+    final Object? raw = body is Map<String, dynamic>
+        ? body.values.whereType<List<dynamic>>().firstOrNull
+        : body;
+    if (raw is! List<dynamic>) {
+      throw const CountryException('The country list was not readable.');
+    }
+    final list = <Country>[];
+    for (final item in raw) {
+      try {
+        list.add(Country.fromJson(item as Map<String, dynamic>));
+      } on Object {
+        continue;
+      }
+    }
+    if (list.isEmpty) {
+      throw const CountryException('The country list was empty.');
+    }
+    return list;
   }
 
   /// One country by its code, or null when the API does not know it or cannot
@@ -71,6 +107,9 @@ class CountryService {
         return Country.fromJson(map as Map<String, dynamic>);
       } on Object {
         _single.remove(upper);
+        for (final (code, name) in builtInCountries) {
+          if (code == upper) return Country(code: code, name: name, flagUrl: '');
+        }
         return null;
       }
     });
