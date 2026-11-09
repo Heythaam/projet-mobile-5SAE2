@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../app_route_observer.dart';
 import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
 import '../models.dart';
+import '../tournaments/screens/tournaments_list_screen.dart';
+import '../tournaments/services/tournament_service.dart';
+import '../tournaments/widgets/requests_badge.dart';
 import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
@@ -98,7 +102,7 @@ class KickoffShell extends StatefulWidget {
   State<KickoffShell> createState() => _KickoffShellState();
 }
 
-class _KickoffShellState extends State<KickoffShell> {
+class _KickoffShellState extends State<KickoffShell> with RouteAware {
   int _tab = 0;
   bool _menuOpen = false;
   bool _loadingProfile = true;
@@ -110,16 +114,48 @@ class _KickoffShellState extends State<KickoffShell> {
   bool _showHistoryOnCalendar = false;
   final _matchDemoController = MatchDemoController();
 
+  /// Join requests waiting for this captain; the home banner hides at zero.
+  int _pendingJoinRequests = 0;
+  int _latestPendingLoad = 0;
+  late final _tournamentService = TournamentService(widget.api);
+  ModalRoute<void>? _route;
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
-    if (!widget.isGuest) {
-      _refreshProfile();
-    } else {
-      _loadingProfile = false;
-      _profile = _guestGamification;
-    }
+    _lifecycle = AppLifecycleListener(onResume: _refreshIfHomeVisible);
+    _refreshProfile();
+    _loadPendingJoinRequests();
     _loadMatches();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      if (_route != null) appRouteObserver.unsubscribe(this);
+      _route = route;
+      if (route != null) appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  /// Back from any screen pushed above the shell (tournaments, friends,
+  /// awards...): requests may have arrived or been answered meanwhile.
+  @override
+  void didPopNext() => _refreshIfHomeVisible();
+
+  /// The banner lives on the Home tab, so only that tab refreshes it.
+  void _refreshIfHomeVisible() {
+    if (_tab == 0 && (_route?.isCurrent ?? true)) _loadPendingJoinRequests();
   }
 
   Future<void> _refreshProfile() async {
@@ -141,6 +177,28 @@ class _KickoffShellState extends State<KickoffShell> {
         _loadingProfile = false;
       });
     }
+  }
+
+  /// The banner is a shortcut, so a failure only hides it; the service logs
+  /// the cause and the tournaments screens show their own errors.
+  Future<void> _loadPendingJoinRequests() async {
+    // Only the latest load may update the banner, so a slow earlier answer
+    // cannot overwrite a newer count.
+    final load = ++_latestPendingLoad;
+    try {
+      final count = await _tournamentService.getPendingRequestCount();
+      if (mounted && load == _latestPendingLoad) {
+        setState(() => _pendingJoinRequests = count);
+      }
+    } on TournamentException {
+      if (mounted && load == _latestPendingLoad) {
+        setState(() => _pendingJoinRequests = 0);
+      }
+    }
+  }
+
+  Future<void> _refreshHome() async {
+    await Future.wait([_refreshProfile(), _loadPendingJoinRequests()]);
   }
 
   Future<void> _loadMatches() async {
@@ -177,10 +235,14 @@ class _KickoffShellState extends State<KickoffShell> {
     );
   }
 
-  @override
-  void dispose() {
-    _matchDemoController.dispose();
-    super.dispose();
+  /// The banner refreshes in [didPopNext] once the tournaments close.
+  void _openTournaments() {
+    setState(() => _menuOpen = false);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TournamentsListScreen(service: _tournamentService),
+      ),
+    );
   }
 
   void _openFriends() {
@@ -280,6 +342,8 @@ class _KickoffShellState extends State<KickoffShell> {
       _tab = _tab == 1 ? 0 : 1;
       _showHistoryOnCalendar = false;
     });
+    // Back on Home: the banner may be out of date.
+    if (_tab == 0) _loadPendingJoinRequests();
   }
 
   Widget _screen() => switch (_tab) {
@@ -289,8 +353,14 @@ class _KickoffShellState extends State<KickoffShell> {
       loading: _loadingProfile,
       loadError: _profileError,
       nextMatch: _nextMatch,
-      onRetry: _refreshProfile,
+      onRetry: _refreshHome,
       onOpenBallMenu: () => setState(() => _menuOpen = true),
+      tournamentBanner: _pendingJoinRequests > 0
+          ? PendingRequestsBanner(
+              count: _pendingJoinRequests,
+              onOpen: _openTournaments,
+            )
+          : null,
     ),
     1 => CalendarScreen(
       matches: _matches,
@@ -338,6 +408,7 @@ class _KickoffShellState extends State<KickoffShell> {
             _BallMenuOverlay(
               onDismiss: () => setState(() => _menuOpen = false),
               onSelect: _openPlaceholder,
+              onTournaments: _openTournaments,
             ),
         ],
       ),
@@ -356,10 +427,15 @@ class _KickoffShellState extends State<KickoffShell> {
 }
 
 class _BallMenuOverlay extends StatelessWidget {
-  const _BallMenuOverlay({required this.onDismiss, required this.onSelect});
+  const _BallMenuOverlay({
+    required this.onDismiss,
+    required this.onSelect,
+    required this.onTournaments,
+  });
 
   final VoidCallback onDismiss;
   final void Function(String title, IconData icon) onSelect;
+  final VoidCallback onTournaments;
 
   @override
   Widget build(BuildContext context) {
@@ -414,7 +490,7 @@ class _BallMenuOverlay extends StatelessWidget {
               bottomColor: KickoffColors.blueDark,
               foreground: Colors.white,
               delay: 100,
-              onTap: () => onSelect('Tournament', Icons.emoji_events_rounded),
+              onTap: onTournaments,
             ),
           ],
         ),

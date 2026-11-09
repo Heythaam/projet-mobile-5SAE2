@@ -171,7 +171,7 @@ Map<String, Object?> gamificationSnapshot(AppDatabase database, int userId) {
   }
   final stats = row.first;
   final xp = stats['xp'] as int;
-  final level = 1 + xp ~/ 300;
+  final level = levelForXp(xp);
   final friendCount =
       database.db
               .select(
@@ -202,7 +202,7 @@ Map<String, Object?> gamificationSnapshot(AppDatabase database, int userId) {
   return {
     'xp': xp,
     'level': level,
-    'rank': _rankForLevel(level),
+    'rank': rankForLevel(level),
     'xpIntoLevel': xp % 300,
     'xpForNextLevel': 300,
     'currentStreak': streak,
@@ -233,7 +233,10 @@ Map<String, Object?> gamificationSnapshot(AppDatabase database, int userId) {
   };
 }
 
-String _rankForLevel(int level) => switch (level) {
+/// Level shown for [xp]; every 300 XP is one level.
+int levelForXp(int xp) => 1 + xp ~/ 300;
+
+String rankForLevel(int level) => switch (level) {
   >= 10 => 'CLUB LEGEND',
   >= 7 => 'GOLDEN BOOT',
   >= 4 => 'TEAM CAPTAIN',

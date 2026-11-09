@@ -155,20 +155,11 @@ class _ChunkyButtonState extends State<ChunkyButton> {
                           ),
                         ),
                       ],
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.showIcon) ...[
-                          Icon(
-                            widget.icon,
-                            size: 24 * scale,
-                            color: widget.foregroundColor,
-                          ),
-                          SizedBox(width: 6 * scale),
-                        ],
-                        Text(
+                      Flexible(
+                        child: Text(
                           widget.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: widget.foregroundColor,
                             fontSize: 17 * scale,
@@ -197,6 +188,9 @@ class PillField extends StatelessWidget {
     this.suffix,
     this.onSubmitted,
     this.enabled = true,
+    this.inputFormatters,
+    this.textCapitalization = TextCapitalization.none,
+    this.autofocus = false,
     super.key,
   });
 
@@ -210,6 +204,9 @@ class PillField extends StatelessWidget {
   final Widget? suffix;
   final ValueChanged<String>? onSubmitted;
   final bool enabled;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextCapitalization textCapitalization;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +224,9 @@ class PillField extends StatelessWidget {
       validator: validator,
       onFieldSubmitted: onSubmitted,
       enabled: enabled,
+      inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization,
+      autofocus: autofocus,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(
