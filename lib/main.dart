@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api_client.dart';
 import 'auth_screen.dart';
 import 'local/session_store.dart';
+import 'security/app_lock.dart';
 import 'models.dart';
 import 'screens/kickoff_shell.dart';
 import 'app_route_observer.dart';
@@ -21,6 +22,8 @@ class FootballMatchApp extends StatefulWidget {
 class _FootballMatchAppState extends State<FootballMatchApp> {
   final _api = ApiClient();
   final Future<SessionStore> _session = SessionStore.open();
+  final Authenticator _authenticator = LocalAuthAuthenticator();
+  AppLockSettings? _appLock;
   UserAccount? _user;
   bool _guest = false;
   Object? _startupError;
@@ -51,6 +54,11 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
 
   Future<void> _restoreSession() async {
     try {
+      try {
+        _appLock ??= await AppLockSettings.open();
+      } catch (_) {
+        // Without saved settings the app simply opens unlocked.
+      }
       final user = await _api.restoreSession();
       if (user != null) await _remember(user);
       if (!mounted) return;
@@ -78,6 +86,17 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         _guest = false;
       });
     }
+  }
+
+  /// Signed-in players get the app lock; guests have nothing to protect.
+  Widget _locked(Widget shell) {
+    final settings = _appLock;
+    if (_guest || settings == null) return shell;
+    return AppLockGate(
+      settings: settings,
+      authenticator: _authenticator,
+      child: shell,
+    );
   }
 
   @override
@@ -138,15 +157,19 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               _startupError = null;
             }),
           )
-        : KickoffShell(
-            api: _api,
-            user: _user ?? _guestUser,
-            isGuest: _guest,
-            onLogout: _logout,
-            onOpenAuth: () => setState(() {
-              _guest = false;
-              _user = null;
-            }),
+        : _locked(
+            KickoffShell(
+              api: _api,
+              user: _user ?? _guestUser,
+              isGuest: _guest,
+              onLogout: _logout,
+              appLock: _guest ? null : _appLock,
+              authenticator: _authenticator,
+              onOpenAuth: () => setState(() {
+                _guest = false;
+                _user = null;
+              }),
+            ),
           ),
   );
 }

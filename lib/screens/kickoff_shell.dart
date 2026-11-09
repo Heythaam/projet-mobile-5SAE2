@@ -15,6 +15,7 @@ import '../users/country_service.dart';
 import '../users/user_profile_controller.dart';
 import 'edit_profile_screen.dart';
 import 'people_screen.dart';
+import '../security/app_lock.dart';
 import '../tournaments/screens/tournaments_list_screen.dart';
 import '../tournaments/services/tournament_service.dart';
 import '../tournaments/widgets/requests_badge.dart';
@@ -65,8 +66,15 @@ class KickoffShell extends StatefulWidget {
     this.isGuest = false,
     this.onOpenAuth,
     this.matchRepository = const EmptyMatchRepository(),
+    this.appLock,
+    this.authenticator,
     super.key,
   });
+
+  /// App lock setting and the phone check. When either is null Settings does
+  /// not offer the lock.
+  final AppLockSettings? appLock;
+  final Authenticator? authenticator;
 
   final ApiClient api;
   final UserAccount user;
@@ -311,6 +319,27 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
                       _editProfile();
                     },
                   ),
+                  if (widget.appLock != null && widget.authenticator != null)
+                    StatefulBuilder(
+                      builder: (context, setSheetState) => SwitchListTile(
+                        key: const ValueKey('settings_app_lock'),
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Lock the app',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        subtitle: const Text(
+                          'Ask for fingerprint, face or screen lock when you open Kickoff.',
+                          style: TextStyle(color: KickoffColors.muted),
+                        ),
+                        value: widget.appLock!.enabled,
+                        onChanged: (on) async {
+                          final ok = await _setAppLock(on);
+                          if (!ok) return;
+                          setSheetState(() {});
+                        },
+                      ),
+                    ),
                   SizedBox(height: 8 * scale),
                   TextButton(
                     key: const ValueKey('settings_people'),
@@ -471,6 +500,32 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
         ),
       ),
     );
+  }
+
+  /// Turns the lock on or off. Both need the phone check to pass first, so a
+  /// stranger holding an unlocked phone cannot switch it off.
+  Future<bool> _setAppLock(bool on) async {
+    final settings = widget.appLock;
+    final auth = widget.authenticator;
+    if (settings == null || auth == null) return false;
+    String? problem;
+    if (on && !await auth.isAvailable()) {
+      problem = 'Set up a fingerprint or screen lock on this phone first.';
+    } else if (!await auth.authenticate(
+      on ? 'Turn on the app lock' : 'Turn off the app lock',
+    )) {
+      problem = 'The check did not pass, so the lock was not changed.';
+    }
+    if (problem != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(problem)));
+      }
+      return false;
+    }
+    await settings.setEnabled(on);
+    return true;
   }
 
   void _openPeople() {
