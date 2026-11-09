@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../local/local_database.dart';
 import '../local/match_local_store.dart';
 import '../screens/match/match_mock_data.dart';
+import '../weather/weather_service.dart';
 
 typedef MatchStoreOpener = Future<MatchLocalStore> Function();
 
@@ -16,12 +17,17 @@ class MatchController extends ChangeNotifier {
     required this.uid,
     required this.username,
     MatchStoreOpener? openStore,
-  }) : _openStore = openStore ?? _openDefaultStore;
+    WeatherService? weather,
+  }) : _openStore = openStore ?? _openDefaultStore,
+       weather = weather ?? WeatherService();
 
   /// The signed-in player. Local ids are strings so Firebase uids fit later.
   final String uid;
   final String username;
   final MatchStoreOpener _openStore;
+
+  /// Forecast for the match card. Needs a connection; shows nothing offline.
+  final WeatherService weather;
 
   // Placeholders the Match home screen already showed. Real values must come
   // from the API once XP is wired.

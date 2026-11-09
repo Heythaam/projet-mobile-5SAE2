@@ -5,6 +5,7 @@ import 'match_create_screens.dart';
 import 'match_join_screen.dart';
 import 'match_lobby_screen.dart';
 import '../../matches/match_controller.dart';
+import '../../weather/match_weather_row.dart';
 import 'match_mock_data.dart';
 
 class MatchHomeScreen extends StatefulWidget {
@@ -211,6 +212,11 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              MatchWeatherRow(
+                service: widget.controller.weather,
+                when: match.scheduledAt,
               ),
               const SizedBox(height: 12),
               Row(
