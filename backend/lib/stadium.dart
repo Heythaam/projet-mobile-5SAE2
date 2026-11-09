@@ -386,6 +386,8 @@ Future<Response> _updateStadium(Request request) async {
     }
   }
 
+  _requireBookingsStillFit(db, stadiumId, input);
+
   db.execute('BEGIN');
   try {
     db.execute(
@@ -420,6 +422,49 @@ Future<Response> _updateStadium(Request request) async {
     rethrow;
   }
   return _json({'stadium': _stadiumJson(db, _stadiumRow(db, stadiumId))});
+}
+
+/// Refuses an edit of the opening days, hours or slot length that would leave
+/// an upcoming pending or confirmed booking outside the new slots. Without this
+/// the owner's inbox and the player's booking would point at a time that no
+/// longer exists.
+void _requireBookingsStillFit(Database db, int stadiumId, _StadiumInput input) {
+  final next = <String, Object?>{
+    'open_days': input.openDays,
+    'open_minute': input.openMinute,
+    'close_minute': input.closeMinute,
+    'slot_minutes': input.slotMinutes,
+    'price_per_hour': input.pricePerHour,
+    'evening_surcharge': input.eveningSurcharge,
+  };
+  final rows = db.select(
+    '''
+      SELECT b.day, b.start_minute, b.end_minute FROM stadium_bookings b
+      JOIN stadium_pitches p ON p.id = b.pitch_id
+      WHERE p.stadium_id = ? AND b.status IN $_activeBooking AND b.day >= ?
+      ORDER BY b.day, b.start_minute
+    ''',
+    [stadiumId, _formatDay(DateTime.now())],
+  );
+  for (final row in rows) {
+    final day = row['day'] as String;
+    final start = row['start_minute'] as int;
+    final end = row['end_minute'] as int;
+    if (_isFinished(day, end)) continue;
+    final fits = _slotsFor(
+      next,
+      day,
+    ).any((slot) => slot.start == start && slot.end == end);
+    if (!fits) {
+      final hour = (start ~/ 60).toString().padLeft(2, '0');
+      final minute = (start % 60).toString().padLeft(2, '0');
+      throw _StadiumError(
+        409,
+        'A booking on $day at $hour:$minute would no longer fit these '
+        'hours. Answer or cancel it first.',
+      );
+    }
+  }
 }
 
 Response _deleteStadium(Request request) {
@@ -754,7 +799,7 @@ class _Slot {
   final int price;
 }
 
-List<_Slot> _slotsFor(Row stadium, String day) {
+List<_Slot> _slotsFor(Map<String, Object?> stadium, String day) {
   final date = DateTime.parse(day);
   final openDays = stadium['open_days'] as int;
   if (openDays & (1 << (date.weekday - 1)) == 0) return const [];

@@ -64,17 +64,9 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
       _authenticated(database, jwtSecret, _sendMessage),
     )
     ..get('/tournaments', _authenticated(database, jwtSecret, _tournaments))
-    ..post(
-      '/tournaments',
-      _authenticated(database, jwtSecret, _createTournament),
-    )
     ..get(
       '/tournaments/<tournamentId>',
       _authenticated(database, jwtSecret, _tournament),
-    )
-    ..patch(
-      '/tournaments/<tournamentId>',
-      _authenticated(database, jwtSecret, _editTournament),
     )
     ..post(
       '/tournaments/<tournamentId>/join',

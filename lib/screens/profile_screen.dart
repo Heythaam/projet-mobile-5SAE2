@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../local/user_local_store.dart';
 import '../models.dart';
+import '../users/avatar_palette.dart';
+import '../users/country_service.dart';
+import '../users/user_avatar.dart';
 import 'kickoff_style.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -12,8 +16,27 @@ class ProfileScreen extends StatelessWidget {
     required this.onFriends,
     required this.onSettings,
     this.onStadiums,
+    this.localProfile,
+    this.onEditProfile,
+    this.matchesPlayed,
+    this.matchesHosted,
+    this.countries,
     super.key,
   });
+
+  /// Looks up the country name for the flag line. Null shows the code only.
+  final CountryService? countries;
+
+  /// Counted from the matches on this phone. Null shows a dash.
+  final int? matchesPlayed;
+  final int? matchesHosted;
+
+  /// The profile saved on this phone. When set, its username, avatar colour,
+  /// position and bio are shown instead of the account's.
+  final LocalUser? localProfile;
+
+  /// Opens the edit screen. Null hides the row, for example for guests.
+  final VoidCallback? onEditProfile;
 
   final UserAccount user;
   final GamificationProfile? profile;
@@ -26,6 +49,9 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
+    final name = localProfile?.username ?? user.username;
+    final position = localProfile?.position;
+    final bio = localProfile?.bio ?? '';
     return ArcadeBackdrop(
       child: SafeArea(
         bottom: false,
@@ -61,33 +87,60 @@ class ProfileScreen extends StatelessWidget {
                           height: 96 * scale,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: KickoffColors.yellow,
+                            color: avatarColor(localProfile?.avatarId ?? 0),
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: KickoffColors.blue,
                               width: 4 * scale,
                             ),
                           ),
-                          child: Text(
-                            user.username.isEmpty
-                                ? '?'
-                                : user.username[0].toUpperCase(),
-                            style: TextStyle(
-                              color: KickoffColors.ink,
-                              fontSize: 34 * scale,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          child: UserAvatarFace(
+                            username: name,
+                            avatarId: localProfile?.avatarId ?? 0,
+                            size: 88 * scale,
+                            photoPath: localProfile?.photoPath,
                           ),
                         ),
                         SizedBox(height: 6 * scale),
                         Text(
-                          '@${user.username}',
+                          '@$name',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 17 * scale,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (localProfile?.country != null)
+                          _CountryLine(
+                            code: localProfile!.country!,
+                            service: countries,
+                          ),
+                        if (position != null)
+                          Padding(
+                            padding: EdgeInsets.only(top: 4 * scale),
+                            child: Text(
+                              position,
+                              key: const ValueKey('profile_position'),
+                              style: TextStyle(
+                                color: KickoffColors.muted,
+                                fontSize: 13 * scale,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        if (bio.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: 4 * scale),
+                            child: Text(
+                              bio,
+                              key: const ValueKey('profile_bio'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: KickoffColors.muted,
+                                fontSize: 13 * scale,
+                              ),
+                            ),
+                          ),
                         SizedBox(height: 6 * scale),
                         Container(
                           constraints: BoxConstraints(minHeight: 36 * scale),
@@ -119,7 +172,7 @@ class ProfileScreen extends StatelessWidget {
                           child: _ProfileStat(
                             icon: Icons.sports_soccer_rounded,
                             label: 'Matches',
-                            value: '—',
+                            value: matchesPlayed?.toString() ?? '—',
                           ),
                         ),
                         SizedBox(width: 8 * scale),
@@ -140,7 +193,28 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (matchesHosted != null && matchesHosted! > 0)
+                      Padding(
+                        padding: EdgeInsets.only(top: 6 * scale),
+                        child: Text(
+                          'You created $matchesHosted of them',
+                          key: const ValueKey('profile_hosted'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: KickoffColors.muted,
+                            fontSize: 12 * scale,
+                          ),
+                        ),
+                      ),
                     SizedBox(height: 16 * scale),
+                    if (onEditProfile != null) ...[
+                      _ProfileRow(
+                        icon: Icons.edit_rounded,
+                        title: 'Edit profile',
+                        onTap: onEditProfile!,
+                      ),
+                      SizedBox(height: 8 * scale),
+                    ],
                     _ProfileRow(
                       icon: Icons.history_rounded,
                       title: 'History',
@@ -177,6 +251,29 @@ class ProfileScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CountryLine extends StatelessWidget {
+  const _CountryLine({required this.code, required this.service});
+
+  final String code;
+  final CountryService? service;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = kickoffScale(context);
+    return Padding(
+      padding: EdgeInsets.only(top: 4 * scale),
+      child: FutureBuilder<Country?>(
+        future: service?.byCode(code),
+        builder: (context, snapshot) => Text(
+          '${flagEmoji(code)} ${snapshot.data?.name ?? code}',
+          key: const ValueKey('profile_country'),
+          style: TextStyle(color: KickoffColors.muted, fontSize: 13 * scale),
         ),
       ),
     );

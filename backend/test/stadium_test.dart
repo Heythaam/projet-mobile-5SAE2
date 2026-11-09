@@ -354,6 +354,58 @@ void main() {
     );
     expect(delete.statusCode, 204);
   });
+
+  test('hours edits that strand a booking are refused', () async {
+    final stadium = await createStadium();
+    final id = stadium['id'];
+    final pitchId = (stadium['pitches'] as List).first['id'];
+    final pitches = (stadium['pitches'] as List)
+        .map((p) => {'id': (p as Map)['id'], 'size': p['size'], 'surface': p['surface']})
+        .toList();
+    final hold = await _send(
+      app,
+      'POST',
+      '/stadiums/$id/bookings',
+      token: player,
+      body: {'pitchId': pitchId, 'date': day, 'start': 19 * 60},
+    );
+    expect(hold.statusCode, 201);
+
+    Future<Response> edit(Map<String, Object?> changes) => _send(
+      app,
+      'PUT',
+      '/owner/stadiums/$id',
+      token: owner,
+      body: {..._stadiumBody, 'pitches': pitches, ...changes},
+    );
+
+    // Closing before the booking, a 90 minute grid and a closed weekday all
+    // move or remove the 19:00 slot.
+    expect((await edit({'closeMinute': 18 * 60})).statusCode, 409);
+    expect((await edit({'slotMinutes': 90})).statusCode, 409);
+    final weekday = DateTime.parse(day).weekday;
+    expect(
+      (await edit({'openDays': 127 & ~(1 << (weekday - 1))})).statusCode,
+      409,
+    );
+
+    // Edits that keep 19:00 as a slot still work, price changes included.
+    expect(
+      (await edit({'closeMinute': 22 * 60, 'pricePerHour': 80})).statusCode,
+      200,
+    );
+
+    // After the booking is cancelled the hours are free to change.
+    final bookingId = ((await _decode(hold))['booking'] as Map)['id'];
+    final cancel = await _send(
+      app,
+      'DELETE',
+      '/stadium-bookings/$bookingId',
+      token: player,
+    );
+    expect(cancel.statusCode, 204);
+    expect((await edit({'closeMinute': 18 * 60})).statusCode, 200);
+  });
 }
 
 const _stadiumBody = <String, Object?>{

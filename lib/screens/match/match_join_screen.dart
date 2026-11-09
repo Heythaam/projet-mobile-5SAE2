@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../location/player_location.dart';
 import '../kickoff_style.dart';
 import 'match_create_screens.dart';
 import 'match_lobby_screen.dart';
+import '../../matches/match_controller.dart';
 import 'match_mock_data.dart';
 import 'match_widgets.dart';
 
@@ -16,7 +18,7 @@ const _allowedJoinCodeCharacters = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 class MatchJoinScreen extends StatefulWidget {
   const MatchJoinScreen({required this.controller, super.key});
 
-  final MatchDemoController controller;
+  final MatchController controller;
 
   @override
   State<MatchJoinScreen> createState() => _MatchJoinScreenState();
@@ -194,6 +196,7 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
       physics: const AlwaysScrollableScrollPhysics(),
       padding: _publicListPadding,
       children: [
+        if (widget.controller.publicMatches.isNotEmpty) _nearbyBar(),
         if (widget.controller.publicMatches.isEmpty)
           SizedBox(
             height: 240,
@@ -223,12 +226,66 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
               child: MatchRow(
                 match: listing.match,
                 timeLabel: listing.timeLabel,
+                distanceKm: listing.distanceKm,
                 onJoin: () => _joinPublicMatch(listing.match),
               ),
             ),
       ],
     ),
   );
+
+  /// Offers to sort the public matches by distance. The location stays on the
+  /// phone and is only asked for when the player taps the button.
+  Widget _nearbyBar() {
+    final controller = widget.controller;
+    final status = controller.locationStatus;
+    final sorted = controller.sortedByDistance;
+    final blocked = status == LocationStatus.deniedForever;
+    final message = sorted
+        ? 'Nearest matches first'
+        : switch (status) {
+            LocationStatus.denied => 'Location permission was refused',
+            LocationStatus.deniedForever =>
+              'Location is blocked. Turn it on in the phone settings.',
+            LocationStatus.serviceOff =>
+              'Location is switched off on your phone',
+            LocationStatus.unavailable => 'Could not read your location',
+            _ => 'Show matches near you',
+          };
+    final action = controller.locating
+        ? 'Locating…'
+        : status == null
+        ? 'Use my location'
+        : 'Try again';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(
+            sorted ? Icons.near_me_rounded : Icons.near_me_disabled_rounded,
+            color: sorted ? KickoffColors.yellow : KickoffColors.muted,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: KickoffColors.muted,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          if (!sorted && !blocked)
+            TextButton(
+              onPressed: controller.locating ? null : controller.useMyLocation,
+              child: Text(action),
+            ),
+        ],
+      ),
+    );
+  }
 
   void _onCodeChanged() {
     if (!mounted) return;
@@ -256,7 +313,7 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
     Navigator.of(context).maybePop();
   }
 
-  void _joinByCode() {
+  Future<void> _joinByCode() async {
     if (_joining) return;
     _joining = true;
     final found = widget.controller.findMatchByCode(_enteredCode);
@@ -272,23 +329,28 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
     }
     final joined = widget.controller.hasJoined(found)
         ? found
-        : widget.controller.joinByCode(_enteredCode);
-    if (joined != null) {
-      _openLobby(joined);
-    } else {
-      _joining = false;
-    }
+        : await widget.controller.joinByCode(_enteredCode);
+    if (!mounted) return;
+    _finishJoin(joined);
   }
 
-  void _joinPublicMatch(MatchHomeMatch match) {
+  Future<void> _joinPublicMatch(MatchHomeMatch match) async {
     if (_joining) return;
     _joining = true;
-    final joined = widget.controller.joinPublicMatch(match);
+    final joined = await widget.controller.joinPublicMatch(match);
+    if (!mounted) return;
+    _finishJoin(joined);
+  }
+
+  void _finishJoin(MatchHomeMatch? joined) {
     if (joined != null) {
       _openLobby(joined);
-    } else {
-      _joining = false;
+      return;
     }
+    _joining = false;
+    _showMessage(
+      widget.controller.lastError ?? 'Could not join this match',
+    );
   }
 
   Future<void> _startCreateFromEmpty() async {
@@ -307,7 +369,10 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
 
   void _openLobby(MatchHomeMatch match) {
     Navigator.of(context).pushReplacement<void, void>(
-      MaterialPageRoute<void>(builder: (_) => MatchLobbyScreen(match: match)),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MatchLobbyScreen(match: match, controller: widget.controller),
+      ),
     );
   }
 

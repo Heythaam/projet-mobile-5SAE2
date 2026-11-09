@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../matches/match_controller.dart';
 import '../kickoff_style.dart';
 import 'match_mock_data.dart';
 
@@ -32,9 +33,12 @@ const _pitchSlots8 = [
 ];
 
 class MatchLobbyScreen extends StatelessWidget {
-  const MatchLobbyScreen({required this.match, super.key});
+  const MatchLobbyScreen({required this.match, this.controller, super.key});
 
   final MatchHomeMatch match;
+
+  /// Needed for the Leave and Cancel buttons.
+  final MatchController? controller;
 
   @override
   Widget build(BuildContext context) {
@@ -98,11 +102,70 @@ class MatchLobbyScreen extends StatelessWidget {
                     ? null
                     : () => _showShareSoon(context),
               ),
+              if (controller != null && controller!.hasJoined(match))
+                TextButton(
+                  onPressed: () => _confirmExit(context),
+                  child: Text(
+                    controller!.isHost(match) ? 'Cancel match' : 'Leave match',
+                    style: const TextStyle(
+                      color: KickoffColors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Asks first, then leaves (or cancels, for the host) and goes back.
+  Future<void> _confirmExit(BuildContext context) async {
+    final controller = this.controller!;
+    final host = controller.isHost(match);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: KickoffColors.panel,
+        title: Text(
+          host ? 'Cancel this match?' : 'Leave this match?',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          host
+              ? 'The match and everyone in it will be removed.'
+              : 'Your place will be free for someone else.',
+          style: const TextStyle(color: KickoffColors.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(host ? 'Cancel match' : 'Leave'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final done = host
+        ? await controller.cancelMatch(match.code)
+        : await controller.leaveMatch(match.code);
+    if (!context.mounted) return;
+    if (done) {
+      Navigator.of(context).maybePop();
+    } else {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(controller.lastError ?? 'Could not do that.'),
+          ),
+        );
+    }
   }
 
   void _tapSlot(BuildContext context, int index) {
