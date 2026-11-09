@@ -406,6 +406,7 @@ Widget _shell({
   ),
 );
 
+// ignore: unused_element
 Widget _guestShell() => MaterialApp(
   home: KickoffShell(
     api: _GuestApiClient(),

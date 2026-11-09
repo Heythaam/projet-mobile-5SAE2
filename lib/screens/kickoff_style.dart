@@ -137,50 +137,50 @@ class _ChunkyButtonState extends State<ChunkyButton> {
                       ),
                     )
                   : widget.largeCard
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          widget.icon,
-                          size: 44 * scale,
-                          color: widget.foregroundColor,
-                        ),
-                        SizedBox(height: 6 * scale),
-                        Text(
-                          widget.label,
-                          style: TextStyle(
-                            color: widget.foregroundColor,
-                            fontSize: 18 * scale,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.showIcon) ...[
-                          Icon(
-                            widget.icon,
-                            size: 24 * scale,
-                            color: widget.foregroundColor,
-                          ),
-                          SizedBox(width: 6 * scale),
-                        ],
-                        Flexible(
-                          child: Text(
-                            widget.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              widget.icon,
+                              size: 44 * scale,
                               color: widget.foregroundColor,
-                              fontSize: 17 * scale,
-                              fontWeight: FontWeight.w600,
                             ),
-                          ),
+                            SizedBox(height: 6 * scale),
+                            Text(
+                              widget.label,
+                              style: TextStyle(
+                                color: widget.foregroundColor,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (widget.showIcon) ...[
+                              Icon(
+                                widget.icon,
+                                size: 24 * scale,
+                                color: widget.foregroundColor,
+                              ),
+                              SizedBox(width: 6 * scale),
+                            ],
+                            Flexible(
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: widget.foregroundColor,
+                                  fontSize: 17 * scale,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
             ),
           ),
         ),
