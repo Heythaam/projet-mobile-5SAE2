@@ -46,12 +46,12 @@ void main() {
 
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final label = '${names[today.weekday - 1]} ${today.day}';
-    await tester.tap(find.bySemanticsLabel(label));
+    await tester.tap(find.bySemanticsLabel(RegExp('^$label')));
     await tester.pumpAndSettle();
     expect(find.text('Today Pitch'), findsOneWidget);
     expect(find.text('Later Pitch'), findsNothing);
 
-    await tester.tap(find.bySemanticsLabel(label));
+    await tester.tap(find.bySemanticsLabel(RegExp('^$label')));
     await tester.pumpAndSettle();
     expect(find.text('Later Pitch'), findsOneWidget);
   });
