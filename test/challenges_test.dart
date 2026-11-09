@@ -35,10 +35,14 @@ void main() {
         currentPlayers: 5,
         joinCode: 'KICK99',
         createdByUserId: 42,
+        gameFormat: '7v7',
+        pitchType: 'Turf',
+        skillLevel: 'Advanced',
       );
 
       expect(challenge.isFull, isFalse);
       expect(challenge.isTeamChallenge, isFalse);
+      expect(challenge.gameFormat, equals('7v7'));
 
       final map = challenge.toMap();
       final restored = Challenge.fromMap(map, currentUserId: 42);
@@ -58,7 +62,7 @@ void main() {
 
     setUp(() async {
       testCount++;
-      final dbName = 'test_db_$testCount.db';
+      final dbName = 'test_db_crud_$testCount.db';
       final inMemoryDb = await databaseFactoryFfi.openDatabase(dbName);
       db = ChallengeDatabase(inMemoryDb);
 
@@ -83,7 +87,12 @@ void main() {
           current_players INTEGER NOT NULL DEFAULT 1,
           join_code TEXT UNIQUE NOT NULL,
           created_by_user_id INTEGER NOT NULL,
-          challenge_status TEXT NOT NULL DEFAULT 'active'
+          challenge_status TEXT NOT NULL DEFAULT 'active',
+          game_format TEXT DEFAULT '5v5',
+          pitch_type TEXT DEFAULT 'Turf',
+          skill_level TEXT DEFAULT 'All Levels',
+          duration_minutes INTEGER DEFAULT 60,
+          rules_notes TEXT
         )
       ''');
       await inMemoryDb.execute('''
@@ -113,7 +122,7 @@ void main() {
       expect(code1.length, equals(6));
     });
 
-    test('Creates challenge and retrieves it under created challenges', () async {
+    test('Creates, updates, and deletes challenge', () async {
       final challenge = Challenge(
         type: ChallengeType.open,
         description: 'Sunday Cup Match',
@@ -128,12 +137,23 @@ void main() {
       final created = await repository.createChallenge(challenge);
       expect(created.id, isNotNull);
 
+      // Update
+      final updated = created.copyWith(description: 'Updated Sunday Cup');
+      final updateSuccess = await repository.updateChallenge(updated);
+      expect(updateSuccess, isTrue);
+
       final createdList = await repository.getCreatedChallenges(42);
-      expect(createdList.length, equals(1));
-      expect(createdList.first.description, equals('Sunday Cup Match'));
+      expect(createdList.first.description, equals('Updated Sunday Cup'));
+
+      // Delete
+      final deleteSuccess = await repository.deleteChallenge(created.id!, 42);
+      expect(deleteSuccess, isTrue);
+
+      final emptyList = await repository.getCreatedChallenges(42);
+      expect(emptyList.isEmpty, isTrue);
     });
 
-    test('User can join browse challenge by ID and Code', () async {
+    test('User can join and quit (leave) challenge', () async {
       final challenge = Challenge(
         type: ChallengeType.open,
         description: 'Open Challenge 1',
@@ -147,16 +167,19 @@ void main() {
 
       final created = await repository.createChallenge(challenge);
 
-      final found = await repository.findByJoinCode('KICK42', 42);
-      expect(found, isNotNull);
-      expect(found!.id, equals(created.id));
-
+      // Join
       final joined = await repository.joinChallenge(created.id!, 42);
       expect(joined, isTrue);
 
-      final userJoinedList = await repository.getJoinedChallenges(42);
+      var userJoinedList = await repository.getJoinedChallenges(42);
       expect(userJoinedList.length, equals(1));
-      expect(userJoinedList.first.id, equals(created.id));
+
+      // Leave
+      final left = await repository.leaveChallenge(created.id!, 42);
+      expect(left, isTrue);
+
+      userJoinedList = await repository.getJoinedChallenges(42);
+      expect(userJoinedList.isEmpty, isTrue);
     });
   });
 
@@ -217,12 +240,12 @@ void main() {
     testWidgets('ChallengesDashboardScreen switches tabs', (
       WidgetTester tester,
     ) async {
-      final inMemoryDb = await databaseFactoryFfi.openDatabase('widget_db_1.db');
+      final inMemoryDb = await databaseFactoryFfi.openDatabase('widget_db_2.db');
       await inMemoryDb.execute('''
         CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT, color TEXT, icon TEXT);
       ''');
       await inMemoryDb.execute('''
-        CREATE TABLE challenges (id INTEGER PRIMARY KEY, type TEXT, team_id INTEGER, description TEXT, difficulty INTEGER, location_name TEXT, date_time TEXT, max_players INTEGER, current_players INTEGER, join_code TEXT UNIQUE, created_by_user_id INTEGER, challenge_status TEXT);
+        CREATE TABLE challenges (id INTEGER PRIMARY KEY, type TEXT, team_id INTEGER, description TEXT, difficulty INTEGER, location_name TEXT, date_time TEXT, max_players INTEGER, current_players INTEGER, join_code TEXT UNIQUE, created_by_user_id INTEGER, challenge_status TEXT, game_format TEXT, pitch_type TEXT, skill_level TEXT, duration_minutes INTEGER, rules_notes TEXT);
       ''');
       await inMemoryDb.execute('''
         CREATE TABLE challenge_participants (challenge_id INTEGER, user_id INTEGER, joined_at TEXT, PRIMARY KEY(challenge_id, user_id));

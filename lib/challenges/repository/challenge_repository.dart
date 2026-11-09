@@ -8,7 +8,10 @@ abstract class ChallengeRepository {
   Future<List<Challenge>> getBrowseChallenges(int userId);
   Future<List<Team>> getLocalTeams();
   Future<Challenge> createChallenge(Challenge challenge);
+  Future<bool> updateChallenge(Challenge challenge);
+  Future<bool> deleteChallenge(int challengeId, int userId);
   Future<bool> joinChallenge(int challengeId, int userId);
+  Future<bool> leaveChallenge(int challengeId, int userId);
   Future<Challenge?> findByJoinCode(String code, int userId);
   Future<String> generateUniqueJoinCode();
 }
@@ -41,8 +44,20 @@ class SqliteChallengeRepository implements ChallengeRepository {
   }
 
   @override
+  Future<bool> updateChallenge(Challenge challenge) =>
+      _db.updateChallenge(challenge);
+
+  @override
+  Future<bool> deleteChallenge(int challengeId, int userId) =>
+      _db.deleteChallenge(challengeId, userId);
+
+  @override
   Future<bool> joinChallenge(int challengeId, int userId) =>
       _db.joinChallenge(challengeId, userId);
+
+  @override
+  Future<bool> leaveChallenge(int challengeId, int userId) =>
+      _db.leaveChallenge(challengeId, userId);
 
   @override
   Future<Challenge?> findByJoinCode(String code, int userId) =>
