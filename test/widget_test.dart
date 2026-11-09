@@ -170,7 +170,7 @@ void main() {
     expect(find.text('4 join requests waiting'), findsOneWidget);
   });
 
-  testWidgets('the home banner refreshes when the app resumes', (
+  testWidgets('ball menu opens Challenge, Match and Tournament', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_guestShell());
@@ -195,6 +195,12 @@ void main() {
         await tester.pageBack();
       }
       await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('the home banner refreshes when the app resumes', (
+    WidgetTester tester,
+  ) async {
     final api = _FakeApiClient(pendingRequests: 2);
     await tester.pumpWidget(_shell(api: api));
     await tester.pumpAndSettle();
