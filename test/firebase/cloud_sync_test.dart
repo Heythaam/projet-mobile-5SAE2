@@ -3,7 +3,6 @@ import 'package:football_match_app/firebase/cloud_sync.dart';
 import 'package:football_match_app/local/local_database.dart';
 import 'package:football_match_app/local/match_local_store.dart';
 import 'package:football_match_app/local/user_local_store.dart';
-import 'package:football_match_app/matches/football_match.dart';
 import 'package:football_match_app/matches/match_controller.dart';
 import 'package:football_match_app/screens/match/match_mock_data.dart';
 import 'package:football_match_app/users/user_profile_controller.dart';
