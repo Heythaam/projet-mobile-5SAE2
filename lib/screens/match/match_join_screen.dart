@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../location/player_location.dart';
 import '../kickoff_style.dart';
 import 'match_create_screens.dart';
 import 'match_lobby_screen.dart';
@@ -195,6 +196,7 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
       physics: const AlwaysScrollableScrollPhysics(),
       padding: _publicListPadding,
       children: [
+        if (widget.controller.publicMatches.isNotEmpty) _nearbyBar(),
         if (widget.controller.publicMatches.isEmpty)
           SizedBox(
             height: 240,
@@ -224,12 +226,66 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
               child: MatchRow(
                 match: listing.match,
                 timeLabel: listing.timeLabel,
+                distanceKm: listing.distanceKm,
                 onJoin: () => _joinPublicMatch(listing.match),
               ),
             ),
       ],
     ),
   );
+
+  /// Offers to sort the public matches by distance. The location stays on the
+  /// phone and is only asked for when the player taps the button.
+  Widget _nearbyBar() {
+    final controller = widget.controller;
+    final status = controller.locationStatus;
+    final sorted = controller.sortedByDistance;
+    final blocked = status == LocationStatus.deniedForever;
+    final message = sorted
+        ? 'Nearest matches first'
+        : switch (status) {
+            LocationStatus.denied => 'Location permission was refused',
+            LocationStatus.deniedForever =>
+              'Location is blocked. Turn it on in the phone settings.',
+            LocationStatus.serviceOff =>
+              'Location is switched off on your phone',
+            LocationStatus.unavailable => 'Could not read your location',
+            _ => 'Show matches near you',
+          };
+    final action = controller.locating
+        ? 'Locating…'
+        : status == null
+        ? 'Use my location'
+        : 'Try again';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(
+            sorted ? Icons.near_me_rounded : Icons.near_me_disabled_rounded,
+            color: sorted ? KickoffColors.yellow : KickoffColors.muted,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: KickoffColors.muted,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          if (!sorted && !blocked)
+            TextButton(
+              onPressed: controller.locating ? null : controller.useMyLocation,
+              child: Text(action),
+            ),
+        ],
+      ),
+    );
+  }
 
   void _onCodeChanged() {
     if (!mounted) return;

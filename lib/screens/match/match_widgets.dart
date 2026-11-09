@@ -208,17 +208,24 @@ class CodeBoxes extends StatelessWidget {
   }
 }
 
+String _distanceLabel(double km) =>
+    km < 1 ? '${(km * 1000).round()} m' : '${km.toStringAsFixed(1)} km';
+
 class MatchRow extends StatelessWidget {
   const MatchRow({
     required this.match,
     required this.timeLabel,
     required this.onJoin,
+    this.distanceKm,
     super.key,
   });
 
   final MatchHomeMatch match;
   final String timeLabel;
   final VoidCallback onJoin;
+
+  /// Kilometres from the player, shown after the stadium name when known.
+  final double? distanceKm;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +235,8 @@ class MatchRow extends StatelessWidget {
       enabled: !full,
       label: full
           ? '${match.stadium}, $timeLabel, match full'
-          : 'Join ${match.stadium} $timeLabel',
+          : 'Join ${match.stadium} $timeLabel'
+                '${distanceKm == null ? '' : ', ${_distanceLabel(distanceKm!)} away'}',
       onTap: full ? null : onJoin,
       child: ExcludeSemantics(
         child: Material(
@@ -277,7 +285,10 @@ class MatchRow extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                match.stadium,
+                                distanceKm == null
+                                    ? match.stadium
+                                    : '${match.stadium} · '
+                                          '${_distanceLabel(distanceKm!)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
