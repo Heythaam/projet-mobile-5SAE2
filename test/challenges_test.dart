@@ -241,17 +241,20 @@ void main() {
     testWidgets('ChallengesDashboardScreen switches tabs', (
       WidgetTester tester,
     ) async {
-      await databaseFactoryFfi.deleteDatabase('widget_db_2.db');
-      final inMemoryDb = await databaseFactoryFfi.openDatabase('widget_db_2.db');
-      await inMemoryDb.execute('''
-        CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT, color TEXT, icon TEXT);
-      ''');
-      await inMemoryDb.execute('''
-        CREATE TABLE challenges (id INTEGER PRIMARY KEY, type TEXT, team_id INTEGER, description TEXT, difficulty INTEGER, location_name TEXT, date_time TEXT, max_players INTEGER, current_players INTEGER, join_code TEXT UNIQUE, created_by_user_id INTEGER, challenge_status TEXT, game_format TEXT, pitch_type TEXT, skill_level TEXT, duration_minutes INTEGER, rules_notes TEXT);
-      ''');
-      await inMemoryDb.execute('''
-        CREATE TABLE challenge_participants (challenge_id INTEGER, user_id INTEGER, joined_at TEXT, PRIMARY KEY(challenge_id, user_id));
-      ''');
+      late Database inMemoryDb;
+      await tester.runAsync(() async {
+        await databaseFactoryFfi.deleteDatabase('widget_db_2.db');
+        inMemoryDb = await databaseFactoryFfi.openDatabase('widget_db_2.db');
+        await inMemoryDb.execute('''
+          CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT, color TEXT, icon TEXT);
+        ''');
+        await inMemoryDb.execute('''
+          CREATE TABLE challenges (id INTEGER PRIMARY KEY, type TEXT, team_id INTEGER, description TEXT, difficulty INTEGER, location_name TEXT, date_time TEXT, max_players INTEGER, current_players INTEGER, join_code TEXT UNIQUE, created_by_user_id INTEGER, challenge_status TEXT, game_format TEXT, pitch_type TEXT, skill_level TEXT, duration_minutes INTEGER, rules_notes TEXT);
+        ''');
+        await inMemoryDb.execute('''
+          CREATE TABLE challenge_participants (challenge_id INTEGER, user_id INTEGER, joined_at TEXT, PRIMARY KEY(challenge_id, user_id));
+        ''');
+      });
 
       final db = ChallengeDatabase(inMemoryDb);
       final repo = SqliteChallengeRepository(db);
