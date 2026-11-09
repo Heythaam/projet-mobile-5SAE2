@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Kickoff uses your location to show public matches near you. It stays on your phone.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Kickoff uses Face ID to unlock the app when you turn on the app lock.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Kickoff uses the camera to take your profile photo. It stays on your phone.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Kickoff uses your photos to set your profile photo. It stays on your phone.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

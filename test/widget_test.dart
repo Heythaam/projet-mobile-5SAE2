@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
 import 'package:football_match_app/auth_screen.dart';
@@ -168,6 +169,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(loads(), 2);
     expect(find.text('4 join requests waiting'), findsOneWidget);
+  });
+
+  testWidgets('ball menu opens the Challenges screen', (
+    WidgetTester tester,
+  ) async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    await tester.pumpWidget(_guestShell());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Open ball menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.flash_on_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Challenges'), findsOneWidget);
   });
 
   testWidgets('the home banner refreshes when the app resumes', (
@@ -388,6 +406,7 @@ Widget _shell({
   ),
 );
 
+// ignore: unused_element
 Widget _guestShell() => MaterialApp(
   home: KickoffShell(
     api: _GuestApiClient(),

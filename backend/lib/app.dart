@@ -12,6 +12,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'database.dart';
 import 'gamification.dart';
 import 'live_hub.dart';
+import 'stadium.dart';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message, {this.code});
@@ -188,6 +189,10 @@ Handler createApp({
       '/tournaments/<tournamentId>/matches/<matchId>/result',
       auth(_recordMatchResult),
     );
+  mountStadiumRoutes(
+    router,
+    authenticated: (handler) => _authenticated(database, jwtSecret, handler),
+  );
 
   return Pipeline()
       .addMiddleware(logRequests())

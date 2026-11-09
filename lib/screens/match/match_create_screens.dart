@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../kickoff_style.dart';
+import '../../local/match_local_store.dart';
+import '../../matches/match_controller.dart';
+import '../../matches/stadium_directory.dart';
 import 'match_mock_data.dart';
 import 'match_widgets.dart';
 
@@ -12,7 +15,7 @@ const _matchTimes = 32;
 class StadiumPickScreen extends StatefulWidget {
   const StadiumPickScreen({required this.controller, super.key});
 
-  final MatchDemoController controller;
+  final MatchController controller;
 
   @override
   State<StadiumPickScreen> createState() => _StadiumPickScreenState();
@@ -28,6 +31,7 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.78);
+    widget.controller.loadStadiums();
   }
 
   @override
@@ -37,7 +41,12 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.controller,
+    builder: (context, _) => _buildPick(context),
+  );
+
+  Widget _buildPick(BuildContext context) => Scaffold(
     backgroundColor: KickoffColors.bg,
     body: SafeArea(
       child: Column(
@@ -46,8 +55,21 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
             current: 1,
             onBack: () => Navigator.of(context).pop(),
           ),
+          if (!widget.controller.stadiumsLoading &&
+              widget.controller.usingSampleStadiums)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Text(
+                'Sample stadiums. Sign in and start the server to book real ones.',
+                key: ValueKey('sample_stadiums_note'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: KickoffColors.muted, fontSize: 12),
+              ),
+            ),
           Expanded(
-            child: LayoutBuilder(
+            child: widget.controller.stadiumsLoading
+                ? const Center(child: CircularProgressIndicator())
+                : LayoutBuilder(
               builder: (context, constraints) {
                 final cardHeight = constraints.maxHeight.clamp(300.0, 390.0);
                 return Column(
@@ -139,7 +161,9 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
             child: ChunkyButton(
               label: 'Pick',
               icon: Icons.check_rounded,
-              onPressed: _openingDate ? null : _openDateStep,
+              onPressed: _openingDate || widget.controller.stadiumsLoading
+                  ? null
+                  : _openDateStep,
             ),
           ),
         ],
@@ -154,7 +178,10 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
       MaterialPageRoute<bool>(
         builder: (_) => DateTimePickScreen(
           controller: widget.controller,
-          stadium: widget.controller.stadiums[_selectedIndex],
+          stadium: widget.controller.stadiums[_selectedIndex.clamp(
+            0,
+            widget.controller.stadiums.length - 1,
+          )],
         ),
       ),
     );
@@ -315,7 +342,7 @@ class DateTimePickScreen extends StatefulWidget {
     super.key,
   });
 
-  final MatchDemoController controller;
+  final MatchController controller;
   final MatchStadiumData stadium;
 
   @override
@@ -328,13 +355,56 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
   TimeOfDay? _selectedTime;
   bool _openingVisibility = false;
 
+  // Real stadiums: the free slots of the selected day come from the server.
+  List<FreeSlot> _slots = const [];
+  FreeSlot? _selectedSlot;
+  bool _loadingSlots = false;
+  String? _slotsError;
+
+  bool get _real => widget.stadium.stadiumId != null;
+
   @override
   void initState() {
     super.initState();
     final today = DateUtils.dateOnly(DateTime.now());
     _days = List.generate(14, (index) => today.add(Duration(days: index)));
     _selectedDay = _days[1];
-    _selectedTime = const TimeOfDay(hour: 18, minute: 0);
+    if (_real) {
+      _loadSlots();
+    } else {
+      _selectedTime = const TimeOfDay(hour: 18, minute: 0);
+    }
+  }
+
+  Future<void> _loadSlots() async {
+    final day = _selectedDay;
+    if (day == null) return;
+    setState(() {
+      _loadingSlots = true;
+      _slotsError = null;
+      _selectedSlot = null;
+      _slots = const [];
+    });
+    try {
+      final slots = await widget.controller.freeSlots(widget.stadium, day);
+      if (!mounted || day != _selectedDay) return;
+      setState(() {
+        _slots = slots;
+        _loadingSlots = false;
+      });
+    } on StadiumDirectoryException catch (error) {
+      if (!mounted || day != _selectedDay) return;
+      setState(() {
+        _slotsError = error.message;
+        _loadingSlots = false;
+      });
+    } catch (_) {
+      if (!mounted || day != _selectedDay) return;
+      setState(() {
+        _slotsError = 'Could not load the free slots.';
+        _loadingSlots = false;
+      });
+    }
   }
 
   @override
@@ -393,16 +463,19 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Choose a time',
-                  style: TextStyle(
+                Text(
+                  _real ? 'Free slots' : 'Choose a time',
+                  style: const TextStyle(
                     color: KickoffColors.muted,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 8),
-                GridView.builder(
+                if (_real)
+                  _slotSection()
+                else
+                  GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: _matchTimes,
@@ -441,7 +514,7 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
               onPressed:
                   _openingVisibility ||
                       _selectedDay == null ||
-                      _selectedTime == null
+                      (_real ? _selectedSlot == null : _selectedTime == null)
                   ? null
                   : _openVisibilityStep,
             ),
@@ -464,10 +537,62 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
   void _selectDay(DateTime day) {
     setState(() {
       _selectedDay = day;
-      if (_isPastToday(_selectedTime ?? TimeOfDay.now())) {
+      if (!_real && _isPastToday(_selectedTime ?? TimeOfDay.now())) {
         _selectedTime = null;
       }
     });
+    if (_real) _loadSlots();
+  }
+
+  Widget _slotSection() {
+    if (_loadingSlots) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_slotsError != null) {
+      return Column(
+        children: [
+          Text(
+            _slotsError!,
+            key: const ValueKey('slots_error'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: KickoffColors.orange),
+          ),
+          TextButton(onPressed: _loadSlots, child: const Text('Try again')),
+        ],
+      );
+    }
+    if (_slots.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          'No free slots this day. Try another day.',
+          key: ValueKey('no_slots'),
+          textAlign: TextAlign.center,
+          style: TextStyle(color: KickoffColors.muted),
+        ),
+      );
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final slot in _slots)
+          SizedBox(
+            width: 104,
+            height: 52,
+            child: _TimeChip(
+              time: TimeOfDay(hour: slot.start ~/ 60, minute: slot.start % 60),
+              label: '${slot.startLabel} · ${slot.pitch.name} ${slot.pitch.size}',
+              selected: identical(_selectedSlot, slot),
+              disabled: false,
+              onTap: () => setState(() => _selectedSlot = slot),
+            ),
+          ),
+      ],
+    );
   }
 
   static String _timeLabel(TimeOfDay time) =>
@@ -477,8 +602,12 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
   Future<void> _openVisibilityStep() async {
     if (_openingVisibility) return;
     final day = _selectedDay;
-    final time = _selectedTime;
-    if (day == null || time == null) return;
+    final slot = _selectedSlot;
+    final time =
+        _real && slot != null
+        ? TimeOfDay(hour: slot.start ~/ 60, minute: slot.start % 60)
+        : _selectedTime;
+    if (day == null || time == null || (_real && slot == null)) return;
     setState(() => _openingVisibility = true);
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -494,6 +623,7 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
               time.minute,
             ),
             visibility: 'Private',
+            slot: slot,
           ),
         ),
       ),
@@ -617,7 +747,7 @@ class VisibilityScreen extends StatefulWidget {
     super.key,
   });
 
-  final MatchDemoController controller;
+  final MatchController controller;
   final CreateMatchDraft draft;
 
   @override
@@ -693,14 +823,33 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
   Future<void> _createMatch() async {
     if (_creating) return;
     setState(() => _creating = true);
-    widget.controller.createMatch(
-      CreateMatchDraft(
-        stadium: widget.draft.stadium,
-        startsAt: widget.draft.startsAt,
-        visibility: _visibility,
-      ),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    try {
+      await widget.controller.createMatch(
+        CreateMatchDraft(
+          stadium: widget.draft.stadium,
+          startsAt: widget.draft.startsAt,
+          visibility: _visibility,
+          slot: widget.draft.slot,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _creating = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              error is LocalMatchException
+                  ? error.message
+                  : error is MatchBookingException
+                  ? error.message
+                  : 'Could not save the match on this phone.',
+            ),
+          ),
+        );
+      return;
+    }
     if (!mounted) return;
     setState(() => _allowCompletionPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {

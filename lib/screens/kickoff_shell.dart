@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../matches/match_controller.dart';
 import '../app_route_observer.dart';
 import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
 import '../models.dart';
+import '../challenges/repository/challenge_repository.dart';
+import '../challenges/screens/challenges_dashboard_screen.dart';
+import '../stadium/stadium_module.dart';
+import '../users/country_service.dart';
+import '../users/user_profile_controller.dart';
+import 'edit_profile_screen.dart';
+import 'people_screen.dart';
+import '../security/app_lock.dart';
 import '../tournaments/screens/tournaments_list_screen.dart';
 import '../tournaments/services/tournament_service.dart';
 import '../tournaments/widgets/requests_badge.dart';
@@ -14,7 +23,6 @@ import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
 import 'match/match_home_screen.dart';
-import 'match/match_mock_data.dart';
 import 'placeholder_screen.dart';
 import 'profile_screen.dart';
 
@@ -48,37 +56,7 @@ final _guestMatches = <FootballMatch>[
   ),
 ];
 
-const _guestGamification = GamificationProfile(
-  xp: 240,
-  level: 3,
-  rank: 'Striker',
-  xpIntoLevel: 40,
-  xpForNextLevel: 100,
-  currentStreak: 2,
-  bestStreak: 5,
-  sentMessages: 4,
-  achievements: [
-    Achievement(
-      code: 'demo-first-match',
-      title: 'First Kick',
-      description: 'Join your first match.',
-      icon: 'sports_soccer',
-      rewardXp: 50,
-      progress: 1,
-      total: 1,
-      unlockedAt: 'demo',
-    ),
-    Achievement(
-      code: 'demo-team-player',
-      title: 'Team Player',
-      description: 'Connect with teammates.',
-      icon: 'groups',
-      rewardXp: 100,
-      progress: 2,
-      total: 3,
-    ),
-  ],
-);
+
 
 class KickoffShell extends StatefulWidget {
   const KickoffShell({
@@ -88,8 +66,15 @@ class KickoffShell extends StatefulWidget {
     this.isGuest = false,
     this.onOpenAuth,
     this.matchRepository = const EmptyMatchRepository(),
+    this.appLock,
+    this.authenticator,
     super.key,
   });
+
+  /// App lock setting and the phone check. When either is null Settings does
+  /// not offer the lock.
+  final AppLockSettings? appLock;
+  final Authenticator? authenticator;
 
   final ApiClient api;
   final UserAccount user;
@@ -112,7 +97,21 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   String? _profileError;
   String? _matchesError;
   bool _showHistoryOnCalendar = false;
-  final _matchDemoController = MatchDemoController();
+  late final _matchController = MatchController(
+    uid: widget.isGuest ? 'guest' : '${widget.user.id}',
+    username: widget.isGuest ? 'Guest' : widget.user.username,
+  );
+  static final _noChanges = ChangeNotifier();
+  final _countries = CountryService();
+
+  /// The signed-in player's profile on this phone. Guests have none.
+  late final UserProfileController? _profileController = widget.isGuest
+      ? null
+      : UserProfileController(
+          uid: '${widget.user.id}',
+          accountUsername: widget.user.username,
+          email: widget.user.email,
+        );
 
   /// Join requests waiting for this captain; the home banner hides at zero.
   int _pendingJoinRequests = 0;
@@ -145,6 +144,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   void dispose() {
     appRouteObserver.unsubscribe(this);
     _lifecycle.dispose();
+    _profileController?.dispose();
     super.dispose();
   }
 
@@ -224,15 +224,27 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     }
   }
 
-  void _openPlaceholder(String title, IconData icon) {
+  void _handleBallMenuSelect(String title, IconData icon) {
     setState(() => _menuOpen = false);
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => title == 'Match'
-            ? MatchHomeScreen(controller: _matchDemoController)
-            : PlaceholderScreen(title: title, icon: icon),
-      ),
-    );
+    if (title == 'Challenge') {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => ChallengesDashboardScreen(
+            repository: SqliteChallengeRepository(),
+            user: widget.user,
+            isGuest: widget.isGuest,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => title == 'Match'
+              ? MatchHomeScreen(controller: _matchController)
+              : PlaceholderScreen(title: title, icon: icon),
+        ),
+      );
+    }
   }
 
   /// The banner refreshes in [didPopNext] once the tournaments close.
@@ -291,6 +303,65 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
                   ),
                 ),
                 SizedBox(height: 12 * scale),
+                if (_profileController?.profile != null) ...[
+                  Text(
+                    '@${_profileController?.profile?.username} · '
+                    '${_profileController?.profile?.email}',
+                    key: const ValueKey('settings_account'),
+                    style: const TextStyle(color: KickoffColors.muted),
+                  ),
+                  SizedBox(height: 12 * scale),
+                  ChunkyButton(
+                    label: 'Edit profile',
+                    icon: Icons.edit_rounded,
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _editProfile();
+                    },
+                  ),
+                  if (widget.appLock != null && widget.authenticator != null)
+                    StatefulBuilder(
+                      builder: (context, setSheetState) => SwitchListTile(
+                        key: const ValueKey('settings_app_lock'),
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Lock the app',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        subtitle: const Text(
+                          'Ask for fingerprint, face or screen lock when you open Kickoff.',
+                          style: TextStyle(color: KickoffColors.muted),
+                        ),
+                        value: widget.appLock!.enabled,
+                        onChanged: (on) async {
+                          final ok = await _setAppLock(on);
+                          if (!ok) return;
+                          setSheetState(() {});
+                        },
+                      ),
+                    ),
+                  SizedBox(height: 8 * scale),
+                  TextButton(
+                    key: const ValueKey('settings_people'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _openPeople();
+                    },
+                    child: const Text('Profiles on this phone'),
+                  ),
+                  TextButton(
+                    key: const ValueKey('settings_reset_profile'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _confirmResetProfile();
+                    },
+                    child: const Text(
+                      'Reset profile on this phone',
+                      style: TextStyle(color: KickoffColors.orange),
+                    ),
+                  ),
+                  SizedBox(height: 8 * scale),
+                ],
                 ChunkyButton(
                   label: widget.isGuest ? 'Sign in' : 'Sign out',
                   icon: widget.isGuest
@@ -370,15 +441,124 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       initialHistory: _showHistoryOnCalendar,
       key: ValueKey(_showHistoryOnCalendar),
     ),
-    _ => ProfileScreen(
-      user: widget.user,
-      profile: _profile,
-      onHistory: _openHistory,
-      onAwards: _openAwards,
-      onFriends: _openFriends,
-      onSettings: _showSettings,
+    _ => ListenableBuilder(
+      listenable: Listenable.merge([
+        _profileController ?? _noChanges,
+        _matchController,
+      ]),
+      builder: (context, _) {
+        final local = _profileController?.profile;
+        return ProfileScreen(
+          user: widget.user,
+          profile: _profile,
+          localProfile: local,
+          countries: _countries,
+          matchesPlayed: _matchController.stats?.played,
+          matchesHosted: _matchController.stats?.hosted,
+          // Only offered once the phone copy loaded; guests have none.
+          onEditProfile: local == null ? null : _editProfile,
+          onHistory: _openHistory,
+          onAwards: _openAwards,
+          onFriends: _openFriends,
+          onSettings: _showSettings,
+          onStadiums: _openStadiums,
+        );
+      },
     ),
   };
+
+  Future<void> _confirmResetProfile() async {
+    final controller = _profileController;
+    if (controller == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset profile?'),
+        content: const Text(
+          'This deletes your bio, position and avatar from this phone and '
+          'starts again from your account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final done = await controller.resetProfile();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          done ? 'Profile reset.' : controller.lastError ?? 'Reset failed.',
+        ),
+      ),
+    );
+  }
+
+  /// Turns the lock on or off. Both need the phone check to pass first, so a
+  /// stranger holding an unlocked phone cannot switch it off.
+  Future<bool> _setAppLock(bool on) async {
+    final settings = widget.appLock;
+    final auth = widget.authenticator;
+    if (settings == null || auth == null) return false;
+    String? problem;
+    if (on && !await auth.isAvailable()) {
+      problem = 'Set up a fingerprint or screen lock on this phone first.';
+    } else if (!await auth.authenticate(
+      on ? 'Turn on the app lock' : 'Turn off the app lock',
+    )) {
+      problem = 'The check did not pass, so the lock was not changed.';
+    }
+    if (problem != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(problem)));
+      }
+      return false;
+    }
+    await settings.setEnabled(on);
+    return true;
+  }
+
+  void _openPeople() {
+    final controller = _profileController;
+    if (controller == null) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => PeopleScreen(controller: controller),
+      ),
+    );
+  }
+
+  Future<void> _editProfile() async {
+    final controller = _profileController;
+    if (controller == null) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) =>
+            EditProfileScreen(controller: controller, countries: _countries),
+      ),
+    );
+  }
+
+  void _openStadiums() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StadiumModule(
+          isGuest: widget.isGuest,
+          onSignIn: widget.onOpenAuth,
+        ),
+      ),
+    );
+  }
 
   FootballMatch? get _nextMatch {
     final now = DateTime.now();
@@ -407,7 +587,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
           if (_menuOpen)
             _BallMenuOverlay(
               onDismiss: () => setState(() => _menuOpen = false),
-              onSelect: _openPlaceholder,
+              onSelect: _handleBallMenuSelect,
               onTournaments: _openTournaments,
             ),
         ],
@@ -417,10 +597,15 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
         menuOpen: _menuOpen,
         onCalendarTap: _selectCalendar,
         onBallTap: () => setState(() => _menuOpen = !_menuOpen),
-        onProfileTap: () => setState(() {
-          _menuOpen = false;
-          _tab = 2;
-        }),
+        onProfileTap: () {
+          // The phone copy of the profile loads the first time it is needed.
+          _profileController?.load();
+          _matchController.load();
+          setState(() {
+            _menuOpen = false;
+            _tab = 2;
+          });
+        },
       ),
     ),
   );

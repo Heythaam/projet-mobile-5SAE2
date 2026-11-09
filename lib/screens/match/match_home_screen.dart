@@ -4,12 +4,14 @@ import '../kickoff_style.dart';
 import 'match_create_screens.dart';
 import 'match_join_screen.dart';
 import 'match_lobby_screen.dart';
+import '../../matches/match_controller.dart';
+import '../../weather/match_weather_row.dart';
 import 'match_mock_data.dart';
 
 class MatchHomeScreen extends StatefulWidget {
   const MatchHomeScreen({required this.controller, super.key});
 
-  final MatchDemoController controller;
+  final MatchController controller;
 
   @override
   State<MatchHomeScreen> createState() => _MatchHomeScreenState();
@@ -17,6 +19,12 @@ class MatchHomeScreen extends StatefulWidget {
 
 class _MatchHomeScreenState extends State<MatchHomeScreen> {
   bool _routeOpening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.load();
+  }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -97,7 +105,7 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
               border: Border.all(color: KickoffColors.ink, width: 2),
             ),
             child: Text(
-              MatchDemoController.usernameInitial,
+              widget.controller.usernameInitial,
               style: const TextStyle(
                 color: KickoffColors.ink,
                 fontSize: 16,
@@ -106,7 +114,7 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
             ),
           ),
           const SizedBox(width: 6),
-          const StatChip(label: 'Lv ${MatchDemoController.level}'),
+          const StatChip(label: 'Lv ${MatchController.level}'),
         ],
       ),
       Row(
@@ -115,13 +123,13 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
           const StatChip(
             icon: Icons.local_fire_department_rounded,
             iconColor: KickoffColors.orange,
-            label: '${MatchDemoController.streak}',
+            label: '${MatchController.streak}',
           ),
           const SizedBox(width: 4),
           const StatChip(
             icon: Icons.bolt_rounded,
             iconColor: KickoffColors.yellow,
-            label: '${MatchDemoController.energy}',
+            label: '${MatchController.energy}',
           ),
         ],
       ),
@@ -205,6 +213,11 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              MatchWeatherRow(
+                service: widget.controller.weather,
+                when: match.scheduledAt,
+              ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -257,7 +270,10 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
     if (_routeOpening) return;
     setState(() => _routeOpening = true);
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => MatchLobbyScreen(match: match)),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MatchLobbyScreen(match: match, controller: widget.controller),
+      ),
     );
     if (mounted) setState(() => _routeOpening = false);
   }
