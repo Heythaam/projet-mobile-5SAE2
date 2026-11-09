@@ -7,6 +7,8 @@ import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
 import '../models.dart';
+import '../challenges/repository/challenge_repository.dart';
+import '../challenges/screens/challenges_dashboard_screen.dart';
 import '../stadium/stadium_module.dart';
 import '../tournaments/screens/tournaments_list_screen.dart';
 import '../tournaments/services/tournament_service.dart';
@@ -225,8 +227,25 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     }
   }
 
-  void _openPlaceholder(String title, IconData icon) {
+  void _handleBallMenuSelect(String title, IconData icon) {
     setState(() => _menuOpen = false);
+    if (title == 'Challenge') {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => ChallengesDashboardScreen(
+            repository: SqliteChallengeRepository(),
+            user: widget.user,
+            isGuest: widget.isGuest,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => PlaceholderScreen(title: title, icon: icon),
+        ),
+      );
+    }
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => title == 'Match'
@@ -420,6 +439,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
           if (_menuOpen)
             _BallMenuOverlay(
               onDismiss: () => setState(() => _menuOpen = false),
+              onSelect: _handleBallMenuSelect,
               onSelect: _openPlaceholder,
               onTournaments: _openTournaments,
             ),
