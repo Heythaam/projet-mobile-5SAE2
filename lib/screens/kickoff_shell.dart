@@ -51,37 +51,7 @@ final _guestMatches = <FootballMatch>[
   ),
 ];
 
-const _guestGamification = GamificationProfile(
-  xp: 240,
-  level: 3,
-  rank: 'Striker',
-  xpIntoLevel: 40,
-  xpForNextLevel: 100,
-  currentStreak: 2,
-  bestStreak: 5,
-  sentMessages: 4,
-  achievements: [
-    Achievement(
-      code: 'demo-first-match',
-      title: 'First Kick',
-      description: 'Join your first match.',
-      icon: 'sports_soccer',
-      rewardXp: 50,
-      progress: 1,
-      total: 1,
-      unlockedAt: 'demo',
-    ),
-    Achievement(
-      code: 'demo-team-player',
-      title: 'Team Player',
-      description: 'Connect with teammates.',
-      icon: 'groups',
-      rewardXp: 100,
-      progress: 2,
-      total: 3,
-    ),
-  ],
-);
+
 
 class KickoffShell extends StatefulWidget {
   const KickoffShell({
@@ -440,7 +410,6 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
             _BallMenuOverlay(
               onDismiss: () => setState(() => _menuOpen = false),
               onSelect: _handleBallMenuSelect,
-              onSelect: _openPlaceholder,
               onTournaments: _openTournaments,
             ),
         ],
