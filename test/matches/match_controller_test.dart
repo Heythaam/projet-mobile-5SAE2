@@ -67,6 +67,20 @@ void main() {
     expect(again.upcomingMatch?.code, created.code);
   });
 
+  test('stats follow create, join and cancel', () async {
+    final host = controllerFor('1', 'Farouk');
+    await host.load();
+    expect(host.stats, (played: 0, hosted: 0));
+    final created = await host.createMatch(draft());
+    expect(host.stats, (played: 1, hosted: 1));
+    final guest = controllerFor('2', 'Sami');
+    await guest.load();
+    await guest.joinByCode(created.code);
+    expect(guest.stats, (played: 1, hosted: 0));
+    await host.cancelMatch(created.code);
+    expect(host.stats, (played: 0, hosted: 0));
+  });
+
   test('a private match is found by code but not listed', () async {
     final controller = controllerFor('1', 'Farouk');
     await controller.load();

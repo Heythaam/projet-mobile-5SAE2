@@ -223,6 +223,23 @@ class MatchLocalStore {
     return _load(_db, rows.first['code']! as String);
   }
 
+  /// How many matches [uid] is in (past ones included) and how many of those
+  /// they created.
+  Future<({int played, int hosted})> statsFor(String uid) async {
+    final played = await _db.rawQuery(
+      'SELECT COUNT(*) AS n FROM match_players WHERE uid = ?',
+      [uid],
+    );
+    final hosted = await _db.rawQuery(
+      'SELECT COUNT(*) AS n FROM matches WHERE host_uid = ?',
+      [uid],
+    );
+    return (
+      played: (played.first['n']! as int),
+      hosted: (hosted.first['n']! as int),
+    );
+  }
+
   // ---- Update -----------------------------------------------------------
 
   /// Puts [uid] in the lowest free slot. [name] is shown in the lobby.

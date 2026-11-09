@@ -16,8 +16,14 @@ class ProfileScreen extends StatelessWidget {
     this.onStadiums,
     this.localProfile,
     this.onEditProfile,
+    this.matchesPlayed,
+    this.matchesHosted,
     super.key,
   });
+
+  /// Counted from the matches on this phone. Null shows a dash.
+  final int? matchesPlayed;
+  final int? matchesHosted;
 
   /// The profile saved on this phone. When set, its username, avatar colour,
   /// position and bio are shown instead of the account's.
@@ -157,7 +163,7 @@ class ProfileScreen extends StatelessWidget {
                           child: _ProfileStat(
                             icon: Icons.sports_soccer_rounded,
                             label: 'Matches',
-                            value: '—',
+                            value: matchesPlayed?.toString() ?? '—',
                           ),
                         ),
                         SizedBox(width: 8 * scale),
@@ -178,6 +184,19 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (matchesHosted != null && matchesHosted! > 0)
+                      Padding(
+                        padding: EdgeInsets.only(top: 6 * scale),
+                        child: Text(
+                          'You created $matchesHosted of them',
+                          key: const ValueKey('profile_hosted'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: KickoffColors.muted,
+                            fontSize: 12 * scale,
+                          ),
+                        ),
+                      ),
                     SizedBox(height: 16 * scale),
                     if (onEditProfile != null) ...[
                       _ProfileRow(

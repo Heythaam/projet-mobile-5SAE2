@@ -402,13 +402,18 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       key: ValueKey(_showHistoryOnCalendar),
     ),
     _ => ListenableBuilder(
-      listenable: _profileController ?? _noChanges,
+      listenable: Listenable.merge([
+        _profileController ?? _noChanges,
+        _matchController,
+      ]),
       builder: (context, _) {
         final local = _profileController?.profile;
         return ProfileScreen(
           user: widget.user,
           profile: _profile,
           localProfile: local,
+          matchesPlayed: _matchController.stats?.played,
+          matchesHosted: _matchController.stats?.hosted,
           // Only offered once the phone copy loaded; guests have none.
           onEditProfile: local == null ? null : _editProfile,
           onHistory: _openHistory,
@@ -517,6 +522,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
         onProfileTap: () {
           // The phone copy of the profile loads the first time it is needed.
           _profileController?.load();
+          _matchController.load();
           setState(() {
             _menuOpen = false;
             _tab = 2;

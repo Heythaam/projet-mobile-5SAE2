@@ -304,6 +304,24 @@ void main() {
     });
   });
 
+  group('stats', () {
+    test('counts matches played and hosted, past ones included', () async {
+      expect(await store.statsFor('me'), (played: 0, hosted: 0));
+      final mine = await seed(host: 'me', hours: 2);
+      final other = await seed(host: 'other', hours: 5);
+      await store.join(other.code, 'me');
+      await seed(host: 'other', hours: 9);
+      expect(await store.statsFor('me'), (played: 2, hosted: 1));
+      expect(await store.statsFor('other'), (played: 2, hosted: 2));
+
+      now = inHours(3);
+      expect(await store.statsFor('me'), (played: 2, hosted: 1));
+
+      await store.cancel(mine.code, 'me');
+      expect(await store.statsFor('me'), (played: 1, hosted: 0));
+    });
+  });
+
   group('cancel', () {
     test('only the host can cancel, and players go with the match', () async {
       final match = await seed();

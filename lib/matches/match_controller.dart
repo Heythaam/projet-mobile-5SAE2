@@ -119,6 +119,9 @@ class MatchController extends ChangeNotifier {
   Map<String, LocalMatch> _byCode = const {};
   MatchHomeMatch? upcomingMatch;
 
+  /// Matches the player is in, and how many they created. Null until loaded.
+  ({int played, int hosted})? stats;
+
   /// Message for the last failed action, ready to show to the player.
   String? lastError;
   bool loaded = false;
@@ -146,6 +149,7 @@ class MatchController extends ChangeNotifier {
           ? _byCode[focusCode]
           : await store.upcomingFor(uid);
       upcomingMatch = next == null ? null : _toHome(next);
+      stats = await store.statsFor(uid);
     } catch (_) {
       lastError = 'Matches could not be loaded from this phone.';
     }
