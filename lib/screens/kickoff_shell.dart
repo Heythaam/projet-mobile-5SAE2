@@ -11,6 +11,8 @@ import '../models.dart';
 import '../challenges/repository/challenge_repository.dart';
 import '../challenges/screens/challenges_dashboard_screen.dart';
 import '../stadium/stadium_module.dart';
+import '../users/user_profile_controller.dart';
+import 'edit_profile_screen.dart';
 import '../tournaments/screens/tournaments_list_screen.dart';
 import '../tournaments/services/tournament_service.dart';
 import '../tournaments/widgets/requests_badge.dart';
@@ -89,6 +91,16 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     uid: widget.isGuest ? 'guest' : '${widget.user.id}',
     username: widget.isGuest ? 'Guest' : widget.user.username,
   );
+  static final _noChanges = ChangeNotifier();
+
+  /// The signed-in player's profile on this phone. Guests have none.
+  late final UserProfileController? _profileController = widget.isGuest
+      ? null
+      : UserProfileController(
+          uid: '${widget.user.id}',
+          accountUsername: widget.user.username,
+          email: widget.user.email,
+        );
 
   /// Join requests waiting for this captain; the home banner hides at zero.
   int _pendingJoinRequests = 0;
@@ -121,6 +133,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   void dispose() {
     appRouteObserver.unsubscribe(this);
     _lifecycle.dispose();
+    _profileController?.dispose();
     super.dispose();
   }
 
@@ -358,16 +371,35 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       initialHistory: _showHistoryOnCalendar,
       key: ValueKey(_showHistoryOnCalendar),
     ),
-    _ => ProfileScreen(
-      user: widget.user,
-      profile: _profile,
-      onHistory: _openHistory,
-      onAwards: _openAwards,
-      onFriends: _openFriends,
-      onSettings: _showSettings,
-      onStadiums: _openStadiums,
+    _ => ListenableBuilder(
+      listenable: _profileController ?? _noChanges,
+      builder: (context, _) {
+        final local = _profileController?.profile;
+        return ProfileScreen(
+          user: widget.user,
+          profile: _profile,
+          localProfile: local,
+          // Only offered once the phone copy loaded; guests have none.
+          onEditProfile: local == null ? null : _editProfile,
+          onHistory: _openHistory,
+          onAwards: _openAwards,
+          onFriends: _openFriends,
+          onSettings: _showSettings,
+          onStadiums: _openStadiums,
+        );
+      },
     ),
   };
+
+  Future<void> _editProfile() async {
+    final controller = _profileController;
+    if (controller == null) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => EditProfileScreen(controller: controller),
+      ),
+    );
+  }
 
   void _openStadiums() {
     Navigator.of(context).push<void>(
@@ -417,10 +449,14 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
         menuOpen: _menuOpen,
         onCalendarTap: _selectCalendar,
         onBallTap: () => setState(() => _menuOpen = !_menuOpen),
-        onProfileTap: () => setState(() {
-          _menuOpen = false;
-          _tab = 2;
-        }),
+        onProfileTap: () {
+          // The phone copy of the profile loads the first time it is needed.
+          _profileController?.load();
+          setState(() {
+            _menuOpen = false;
+            _tab = 2;
+          });
+        },
       ),
     ),
   );

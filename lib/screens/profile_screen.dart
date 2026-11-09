@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../local/user_local_store.dart';
 import '../models.dart';
+import '../users/avatar_palette.dart';
 import 'kickoff_style.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -12,8 +14,17 @@ class ProfileScreen extends StatelessWidget {
     required this.onFriends,
     required this.onSettings,
     this.onStadiums,
+    this.localProfile,
+    this.onEditProfile,
     super.key,
   });
+
+  /// The profile saved on this phone. When set, its username, avatar colour,
+  /// position and bio are shown instead of the account's.
+  final LocalUser? localProfile;
+
+  /// Opens the edit screen. Null hides the row, for example for guests.
+  final VoidCallback? onEditProfile;
 
   final UserAccount user;
   final GamificationProfile? profile;
@@ -26,6 +37,9 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
+    final name = localProfile?.username ?? user.username;
+    final position = localProfile?.position;
+    final bio = localProfile?.bio ?? '';
     return ArcadeBackdrop(
       child: SafeArea(
         bottom: false,
@@ -61,7 +75,7 @@ class ProfileScreen extends StatelessWidget {
                           height: 96 * scale,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: KickoffColors.yellow,
+                            color: avatarColor(localProfile?.avatarId ?? 0),
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: KickoffColors.blue,
@@ -69,9 +83,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           ),
                           child: Text(
-                            user.username.isEmpty
-                                ? '?'
-                                : user.username[0].toUpperCase(),
+                            name.isEmpty ? '?' : name[0].toUpperCase(),
                             style: TextStyle(
                               color: KickoffColors.ink,
                               fontSize: 34 * scale,
@@ -81,13 +93,39 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 6 * scale),
                         Text(
-                          '@${user.username}',
+                          '@$name',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 17 * scale,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (position != null)
+                          Padding(
+                            padding: EdgeInsets.only(top: 4 * scale),
+                            child: Text(
+                              position,
+                              key: const ValueKey('profile_position'),
+                              style: TextStyle(
+                                color: KickoffColors.muted,
+                                fontSize: 13 * scale,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        if (bio.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: 4 * scale),
+                            child: Text(
+                              bio,
+                              key: const ValueKey('profile_bio'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: KickoffColors.muted,
+                                fontSize: 13 * scale,
+                              ),
+                            ),
+                          ),
                         SizedBox(height: 6 * scale),
                         Container(
                           constraints: BoxConstraints(minHeight: 36 * scale),
@@ -141,6 +179,14 @@ class ProfileScreen extends StatelessWidget {
                       ],
                     ),
                     SizedBox(height: 16 * scale),
+                    if (onEditProfile != null) ...[
+                      _ProfileRow(
+                        icon: Icons.edit_rounded,
+                        title: 'Edit profile',
+                        onTap: onEditProfile!,
+                      ),
+                      SizedBox(height: 8 * scale),
+                    ],
                     _ProfileRow(
                       icon: Icons.history_rounded,
                       title: 'History',
