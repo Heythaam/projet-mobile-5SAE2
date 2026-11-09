@@ -32,12 +32,17 @@ void main() {
   }) => store.create(uid: uid, username: username, email: email);
 
   group('schema', () {
-    test('onCreate builds version 1 with foreign keys on', () async {
+    test('onCreate builds the current version with foreign keys on', () async {
       final tables = await db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table' "
         "AND name NOT LIKE 'sqlite_%' ORDER BY name",
       );
-      expect(tables.map((t) => t['name']), ['session', 'users']);
+      expect(tables.map((t) => t['name']), [
+        'match_players',
+        'matches',
+        'session',
+        'users',
+      ]);
 
       final version = await db.rawQuery('PRAGMA user_version');
       expect(version.first['user_version'], LocalDatabase.version);

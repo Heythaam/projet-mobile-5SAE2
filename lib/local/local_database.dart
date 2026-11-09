@@ -13,7 +13,7 @@ class LocalDatabase {
 
   /// Bump this and add an `if (oldVersion < N)` step in [onUpgrade] whenever
   /// the schema changes.
-  static const version = 1;
+  static const version = 2;
 
   /// [factory] and [path] exist so tests can open an in-memory database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -43,7 +43,7 @@ class LocalDatabase {
     int oldVersion,
     int newVersion,
   ) async {
-    if (oldVersion < 1) {
+    if (oldVersion < 1 && newVersion >= 1) {
       await db.execute('''
         CREATE TABLE users(
           uid        TEXT PRIMARY KEY,
@@ -63,6 +63,33 @@ class LocalDatabase {
           signed_in_at INTEGER NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 2 && newVersion >= 2) {
+      await db.execute('''
+        CREATE TABLE matches(
+          code         TEXT PRIMARY KEY COLLATE NOCASE,
+          host_uid     TEXT NOT NULL,
+          stadium      TEXT NOT NULL,
+          scheduled_at INTEGER NOT NULL,
+          capacity     INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 30),
+          is_public    INTEGER NOT NULL DEFAULT 0 CHECK (is_public IN (0, 1)),
+          created_at   INTEGER NOT NULL,
+          updated_at   INTEGER NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE match_players(
+          match_code TEXT NOT NULL REFERENCES matches(code) ON DELETE CASCADE,
+          uid        TEXT NOT NULL,
+          slot       INTEGER NOT NULL CHECK (slot >= 0),
+          joined_at  INTEGER NOT NULL,
+          PRIMARY KEY (match_code, uid),
+          UNIQUE (match_code, slot)
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_matches_public_time ON matches(is_public, scheduled_at)',
+      );
     }
   }
 }
