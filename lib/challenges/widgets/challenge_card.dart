@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../screens/kickoff_style.dart';
+import '../../weather/match_weather_row.dart';
+import '../../weather/weather_service.dart';
 import '../models/challenge_model.dart';
 import 'star_rating.dart';
+
+final _weather = WeatherService();
 
 class ChallengeCard extends StatelessWidget {
   const ChallengeCard({
@@ -22,6 +27,21 @@ class ChallengeCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onCopyCode;
+
+  Future<void> _share(BuildContext context) async {
+    final text =
+        'Join my football challenge at ${challenge.locationName}! '
+        'Open Kickoff and enter code ${challenge.joinCode}.';
+    try {
+      await SharePlus.instance.share(ShareParams(text: text));
+    } on Object {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invite copied')),
+      );
+    }
+  }
 
   void _showDetailBottomSheet(BuildContext context) {
     final scale = kickoffScale(context);
@@ -114,6 +134,22 @@ class ChallengeCard extends StatelessWidget {
                 ],
               ),
               SizedBox(height: 8 * scale),
+              if (challenge.status == ChallengeStatus.active) ...[
+                MatchWeatherRow(service: _weather, when: date),
+                SizedBox(height: 8 * scale),
+              ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('share_challenge'),
+                  onPressed: () => _share(context),
+                  icon: const Icon(Icons.share_rounded, color: KickoffColors.yellow),
+                  label: const Text(
+                    'Share challenge',
+                    style: TextStyle(color: KickoffColors.yellow),
+                  ),
+                ),
+              ),
 
               Row(
                 children: [
