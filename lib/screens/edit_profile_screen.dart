@@ -5,6 +5,7 @@ import '../local/user_local_store.dart';
 import '../users/avatar_palette.dart';
 import '../users/country_picker.dart';
 import '../users/country_service.dart';
+import '../users/photo_source.dart';
 import '../users/user_avatar.dart';
 import '../users/user_profile_controller.dart';
 import 'kickoff_style.dart';
@@ -15,10 +16,14 @@ class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
     required this.controller,
     this.countries,
+    this.photos,
     super.key,
   });
 
   final UserProfileController controller;
+
+  /// Camera and gallery access. A default one is made when null.
+  final PhotoSource? photos;
 
   /// Source of the country list. A default one is made when null.
   final CountryService? countries;
@@ -33,6 +38,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late String? _position;
   late int _avatarId;
   late String? _country;
+  late String? _photoPath;
+  late final PhotoSource _photos = widget.photos ?? ImagePickerPhotoSource();
+
+  /// Copies made in this session and not saved yet. They are deleted when
+  /// replaced, removed, or when the screen closes without saving them.
+  final _unsaved = <String>{};
   late final CountryService _countries =
       widget.countries ?? CountryService();
   bool _saving = false;
@@ -47,17 +58,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _position = profile?.position;
     _avatarId = profile?.avatarId ?? 0;
     _country = profile?.country;
+    _photoPath = profile?.photoPath;
   }
 
   @override
   void dispose() {
+    for (final path in _unsaved) {
+      _photos.delete(path);
+    }
     _username.dispose();
     _bio.dispose();
     super.dispose();
   }
 
+  Future<void> _takePhoto(PhotoChoice choice) async {
+    try {
+      final path = await _photos.pick(choice);
+      if (path == null || !mounted) return;
+      final previous = _photoPath;
+      if (previous != null && _unsaved.remove(previous)) {
+        _photos.delete(previous);
+      }
+      _unsaved.add(path);
+      setState(() {
+        _photoPath = path;
+        _error = null;
+      });
+    } on PhotoException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
+  void _removePhoto() {
+    final previous = _photoPath;
+    if (previous != null && _unsaved.remove(previous)) {
+      _photos.delete(previous);
+    }
+    setState(() => _photoPath = null);
+  }
+
   Future<void> _save() async {
     if (_saving) return;
+    final oldPhoto = widget.controller.profile?.photoPath;
     setState(() {
       _saving = true;
       _error = null;
@@ -70,9 +112,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       avatarId: _avatarId,
       country: _country,
       clearCountry: _country == null,
+      photoPath: _photoPath,
+      clearPhoto: _photoPath == null,
     );
     if (!mounted) return;
     if (saved) {
+      // The saved copy stays; the one it replaced is no longer needed.
+      _unsaved.remove(_photoPath);
+      if (oldPhoto != null && oldPhoto != _photoPath) {
+        _photos.delete(oldPhoto);
+      }
       Navigator.of(context).pop(true);
     } else {
       setState(() {
@@ -145,11 +194,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               : _username.text.trim().toLowerCase(),
                           avatarId: _avatarId,
                           size: 80,
-                          photoPath: widget.controller.profile?.photoPath,
+                          photoPath: _photoPath,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          key: const ValueKey('photo_camera'),
+                          onPressed: () => _takePhoto(PhotoChoice.camera),
+                          icon: const Icon(Icons.photo_camera_rounded),
+                          label: const Text('Camera'),
+                        ),
+                        TextButton.icon(
+                          key: const ValueKey('photo_gallery'),
+                          onPressed: () => _takePhoto(PhotoChoice.gallery),
+                          icon: const Icon(Icons.photo_library_rounded),
+                          label: const Text('Gallery'),
+                        ),
+                        if (_photoPath != null)
+                          TextButton.icon(
+                            key: const ValueKey('photo_remove'),
+                            onPressed: _removePhoto,
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            label: const Text('Remove'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Wrap(
                       alignment: WrapAlignment.center,
                       spacing: 10,

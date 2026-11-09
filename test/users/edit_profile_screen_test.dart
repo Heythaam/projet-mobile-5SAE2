@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:football_match_app/local/local_database.dart';
 import 'package:football_match_app/local/user_local_store.dart';
 import 'package:football_match_app/screens/edit_profile_screen.dart';
+import 'package:football_match_app/users/photo_source.dart';
 import 'package:football_match_app/users/user_profile_controller.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -88,4 +89,89 @@ void main() {
     expect(find.byType(EditProfileScreen), findsOneWidget);
     await tester.runAsync(db.close);
   });
+
+  testWidgets('a picked photo is saved, and replacing it deletes the old copy', (
+    tester,
+  ) async {
+    final (db, controller) = (await tester.runAsync(setup))!;
+    final photos = _FakePhotos(['/app/p1.jpg', '/app/p2.jpg']);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EditProfileScreen(controller: controller, photos: photos),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('photo_gallery')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('avatar_photo')), findsOneWidget);
+    expect(find.byKey(const ValueKey('photo_remove')), findsOneWidget);
+
+    // A second pick throws the unsaved first copy away.
+    await tester.tap(find.byKey(const ValueKey('photo_camera')));
+    await tester.pump();
+    expect(photos.deleted, ['/app/p1.jpg']);
+
+    await tester.tap(find.text('Save'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.profile?.photoPath, '/app/p2.jpg');
+    expect(photos.deleted, ['/app/p1.jpg']);
+    await tester.runAsync(db.close);
+  });
+
+  testWidgets('removing the photo clears it and deletes the old file', (
+    tester,
+  ) async {
+    final (db, controller) = (await tester.runAsync(setup))!;
+    await tester.runAsync(() => controller.save(photoPath: '/app/old.jpg'));
+    final photos = _FakePhotos([]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EditProfileScreen(controller: controller, photos: photos),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('photo_remove')));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.profile?.photoPath, isNull);
+    expect(photos.deleted, ['/app/old.jpg']);
+    await tester.runAsync(db.close);
+  });
+
+  testWidgets('a photo failure shows a message', (tester) async {
+    final (db, controller) = (await tester.runAsync(setup))!;
+    final photos = _FakePhotos([], fail: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EditProfileScreen(controller: controller, photos: photos),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('photo_camera')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('edit_profile_error')), findsOneWidget);
+    await tester.runAsync(db.close);
+  });
+}
+
+class _FakePhotos implements PhotoSource {
+  _FakePhotos(this.paths, {this.fail = false});
+
+  final List<String> paths;
+  final bool fail;
+  final deleted = <String>[];
+
+  @override
+  Future<String?> pick(PhotoChoice choice) async {
+    if (fail) throw const PhotoException('Could not get that photo.');
+    return paths.isEmpty ? null : paths.removeAt(0);
+  }
+
+  @override
+  Future<void> delete(String path) async => deleted.add(path);
 }
