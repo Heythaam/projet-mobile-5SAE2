@@ -5,6 +5,9 @@ import '../challenges/repository/challenge_repository.dart';
 import '../local/match_local_store.dart';
 import '../screens/match/match_mock_data.dart';
 
+/// The uid of every sample player starts with this.
+const demoUidPrefix = 'demo-';
+
 /// Players that fill the demo matches and challenges.
 const demoPlayers = [
   'Sami', 'Yassine', 'Amine', 'Karim', 'Mehdi', 'Nour', 'Hatem', 'Ali',
@@ -30,7 +33,7 @@ Future<int> seedDemoMatches(MatchLocalStore store, {Random? random}) async {
       rng.nextBool() ? 0 : 30,
     );
     final match = await store.create(
-      hostUid: 'demo-$host',
+      hostUid: '$demoUidPrefix$host',
       hostName: host,
       stadium: stadium.name,
       scheduledAt: start,
@@ -44,7 +47,7 @@ Future<int> seedDemoMatches(MatchLocalStore store, {Random? random}) async {
     final fill = 1 + rng.nextInt(stadium.players - 1);
     for (final name in others.take(fill)) {
       try {
-        await store.join(match.code, 'demo-$name', name: name);
+        await store.join(match.code, '$demoUidPrefix$name', name: name);
       } on LocalMatchException {
         break;
       }

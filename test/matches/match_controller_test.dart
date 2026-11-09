@@ -118,6 +118,17 @@ void main() {
     expect(guest.lastError, contains('host'));
   });
 
+  test('sample matches are added once and can be removed', () async {
+    final c = controllerFor('1', 'Farouk');
+    await c.load();
+    expect(await c.loadDemoMatches(), 12);
+    expect(c.publicMatches, hasLength(12));
+    expect(await c.loadDemoMatches(), 0);
+    expect(c.publicMatches, hasLength(12));
+    await c.removeDemoMatches();
+    expect(c.publicMatches, isEmpty);
+  });
+
   test('a match with more than 5 players cannot be cancelled', () async {
     final host = controllerFor('1', 'Farouk');
     await host.load();

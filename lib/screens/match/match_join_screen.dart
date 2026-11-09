@@ -332,17 +332,38 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                 ),
               ),
           ],
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: const ValueKey('load_demo_matches'),
-              onPressed: () async {
-                await widget.controller.loadDemoMatches();
-                if (mounted) setState(() {});
-              },
-              icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: const Text('Add sample matches'),
-            ),
+          Wrap(
+            children: [
+              TextButton.icon(
+                key: const ValueKey('load_demo_matches'),
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final added = await widget.controller.loadDemoMatches();
+                  if (!mounted) return;
+                  setState(() {});
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        added == 0
+                            ? 'Sample matches are already added.'
+                            : 'Added $added sample matches.',
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Add sample matches'),
+              ),
+              TextButton.icon(
+                key: const ValueKey('remove_demo_matches'),
+                onPressed: () async {
+                  await widget.controller.removeDemoMatches();
+                  if (mounted) setState(() {});
+                },
+                icon: const Icon(Icons.delete_sweep_rounded, size: 18),
+                label: const Text('Remove samples'),
+              ),
+            ],
           ),
         ],
       ),

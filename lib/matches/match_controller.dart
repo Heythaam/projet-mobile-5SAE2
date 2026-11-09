@@ -333,11 +333,21 @@ class MatchController extends ChangeNotifier {
   }
 
   /// Adds sample public matches by other players, for trying the app out.
+  /// Does nothing (returns 0) when the samples are already there.
   Future<int> loadDemoMatches() async {
-    final added = await seedDemoMatches(await _ensureStore());
+    final store = await _ensureStore();
+    if (await store.countHostedByPrefix(demoUidPrefix) > 0) return 0;
+    final added = await seedDemoMatches(store);
     await _refresh();
     notifyListeners();
     return added;
+  }
+
+  /// Removes the sample matches and their players.
+  Future<void> removeDemoMatches() async {
+    await (await _ensureStore()).deleteHostedByPrefix(demoUidPrefix);
+    await _refresh();
+    notifyListeners();
   }
 
   /// Makes the match public or private. Only the host can.
