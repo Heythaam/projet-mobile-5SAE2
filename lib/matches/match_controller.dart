@@ -5,8 +5,20 @@ import '../location/player_location.dart';
 import '../local/match_local_store.dart';
 import '../screens/match/match_mock_data.dart';
 import '../weather/weather_service.dart';
+import 'stadium_directory.dart';
 
 typedef MatchStoreOpener = Future<MatchLocalStore> Function();
+
+/// The match was saved but its stadium slot could not be held, so the match was
+/// removed again. [message] is ready to show to the player.
+class MatchBookingException implements Exception {
+  const MatchBookingException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 /// Match state for the Match screens, saved on the phone with SQFlite.
 ///
@@ -20,9 +32,11 @@ class MatchController extends ChangeNotifier {
     MatchStoreOpener? openStore,
     WeatherService? weather,
     LocationSource? location,
+    StadiumDirectory? stadiumDirectory,
   }) : _openStore = openStore ?? _openDefaultStore,
        weather = weather ?? WeatherService(),
-       _location = location ?? const GeolocatorLocationSource();
+       _location = location ?? const GeolocatorLocationSource(),
+       _directory = stadiumDirectory ?? HttpStadiumDirectory();
 
   /// The signed-in player. Local ids are strings so Firebase uids fit later.
   final String uid;
@@ -38,9 +52,57 @@ class MatchController extends ChangeNotifier {
   static const streak = 1;
   static const energy = 50;
 
-  // Stadiums are still sample data until the Stadium module has a player
-  // booking screen.
-  final List<MatchStadiumData> stadiums = matchStadiums;
+  final StadiumDirectory _directory;
+
+  /// Stadiums to pick from. Real ones from the Stadium module after
+  /// [loadStadiums]; the sample list when the server cannot be reached.
+  List<MatchStadiumData> stadiums = matchStadiums;
+  bool usingSampleStadiums = true;
+  bool stadiumsLoading = false;
+
+  /// Asks the Stadium module for its open stadiums. Falls back to the sample
+  /// list, with [usingSampleStadiums] true, for guests, when the server is
+  /// unreachable, or when no stadium is open yet.
+  Future<void> loadStadiums() async {
+    if (stadiumsLoading) return;
+    stadiumsLoading = true;
+    notifyListeners();
+    try {
+      final real = await _directory.stadiums();
+      if (real.isNotEmpty) {
+        stadiums = [
+          for (final stadium in real)
+            MatchStadiumData(
+              stadiumId: stadium.id,
+              name: stadium.name,
+              distance: stadium.address.split(',').first.trim(),
+              coins: stadium.pricePerHour,
+              players: stadium.maxCapacity,
+            ),
+        ];
+        usingSampleStadiums = false;
+      } else {
+        stadiums = matchStadiums;
+        usingSampleStadiums = true;
+      }
+    } on StadiumDirectoryException {
+      stadiums = matchStadiums;
+      usingSampleStadiums = true;
+    } catch (_) {
+      stadiums = matchStadiums;
+      usingSampleStadiums = true;
+    }
+    stadiumsLoading = false;
+    notifyListeners();
+  }
+
+  /// Free slots of a real stadium on [day]. Throws
+  /// [StadiumDirectoryException] with a message ready to show.
+  Future<List<FreeSlot>> freeSlots(MatchStadiumData stadium, DateTime day) {
+    final id = stadium.stadiumId;
+    if (id == null) return Future.value(const []);
+    return _directory.freeSlots(id, day);
+  }
 
   final LocationSource _location;
   PlayerLocation? _here;
@@ -175,20 +237,42 @@ class MatchController extends ChangeNotifier {
     }
   }
 
-  /// Saves a new match with the player as host. Throws
-  /// [LocalMatchException] when the input is not valid.
+  /// Saves a new match with the player as host. In a real stadium it also
+  /// holds the picked slot; if that fails the match is removed again and
+  /// [MatchBookingException] is thrown. Throws [LocalMatchException] when the
+  /// input is not valid.
   Future<MatchHomeMatch> createMatch(CreateMatchDraft draft) async {
     final store = await _ensureStore();
-    final created = await store.create(
+    var created = await store.create(
       hostUid: uid,
       hostName: username,
       stadium: draft.stadium.name,
       scheduledAt: draft.startsAt,
-      capacity: draft.stadium.players,
+      capacity: draft.capacity,
       isPublic: draft.visibility == 'Public',
       latitude: draft.stadium.latitude,
       longitude: draft.stadium.longitude,
     );
+    final slot = draft.slot;
+    final stadiumId = draft.stadium.stadiumId;
+    if (slot != null && stadiumId != null) {
+      final int bookingId;
+      try {
+        bookingId = await _directory.hold(
+          stadiumId: stadiumId,
+          pitchId: slot.pitch.id,
+          day: DateUtils.dateOnly(draft.startsAt),
+          start: slot.start,
+          matchCode: created.code,
+        );
+      } on StadiumDirectoryException catch (error) {
+        await store.cancel(created.code, uid);
+        await _refresh();
+        notifyListeners();
+        throw MatchBookingException(error.message);
+      }
+      created = await store.setBookingId(created.code, uid, bookingId);
+    }
     await _refresh(focusCode: created.code);
     notifyListeners();
     return _toHome(created);
@@ -202,9 +286,25 @@ class MatchController extends ChangeNotifier {
   Future<bool> leaveMatch(String code) async =>
       _change(() async => (await _ensureStore()).leave(code, uid));
 
-  /// Removes the match and everyone in it. Only the host can do this.
-  Future<bool> cancelMatch(String code) async =>
-      _change(() async => (await _ensureStore()).cancel(code, uid));
+  /// Removes the match and everyone in it. Only the host can do this. A
+  /// stadium slot held for the match is released first; if that fails the
+  /// match stays so the host can try again.
+  Future<bool> cancelMatch(String code) async {
+    final bookingId = _byCode[code.trim().toUpperCase()]?.bookingId;
+    if (bookingId != null) {
+      try {
+        await _directory.release(bookingId);
+      } on StadiumDirectoryException catch (error) {
+        // 404: the booking is already gone (stadium removed), nothing to free.
+        if (error.statusCode != 404) {
+          lastError = 'Could not release the stadium slot. ${error.message}';
+          notifyListeners();
+          return false;
+        }
+      }
+    }
+    return _change(() async => (await _ensureStore()).cancel(code, uid));
+  }
 
   Future<bool> _change(Future<Object?> Function() action) async {
     lastError = null;

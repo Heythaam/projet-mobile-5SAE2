@@ -1,5 +1,7 @@
-// Match models for the screens. The stadium list below is sample data until
-// the Stadium module has a player booking screen.
+import '../../matches/stadium_directory.dart';
+
+// Match models for the screens. The stadium list at the bottom is sample data,
+// used only when the Stadium module's server is not reachable (or for guests).
 
 class MatchStadiumData {
   const MatchStadiumData({
@@ -9,7 +11,11 @@ class MatchStadiumData {
     required this.players,
     this.latitude,
     this.longitude,
+    this.stadiumId,
   });
+
+  /// The Stadium module's id, or null for a sample stadium.
+  final int? stadiumId;
 
   final String name;
   final String distance;
@@ -61,11 +67,19 @@ class CreateMatchDraft {
     required this.stadium,
     required this.startsAt,
     required this.visibility,
+    this.slot,
   });
 
   final MatchStadiumData stadium;
   final DateTime startsAt;
   final String visibility;
+
+  /// The free slot picked in a real stadium. Null for a sample stadium.
+  final FreeSlot? slot;
+
+  /// Players in the match: the size of the picked pitch, or the sample
+  /// stadium's size.
+  int get capacity => slot?.pitch.capacity ?? stadium.players;
 }
 
 const matchStadiums = [
