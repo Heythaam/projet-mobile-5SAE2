@@ -1,8 +1,8 @@
 # Kickoff
 
 Kickoff is a Flutter football-match app with a Dart Shelf API and a shared
-SQLite database. The implemented user module covers accounts, friends,
-one-to-one chat, and server-backed gamification. Match creation and stadium
+SQLite database. The implemented modules cover accounts, friends, one-to-one
+chat, server-backed gamification, and tournaments. Match creation and stadium
 booking remain future product work.
 
 ## Interface direction
@@ -31,6 +31,19 @@ Kickoff uses its own football identity and original artwork.
   defaults; teammate mutations and other server-backed actions ask the visitor
   to sign in. Authenticated sessions retain the normal API-backed behavior.
 
+## Tournaments module
+
+Open **Tournament** from the ball menu to browse, search and filter
+tournaments. Players register a team with a chosen name or ask to join an
+existing team; captains answer requests, view requesters' profiles, remove
+players and can leave before kickoff. Detail tabs follow the format: leagues
+show standings, knockouts show a bracket, and groups + knockout show both.
+Captains see waiting join requests on the home screen and tournament cards.
+
+Tournaments, matches and results are entered directly in SQLite for now. See
+[docs/tournaments.md](docs/tournaments.md) for the rules, API, data model,
+bracket algorithm, SQL examples and seed scripts.
+
 ## Run the API
 
 From the project root in PowerShell:
@@ -44,8 +57,12 @@ dart run bin/server.dart
 ```
 
 The API listens on port `8080` and creates `backend/data/football_matches.sqlite`
-automatically. Set `PORT` or `DB_PATH` before starting the server to override
-these defaults.
+automatically, migrating older schemas on start. Set `PORT` or `DB_PATH`
+before starting the server to override these defaults.
+
+Test accounts and tournaments are restored with `dart run bin/seed.dart` from
+`backend/`; see
+[docs/tournaments.md](docs/tournaments.md#seed-data).
 
 ## Run the Flutter app
 
@@ -76,13 +93,28 @@ flutter run -d <device-serial> --dart-define=API_BASE_URL=http://127.0.0.1:8080
 If `adb` is not on `PATH`, use
 `$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe`.
 
+### Android NDK
+
+Flutter and plugins such as `jni` request one exact NDK version.
+`android/build.gradle.kts` uses that version when it is installed and
+otherwise the newest NDK in your Android SDK, so every machine builds with what
+it has; with no NDK installed, Gradle downloads the requested one. If a build
+reports a missing NDK, install one from Android Studio (SDK Manager > SDK Tools
+> NDK (Side by side)).
+
 ## Tests
 
 ```powershell
+flutter analyze
 flutter test
 Set-Location backend
+dart analyze
 dart test
 ```
 
+On Windows, stop the API before `dart test`: the running server locks
+`backend/.dart_tool/lib/sqlite3.dll`.
+
 The API routes, SQLite schema, and gamification rules are in `backend/lib`;
-the Flutter user interface, models, and API client are in `lib`.
+the Flutter user interface, models, and API client are in `lib`, with the
+tournaments module in `lib/tournaments`.

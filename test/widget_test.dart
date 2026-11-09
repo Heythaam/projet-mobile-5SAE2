@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:football_match_app/api_client.dart';
+import 'package:football_match_app/app_route_observer.dart';
 import 'package:football_match_app/auth_screen.dart';
 import 'package:football_match_app/matches/football_match.dart';
 import 'package:football_match_app/matches/match_repository.dart';
@@ -87,31 +88,89 @@ void main() {
     expect(find.text('Create'), findsOneWidget);
   });
 
-  testWidgets('guest shell exposes demo data and profile actions', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(_guestShell());
+  testWidgets('ball menu opens tournaments', (WidgetTester tester) async {
+    await tester.pumpWidget(_shell());
     await tester.pumpAndSettle();
 
-    expect(find.text('Blue Arena'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Calendar'));
+    await tester.tap(find.bySemanticsLabel('Open ball menu'));
     await tester.pumpAndSettle();
-    expect(find.text('Blue Arena'), findsOneWidget);
-    expect(find.text('North Park'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Profile'));
+    await tester.tap(find.byIcon(Icons.emoji_events_rounded));
     await tester.pumpAndSettle();
-    expect(find.text('Lv 3 · Striker'), findsOneWidget);
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
-    await tester.pumpAndSettle();
-    expect(find.text('Awards'), findsOneWidget);
-    await tester.tap(find.text('Awards'));
-    await tester.pumpAndSettle();
-    expect(find.text('First Kick'), findsOneWidget);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+
+    expect(find.text('Tournaments'), findsOneWidget);
+    expect(find.text('No tournaments yet'), findsOneWidget);
   });
 
-  testWidgets('guest ball menu opens every existing destination', (
+  testWidgets('home shows waiting join requests and opens tournaments', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeApiClient(pendingRequests: 2);
+    await tester.pumpWidget(_shell(api: api));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 join requests waiting'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home_join_requests')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tournaments'), findsOneWidget);
+
+    // Coming back refreshes the count, since requests may have been answered.
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(
+      api.calls.where((call) => call == 'GET /me/tournament-requests'),
+      hasLength(2),
+    );
+  });
+
+  testWidgets('the home banner refreshes when coming back from any screen', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeApiClient(pendingRequests: 2);
+    await tester.pumpWidget(_shell(api: api));
+    await tester.pumpAndSettle();
+
+    // Friends, awards or any other screen pushed above the shell.
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    navigator.push<void>(
+      MaterialPageRoute<void>(builder: (_) => const Scaffold()),
+    );
+    await tester.pumpAndSettle();
+    api.pendingRequests = 3;
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 join requests waiting'), findsOneWidget);
+  });
+
+  testWidgets('switching back to Home refreshes the banner', (
+    WidgetTester tester,
+  ) async {
+    final api = _FakeApiClient(pendingRequests: 2);
+    await tester.pumpWidget(_shell(api: api));
+    await tester.pumpAndSettle();
+    int loads() =>
+        api.calls.where((call) => call == 'GET /me/tournament-requests').length;
+
+    await tester.tap(find.bySemanticsLabel('Calendar'));
+    await tester.pumpAndSettle();
+    // Off the Home tab, coming back from another screen does not reload.
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    navigator.push<void>(
+      MaterialPageRoute<void>(builder: (_) => const Scaffold()),
+    );
+    await tester.pumpAndSettle();
+    navigator.pop();
+    await tester.pumpAndSettle();
+    expect(loads(), 1);
+
+    api.pendingRequests = 4;
+    await tester.tap(find.bySemanticsLabel('Calendar'));
+    await tester.pumpAndSettle();
+    expect(loads(), 2);
+    expect(find.text('4 join requests waiting'), findsOneWidget);
+  });
+
+  testWidgets('the home banner refreshes when the app resumes', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_guestShell());
@@ -136,7 +195,32 @@ void main() {
         await tester.pageBack();
       }
       await tester.pumpAndSettle();
+    final api = _FakeApiClient(pendingRequests: 2);
+    await tester.pumpWidget(_shell(api: api));
+    await tester.pumpAndSettle();
+    api.pendingRequests = 1;
+
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
     }
+    await tester.pumpAndSettle();
+    expect(find.text('1 join request waiting'), findsOneWidget);
+  });
+
+  testWidgets('home hides the requests banner when none are waiting', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_shell());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('home_join_requests')), findsNothing);
   });
 
   testWidgets('shell fits phone sizes and text scales without clipping', (
@@ -305,15 +389,21 @@ void main() {
   });
 }
 
-Widget _shell({Key? key, double textScale = 1}) => MaterialApp(
+Widget _shell({
+  Key? key,
+  double textScale = 1,
+  int pendingRequests = 0,
+  _FakeApiClient? api,
+}) => MaterialApp(
   key: key,
+  navigatorObservers: [appRouteObserver],
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context)
         .copyWith(textScaler: TextScaler.linear(textScale)),
     child: child!,
   ),
   home: KickoffShell(
-    api: _FakeApiClient(),
+    api: api ?? _FakeApiClient(pendingRequests: pendingRequests),
     user: const UserAccount(id: 1, username: 'player', email: 'p@example.com'),
     onLogout: () {},
     matchRepository: const EmptyMatchRepository(),
@@ -332,6 +422,11 @@ Widget _guestShell() => MaterialApp(
 );
 
 class _FakeApiClient extends Fake implements ApiClient {
+  _FakeApiClient({this.pendingRequests = 0});
+
+  int pendingRequests;
+  final calls = <String>[];
+
   @override
   Future<GamificationProfile> getGamificationProfile() async =>
       const GamificationProfile(
@@ -345,6 +440,18 @@ class _FakeApiClient extends Fake implements ApiClient {
         sentMessages: 0,
         achievements: [],
       );
+
+  @override
+  Future<Map<String, dynamic>> sendAuthenticated(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    calls.add('$method $path');
+    return path == '/me/tournament-requests'
+        ? {'pendingRequests': pendingRequests}
+        : {'tournaments': <Object>[]};
+  }
 }
 
 class _GuestApiClient extends Fake implements ApiClient {}

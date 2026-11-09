@@ -11,6 +11,7 @@ class ProfileScreen extends StatelessWidget {
     required this.onAwards,
     required this.onFriends,
     required this.onSettings,
+    this.onStadiums,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback onAwards;
   final VoidCallback onFriends;
   final VoidCallback onSettings;
+  final VoidCallback? onStadiums;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +158,14 @@ class ProfileScreen extends StatelessWidget {
                       title: 'Friends',
                       onTap: onFriends,
                     ),
+                    if (onStadiums != null) ...[
+                      SizedBox(height: 8 * scale),
+                      _ProfileRow(
+                        icon: Icons.stadium_rounded,
+                        title: 'My stadiums',
+                        onTap: onStadiums!,
+                      ),
+                    ],
                     SizedBox(height: 8 * scale),
                     _ProfileRow(
                       icon: Icons.settings_rounded,
@@ -188,35 +198,38 @@ class _ProfileStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
     return Tooltip(
-    message: label,
-    child: Container(
-      constraints: BoxConstraints(minHeight: 88 * scale),
-      padding: EdgeInsets.symmetric(horizontal: 7 * scale, vertical: 10 * scale),
-      decoration: BoxDecoration(
-        color: KickoffColors.panel,
-        borderRadius: BorderRadius.circular(14 * scale),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: KickoffColors.yellow, size: 20 * scale),
-          SizedBox(width: 6 * scale),
-          Flexible(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16 * scale,
-                fontWeight: FontWeight.w500,
+      message: label,
+      child: Container(
+        constraints: BoxConstraints(minHeight: 88 * scale),
+        padding: EdgeInsets.symmetric(
+          horizontal: 7 * scale,
+          vertical: 10 * scale,
+        ),
+        decoration: BoxDecoration(
+          color: KickoffColors.panel,
+          borderRadius: BorderRadius.circular(14 * scale),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: KickoffColors.yellow, size: 20 * scale),
+            SizedBox(width: 6 * scale),
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16 * scale,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -235,37 +248,40 @@ class _ProfileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
     return Material(
-    color: KickoffColors.panel,
-    borderRadius: BorderRadius.circular(14 * scale),
-    child: InkWell(
-      onTap: onTap,
+      color: KickoffColors.panel,
       borderRadius: BorderRadius.circular(14 * scale),
-      child: Container(
-        constraints: BoxConstraints(minHeight: 64 * scale),
-        padding: EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 12 * scale),
-        child: Row(
-          children: [
-            Icon(icon, color: KickoffColors.yellow, size: 22 * scale),
-            SizedBox(width: 12 * scale),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16 * scale,
-                  fontWeight: FontWeight.w500,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14 * scale),
+        child: Container(
+          constraints: BoxConstraints(minHeight: 64 * scale),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12 * scale,
+            vertical: 12 * scale,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: KickoffColors.yellow, size: 22 * scale),
+              SizedBox(width: 12 * scale),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16 * scale,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: KickoffColors.dim,
-              size: 20 * scale,
-            ),
-          ],
+              Icon(
+                Icons.chevron_right_rounded,
+                color: KickoffColors.dim,
+                size: 20 * scale,
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
