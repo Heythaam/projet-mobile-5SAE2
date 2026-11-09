@@ -46,7 +46,7 @@ Feature modules in the client:
 - Shell and core screens: `lib/main.dart` (session restore, auth vs shell routing), `lib/screens/kickoff_shell.dart` (three-item nav, menu, profile).
 - `lib/tournaments/` (models/services/screens/widgets, constants in `tournament_constants.dart`); reference doc `docs/tournaments.md` must be updated with any tournament change. Team-name rules are duplicated in `_teamName` (API) and `TeamName` (app) and must stay in sync.
 - `lib/stadium/stadium_module.dart` + `backend/lib/stadium.dart`: deliberately isolated owner-side module. Shared files only call `createStadiumTables`, `mountStadiumRoutes` and open `StadiumModule`; stadium tables never reference users/XP/friends.
-- Match UI is currently split across `lib/screens/match/` (screens with `match_mock_data.dart`) and `lib/features/match/` (empty placeholder files: every file there and in `test/features/match/` is 0 bytes and nothing imports them). There are no match endpoints yet; `lib/matches/match_repository.dart` is an empty calendar repository interface. Do not add fake matches, tournaments, or locally persisted XP as if real.
+- Match UI lives in `lib/screens/match/` (screens with `match_mock_data.dart`); the empty `lib/features/match/` placeholder files were removed. There are no match endpoints yet; `lib/matches/match_repository.dart` is an empty calendar repository interface. Do not add fake matches, tournaments, or locally persisted XP as if real.
 
 Cross-cutting rules:
 
