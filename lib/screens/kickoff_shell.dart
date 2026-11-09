@@ -305,8 +305,8 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
                 SizedBox(height: 12 * scale),
                 if (_profileController?.profile != null) ...[
                   Text(
-                    '@${_profileController!.profile!.username} · '
-                    '${_profileController!.profile!.email}',
+                    '@${_profileController?.profile?.username} · '
+                    '${_profileController?.profile?.email}',
                     key: const ValueKey('settings_account'),
                     style: const TextStyle(color: KickoffColors.muted),
                   ),

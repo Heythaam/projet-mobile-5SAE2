@@ -324,7 +324,7 @@ void main() {
       );
       expect(id, 31);
       expect(seen?.method, 'POST');
-      expect(jsonDecode((seen! as http.Request).body), {
+      expect(jsonDecode((seen as http.Request).body), {
         'pitchId': 12,
         'date': '2026-11-20',
         'start': 1080,

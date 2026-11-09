@@ -69,6 +69,7 @@ void main() {
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     await settle(tester);
+    await settle(tester);
     expect(find.text('@sami'), findsNothing);
     expect(find.text('@farouk (you)'), findsOneWidget);
     await tester.runAsync(db.close);

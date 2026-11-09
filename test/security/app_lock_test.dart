@@ -4,10 +4,10 @@ import 'package:football_match_app/security/app_lock.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeAuth implements Authenticator {
-  _FakeAuth({this.result = true, this.available = true});
+  _FakeAuth({this.result = true});
 
   bool result;
-  bool available;
+  bool available = true;
   int asked = 0;
 
   @override

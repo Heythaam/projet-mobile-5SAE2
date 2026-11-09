@@ -49,7 +49,7 @@ void main() {
       expect(WeatherService.parse({'hourly': 5}, saturday), isNull);
       expect(WeatherService.parse({'hourly': {'time': []}}, saturday), isNull);
       expect(
-        WeatherService.parse(forecast(temps: ['hot', 1, 2]), saturday),
+        WeatherService.parse(forecast(temps: [20.5, 'hot', 17.2]), saturday),
         isNull,
       );
     });

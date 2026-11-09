@@ -7,6 +7,12 @@ import 'package:football_match_app/users/photo_source.dart';
 import 'package:football_match_app/users/user_profile_controller.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+void tall(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 2600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
   sqfliteFfiInit();
 
@@ -32,6 +38,7 @@ void main() {
   testWidgets('saving updates the phone profile and closes the screen', (
     tester,
   ) async {
+    tall(tester);
     final (db, controller) = (await tester.runAsync(setup))!;
     await tester.pumpWidget(
       MaterialApp(
@@ -71,6 +78,7 @@ void main() {
   testWidgets('a taken username shows the error and stays open', (
     tester,
   ) async {
+    tall(tester);
     final (db, controller) = (await tester.runAsync(() => setup(taken: true)))!;
     await tester.pumpWidget(
       MaterialApp(home: EditProfileScreen(controller: controller)),
@@ -93,6 +101,7 @@ void main() {
   testWidgets('a picked photo is saved, and replacing it deletes the old copy', (
     tester,
   ) async {
+    tall(tester);
     final (db, controller) = (await tester.runAsync(setup))!;
     final photos = _FakePhotos(['/app/p1.jpg', '/app/p2.jpg']);
     await tester.pumpWidget(
@@ -124,6 +133,7 @@ void main() {
   testWidgets('removing the photo clears it and deletes the old file', (
     tester,
   ) async {
+    tall(tester);
     final (db, controller) = (await tester.runAsync(setup))!;
     await tester.runAsync(() => controller.save(photoPath: '/app/old.jpg'));
     final photos = _FakePhotos([]);
@@ -145,6 +155,7 @@ void main() {
   });
 
   testWidgets('a photo failure shows a message', (tester) async {
+    tall(tester);
     final (db, controller) = (await tester.runAsync(setup))!;
     final photos = _FakePhotos([], fail: true);
     await tester.pumpWidget(
