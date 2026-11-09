@@ -182,7 +182,8 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Open ball menu'));
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.flash_on_rounded));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Challenges'), findsOneWidget);
   });
