@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../local/local_database.dart';
 import '../location/player_location.dart';
 import '../local/match_local_store.dart';
+import 'football_match.dart';
 import '../screens/match/match_mock_data.dart';
 import '../weather/weather_service.dart';
 import 'stadium_directory.dart';
@@ -121,6 +122,22 @@ class MatchController extends ChangeNotifier {
 
   /// Matches the player is in, and how many they created. Null until loaded.
   ({int played, int hosted})? stats;
+
+  /// The upcoming matches the player is in, shaped for the calendar.
+  List<FootballMatch> get calendarMatches => [
+    for (final match in _byCode.values.where((m) => m.hasPlayer(uid)))
+      FootballMatch(
+        id: match.code,
+        scheduledAt: match.scheduledAt,
+        stadium: match.stadium,
+        joinedSlots: match.players,
+        totalSlots: match.capacity,
+        isPublic: match.isPublic,
+        participation: match.hostUid == uid
+            ? MatchParticipation.created
+            : MatchParticipation.joined,
+      ),
+  ];
 
   /// Message for the last failed action, ready to show to the player.
   String? lastError;

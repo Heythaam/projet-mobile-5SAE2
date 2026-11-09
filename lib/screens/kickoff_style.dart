@@ -343,20 +343,24 @@ class SlotDots extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var index = 0; index < total.clamp(0, 20); index++) ...[
-          if (index > 0) SizedBox(width: 3 * scale),
-          Container(
-            width: 9 * scale,
-            height: 9 * scale,
-            decoration: BoxDecoration(
-              color: index < joined ? KickoffColors.yellow : Colors.transparent,
-              shape: BoxShape.circle,
-              border: index < joined
-                  ? null
-                  : Border.all(color: KickoffColors.dim, width: 1.5 * scale),
+        // Many slots would not fit on a card, so a people icon replaces the dots.
+        if (total > 8)
+          Icon(Icons.groups_rounded, size: 18 * scale, color: KickoffColors.yellow)
+        else
+          for (var index = 0; index < total.clamp(0, 8); index++) ...[
+            if (index > 0) SizedBox(width: 3 * scale),
+            Container(
+              width: 9 * scale,
+              height: 9 * scale,
+              decoration: BoxDecoration(
+                color: index < joined ? KickoffColors.yellow : Colors.transparent,
+                shape: BoxShape.circle,
+                border: index < joined
+                    ? null
+                    : Border.all(color: KickoffColors.dim, width: 1.5 * scale),
+              ),
             ),
-          ),
-        ],
+          ],
         SizedBox(width: 5 * scale),
         Text(
           '$joined/$total',

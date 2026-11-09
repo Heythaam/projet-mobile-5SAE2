@@ -202,6 +202,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   }
 
   Future<void> _loadMatches() async {
+    _matchController.load();
     setState(() {
       _loadingMatches = true;
       _matchesError = null;
@@ -433,13 +434,17 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
             )
           : null,
     ),
-    1 => CalendarScreen(
-      matches: _matches,
-      loading: _loadingMatches,
-      loadError: _matchesError,
-      onRetry: _loadMatches,
-      initialHistory: _showHistoryOnCalendar,
-      key: ValueKey(_showHistoryOnCalendar),
+    1 => ListenableBuilder(
+      listenable: _matchController,
+      builder: (context, _) => CalendarScreen(
+        // Matches made on this phone first, then the ones from the repository.
+        matches: [..._matchController.calendarMatches, ..._matches],
+        loading: _loadingMatches,
+        loadError: _matchesError,
+        onRetry: _loadMatches,
+        initialHistory: _showHistoryOnCalendar,
+        key: ValueKey(_showHistoryOnCalendar),
+      ),
     ),
     _ => ListenableBuilder(
       listenable: Listenable.merge([

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:football_match_app/local/local_database.dart';
 import 'package:football_match_app/local/match_local_store.dart';
 import 'package:football_match_app/location/player_location.dart';
+import 'package:football_match_app/matches/football_match.dart';
 import 'package:football_match_app/matches/match_controller.dart';
 import 'package:football_match_app/screens/match/match_mock_data.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -65,6 +66,24 @@ void main() {
     final again = controllerFor('1', 'Farouk');
     await again.load();
     expect(again.upcomingMatch?.code, created.code);
+  });
+
+  test('calendarMatches lists the matches the player is in', () async {
+    final host = controllerFor('1', 'Farouk');
+    await host.load();
+    expect(host.calendarMatches, isEmpty);
+    final created = await host.createMatch(draft());
+
+    final calendar = host.calendarMatches;
+    expect(calendar.map((m) => m.id), [created.code]);
+    expect(calendar.single.participation, MatchParticipation.created);
+    expect(calendar.single.joinedSlots, 1);
+    expect(calendar.single.totalSlots, matchStadiums.first.players);
+
+    // Someone who is not in the match does not see it on their calendar.
+    final other = controllerFor('2', 'Sami');
+    await other.load();
+    expect(other.calendarMatches, isEmpty);
   });
 
   test('stats follow create, join and cancel', () async {
