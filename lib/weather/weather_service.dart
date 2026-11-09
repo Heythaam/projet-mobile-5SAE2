@@ -117,6 +117,59 @@ class WeatherService {
     }
   }
 
+  /// Every forecast hour of the calendar day of [day], or an empty list when
+  /// the day is out of range or the forecast cannot be read.
+  Future<List<MatchWeather>> forecastDay({
+    required double latitude,
+    required double longitude,
+    required DateTime day,
+  }) async {
+    final now = _clock();
+    final start = DateTime(day.year, day.month, day.day);
+    if (start.isBefore(DateTime(now.year, now.month, now.day)) ||
+        start.isAfter(now.add(const Duration(days: maxDaysAhead - 1)))) {
+      return const [];
+    }
+    try {
+      final uri = _baseUri.replace(
+        queryParameters: {
+          'latitude': latitude.toString(),
+          'longitude': longitude.toString(),
+          'hourly': 'temperature_2m,precipitation_probability,weather_code,'
+              'wind_speed_10m',
+          'timezone': 'auto',
+          'forecast_days': '$maxDaysAhead',
+        },
+      );
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return const [];
+      return parseDay(jsonDecode(response.body), day);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// All hours of [day] found in an Open-Meteo response, in order.
+  static List<MatchWeather> parseDay(Object? json, DateTime day) {
+    if (json is! Map<String, dynamic>) return const [];
+    final hourly = json['hourly'];
+    if (hourly is! Map<String, dynamic>) return const [];
+    final times = hourly['time'];
+    if (times is! List) return const [];
+    final result = <MatchWeather>[];
+    for (var i = 0; i < times.length; i++) {
+      final raw = times[i];
+      if (raw is! String) continue;
+      final time = DateTime.tryParse(raw);
+      if (time == null || !DateUtils.isSameDay(time, day)) continue;
+      final hour = parse(json, time);
+      if (hour != null && hour.time == time) result.add(hour);
+    }
+    return result;
+  }
+
   /// Picks the forecast hour closest to [when] from an Open-Meteo response.
   /// Returns null when the response does not have the expected shape.
   static MatchWeather? parse(Object? json, DateTime when) {

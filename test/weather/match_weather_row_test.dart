@@ -73,4 +73,36 @@ void main() {
     expect(find.byType(Text), findsNothing);
     expect(find.byType(Icon), findsNothing);
   });
+
+  testWidgets('tapping the row opens the forecast of the whole day', (
+    tester,
+  ) async {
+    final service = serviceReturning(
+      () => http.Response(
+        jsonEncode({
+          'hourly': {
+            'time': [
+              '2026-11-14T17:00',
+              '2026-11-14T18:00',
+              '2026-11-15T18:00',
+            ],
+            'temperature_2m': [17.0, 19.4, 8.0],
+            'weather_code': [3, 2, 61],
+            'wind_speed_10m': [10.0, 12.0, 30.0],
+            'precipitation_probability': [5, 10, 80],
+          },
+        }),
+        200,
+      ),
+    );
+    await pumpRow(tester, service);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('weather_row')));
+    await tester.pumpAndSettle();
+    expect(find.text('17:00'), findsOneWidget);
+    expect(find.text('18:00'), findsOneWidget);
+    expect(find.text('Match'), findsOneWidget);
+    // Another day's hour is not listed.
+    expect(find.text('8°'), findsNothing);
+  });
 }
