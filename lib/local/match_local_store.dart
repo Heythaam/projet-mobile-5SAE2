@@ -16,7 +16,11 @@ enum LocalMatchError {
   hostCannotLeave,
   notHost,
   started,
+  tooManyToCancel,
 }
+
+/// A host can no longer cancel once more players than this have joined.
+const maxPlayersToCancel = 5;
 
 class LocalMatchException implements Exception {
   const LocalMatchException(this.error, this.message);
@@ -331,6 +335,13 @@ class MatchLocalStore {
         throw const LocalMatchException(
           LocalMatchError.notHost,
           'Only the host can cancel this match.',
+        );
+      }
+      if (match.players > maxPlayersToCancel) {
+        throw const LocalMatchException(
+          LocalMatchError.tooManyToCancel,
+          'This match has more than $maxPlayersToCancel players, so it '
+          'cannot be cancelled. Ask players to leave first.',
         );
       }
       await txn.delete('matches', where: 'code = ?', whereArgs: [match.code]);

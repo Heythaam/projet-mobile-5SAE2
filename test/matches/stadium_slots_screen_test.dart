@@ -71,10 +71,28 @@ void main() {
         price: 60,
       ),
     ]);
-    expect(find.text('18:00 · A 5v5'), findsOneWidget);
-    expect(find.text('Free slots'), findsOneWidget);
-    // The sample time grid is not shown.
+    // The default time is 18:00, so the pitch free then is offered.
+    expect(find.text('A · 5v5'), findsOneWidget);
+    expect(find.text('Choose a pitch'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pick_date')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pick_time')), findsOneWidget);
+    // No list of hours any more.
     expect(find.text('08:00'), findsNothing);
+  });
+
+  testWidgets('a time with no free pitch lists the free start times', (
+    tester,
+  ) async {
+    await open(tester, const [
+      FreeSlot(
+        pitch: RealPitch(id: 11, name: 'A', size: '5v5'),
+        start: 20 * 60,
+        end: 21 * 60,
+        price: 60,
+      ),
+    ]);
+    expect(find.byKey(const ValueKey('no_pitch_at_time')), findsOneWidget);
+    expect(find.textContaining('20:00'), findsOneWidget);
   });
 
   testWidgets('a day without free slots says so', (tester) async {

@@ -100,6 +100,27 @@ void main() {
     expect(host.stats, (played: 0, hosted: 0));
   });
 
+  test('a match with more than 5 players cannot be cancelled', () async {
+    final host = controllerFor('1', 'Farouk');
+    await host.load();
+    final created = await host.createMatch(draft());
+    final guests = <MatchController>[];
+    for (var i = 2; i <= 6; i++) {
+      final guest = controllerFor('$i', 'P$i');
+      await guest.load();
+      await guest.joinByCode(created.code);
+      guests.add(guest);
+    }
+    await host.load();
+    expect(await host.cancelMatch(created.code), isFalse);
+    expect(host.lastError, contains('more than 5'));
+    expect(await store.getByCode(created.code), isNotNull);
+    // Once someone leaves, 5 players remain and the host can cancel.
+    await guests.first.leaveMatch(created.code);
+    await host.load();
+    expect(await host.cancelMatch(created.code), isTrue);
+  });
+
   test('a private match is found by code but not listed', () async {
     final controller = controllerFor('1', 'Farouk');
     await controller.load();

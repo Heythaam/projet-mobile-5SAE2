@@ -311,7 +311,15 @@ class MatchController extends ChangeNotifier {
   /// stadium slot held for the match is released first; if that fails the
   /// match stays so the host can try again.
   Future<bool> cancelMatch(String code) async {
-    final bookingId = _byCode[code.trim().toUpperCase()]?.bookingId;
+    final known = _byCode[code.trim().toUpperCase()];
+    if (known != null && known.players > maxPlayersToCancel) {
+      lastError =
+          'This match has more than $maxPlayersToCancel players, so it '
+          'cannot be cancelled. Ask players to leave first.';
+      notifyListeners();
+      return false;
+    }
+    final bookingId = known?.bookingId;
     if (bookingId != null) {
       try {
         await _directory.release(bookingId);

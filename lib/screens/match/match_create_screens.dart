@@ -10,7 +10,6 @@ import 'match_widgets.dart';
 const _stadiumCardRadius = 22.0;
 const _stadiumBorderWidth = 4.0;
 const _visibilityCardHeight = 170.0;
-const _matchTimes = 32;
 
 class StadiumPickScreen extends StatefulWidget {
   const StadiumPickScreen({required this.controller, super.key});
@@ -350,9 +349,8 @@ class DateTimePickScreen extends StatefulWidget {
 }
 
 class _DateTimePickScreenState extends State<DateTimePickScreen> {
-  late final List<DateTime> _days;
-  late DateTime? _selectedDay;
-  TimeOfDay? _selectedTime;
+  late DateTime _day;
+  TimeOfDay _time = const TimeOfDay(hour: 18, minute: 0);
   bool _openingVisibility = false;
 
   // Real stadiums: the free slots of the selected day come from the server.
@@ -362,23 +360,17 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
   String? _slotsError;
 
   bool get _real => widget.stadium.stadiumId != null;
+  int get _minutes => _time.hour * 60 + _time.minute;
 
   @override
   void initState() {
     super.initState();
-    final today = DateUtils.dateOnly(DateTime.now());
-    _days = List.generate(14, (index) => today.add(Duration(days: index)));
-    _selectedDay = _days[1];
-    if (_real) {
-      _loadSlots();
-    } else {
-      _selectedTime = const TimeOfDay(hour: 18, minute: 0);
-    }
+    _day = DateUtils.dateOnly(DateTime.now()).add(const Duration(days: 1));
+    if (_real) _loadSlots();
   }
 
   Future<void> _loadSlots() async {
-    final day = _selectedDay;
-    if (day == null) return;
+    final day = _day;
     setState(() {
       _loadingSlots = true;
       _slotsError = null;
@@ -387,25 +379,55 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
     });
     try {
       final slots = await widget.controller.freeSlots(widget.stadium, day);
-      if (!mounted || day != _selectedDay) return;
+      if (!mounted || day != _day) return;
       setState(() {
         _slots = slots;
         _loadingSlots = false;
       });
     } on StadiumDirectoryException catch (error) {
-      if (!mounted || day != _selectedDay) return;
+      if (!mounted || day != _day) return;
       setState(() {
         _slotsError = error.message;
         _loadingSlots = false;
       });
     } catch (_) {
-      if (!mounted || day != _selectedDay) return;
+      if (!mounted || day != _day) return;
       setState(() {
         _slotsError = 'Could not load the free slots.';
         _loadingSlots = false;
       });
     }
   }
+
+  Future<void> _pickDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _day,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 90)),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _day = DateUtils.dateOnly(picked));
+    if (_real) _loadSlots();
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(context: context, initialTime: _time);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _time = picked;
+      _selectedSlot = null;
+    });
+  }
+
+  bool get _inPast {
+    final at = DateTime(_day.year, _day.month, _day.day, _time.hour, _time.minute);
+    return !at.isAfter(DateTime.now());
+  }
+
+  List<FreeSlot> get _pitchesAtTime =>
+      _slots.where((slot) => slot.start == _minutes).toList();
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -421,88 +443,52 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      color: KickoffColors.yellow,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'When?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'When?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 78,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _days.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final day = _days[index];
-                      final selected = DateUtils.isSameDay(day, _selectedDay);
-                      return _DayChip(
-                        date: day,
-                        label: index == 0
-                            ? 'Today'
-                            : index == 1
-                            ? 'Tomorrow'
-                            : _weekday(day.weekday),
-                        selected: selected,
-                        onTap: () => _selectDay(day),
-                      );
-                    },
-                  ),
+                _PickerTile(
+                  key: const ValueKey('pick_date'),
+                  icon: Icons.calendar_today_rounded,
+                  label: 'Date',
+                  value: _dateLabel(_day),
+                  onTap: _pickDate,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  _real ? 'Free slots' : 'Choose a time',
-                  style: const TextStyle(
-                    color: KickoffColors.muted,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                const SizedBox(height: 10),
+                _PickerTile(
+                  key: const ValueKey('pick_time'),
+                  icon: Icons.access_time_rounded,
+                  label: 'Time',
+                  value: _timeLabel(_time),
+                  onTap: _pickTime,
                 ),
-                const SizedBox(height: 8),
-                if (_real)
-                  _slotSection()
-                else
-                  GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _matchTimes,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: 1.65,
+                if (_inPast)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: Text(
+                      'That time has already passed. Pick a later one.',
+                      key: ValueKey('past_time'),
+                      style: TextStyle(color: KickoffColors.orange),
+                    ),
                   ),
-                  itemBuilder: (context, index) {
-                    final time = TimeOfDay(
-                      hour: 8 + index ~/ 2,
-                      minute: index.isEven ? 0 : 30,
-                    );
-                    final selected = _selectedTime == time;
-                    final disabled = _isPastToday(time);
-                    return _TimeChip(
-                      time: time,
-                      label: _timeLabel(time),
-                      selected: selected,
-                      disabled: disabled,
-                      onTap: disabled
-                          ? null
-                          : () => setState(() => _selectedTime = time),
-                    );
-                  },
-                ),
+                if (_real) ...[
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Choose a pitch',
+                    style: TextStyle(
+                      color: KickoffColors.muted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _pitchSection(),
+                ],
               ],
             ),
           ),
@@ -513,8 +499,8 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
               icon: Icons.arrow_forward_rounded,
               onPressed:
                   _openingVisibility ||
-                      _selectedDay == null ||
-                      (_real ? _selectedSlot == null : _selectedTime == null)
+                      _inPast ||
+                      (_real && _selectedSlot == null)
                   ? null
                   : _openVisibilityStep,
             ),
@@ -524,27 +510,7 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
     ),
   );
 
-  bool _isPastToday(TimeOfDay time) {
-    if (_selectedDay == null ||
-        !DateUtils.isSameDay(_selectedDay, DateTime.now())) {
-      return false;
-    }
-    final now = TimeOfDay.now();
-    return time.hour < now.hour ||
-        (time.hour == now.hour && time.minute <= now.minute);
-  }
-
-  void _selectDay(DateTime day) {
-    setState(() {
-      _selectedDay = day;
-      if (!_real && _isPastToday(_selectedTime ?? TimeOfDay.now())) {
-        _selectedTime = null;
-      }
-    });
-    if (_real) _loadSlots();
-  }
-
-  Widget _slotSection() {
+  Widget _pitchSection() {
     if (_loadingSlots) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
@@ -575,21 +541,29 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
         ),
       );
     }
+    final pitches = _pitchesAtTime;
+    if (pitches.isEmpty) {
+      final times = {for (final slot in _slots) slot.startLabel}.toList();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'No pitch is free at ${_timeLabel(_time)}. '
+          'Free start times: ${times.join(', ')}.',
+          key: const ValueKey('no_pitch_at_time'),
+          style: const TextStyle(color: KickoffColors.muted),
+        ),
+      );
+    }
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final slot in _slots)
-          SizedBox(
-            width: 104,
-            height: 52,
-            child: _TimeChip(
-              time: TimeOfDay(hour: slot.start ~/ 60, minute: slot.start % 60),
-              label: '${slot.startLabel} · ${slot.pitch.name} ${slot.pitch.size}',
-              selected: identical(_selectedSlot, slot),
-              disabled: false,
-              onTap: () => setState(() => _selectedSlot = slot),
-            ),
+        for (final slot in pitches)
+          ChoiceChip(
+            key: ValueKey('pitch_${slot.pitch.id}'),
+            label: Text('${slot.pitch.name} · ${slot.pitch.size}'),
+            selected: identical(_selectedSlot, slot),
+            onSelected: (_) => setState(() => _selectedSlot = slot),
           ),
       ],
     );
@@ -599,15 +573,18 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
       '${time.hour.toString().padLeft(2, '0')}:'
       '${time.minute.toString().padLeft(2, '0')}';
 
+  static String _dateLabel(DateTime day) =>
+      '${const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day.weekday - 1]} '
+      '${day.day.toString().padLeft(2, '0')}/'
+      '${day.month.toString().padLeft(2, '0')}/${day.year}';
+
   Future<void> _openVisibilityStep() async {
     if (_openingVisibility) return;
-    final day = _selectedDay;
     final slot = _selectedSlot;
-    final time =
-        _real && slot != null
+    if (_inPast || (_real && slot == null)) return;
+    final time = slot != null
         ? TimeOfDay(hour: slot.start ~/ 60, minute: slot.start % 60)
-        : _selectedTime;
-    if (day == null || time == null || (_real && slot == null)) return;
+        : _time;
     setState(() => _openingVisibility = true);
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -616,9 +593,9 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
           draft: CreateMatchDraft(
             stadium: widget.stadium,
             startsAt: DateTime(
-              day.year,
-              day.month,
-              day.day,
+              _day.year,
+              _day.month,
+              _day.day,
               time.hour,
               time.minute,
             ),
@@ -632,108 +609,51 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
     setState(() => _openingVisibility = false);
     if (result == true && mounted) Navigator.of(context).pop(true);
   }
-
-  static String _weekday(int weekday) =>
-      const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday - 1];
 }
 
-class _DayChip extends StatelessWidget {
-  const _DayChip({
-    required this.date,
+class _PickerTile extends StatelessWidget {
+  const _PickerTile({
+    required this.icon,
     required this.label,
-    required this.selected,
+    required this.value,
     required this.onTap,
+    super.key,
   });
 
-  final DateTime date;
+  final IconData icon;
   final String label;
-  final bool selected;
+  final String value;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    selected: selected,
-    label: '$label ${date.day}',
-    child: Material(
-      color: selected ? KickoffColors.yellow : KickoffColors.panel,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          width: 68,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                style: TextStyle(
-                  color: selected ? KickoffColors.ink : KickoffColors.muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                '${date.day}',
-                style: TextStyle(
-                  color: selected ? KickoffColors.ink : Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _TimeChip extends StatelessWidget {
-  const _TimeChip({
-    required this.time,
-    required this.label,
-    required this.selected,
-    required this.disabled,
-    required this.onTap,
-  });
-
-  final TimeOfDay time;
-  final String label;
-  final bool selected;
-  final bool disabled;
-  final VoidCallback? onTap;
-
-  @override
   Widget build(BuildContext context) => Material(
-    color: selected ? KickoffColors.yellow : KickoffColors.panel,
-    borderRadius: BorderRadius.circular(12),
+    color: KickoffColors.panel,
+    borderRadius: BorderRadius.circular(18),
     child: InkWell(
+      borderRadius: BorderRadius.circular(18),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Semantics(
-        button: onTap != null,
-        enabled: onTap != null,
-        selected: selected,
-        label: label,
-        child: Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: KickoffColors.yellow),
+            const SizedBox(width: 12),
+            Text(
               label,
-              style: TextStyle(
-                color: disabled
-                    ? KickoffColors.dim
-                    : selected
-                    ? KickoffColors.ink
-                    : Colors.white,
-                fontSize: 14,
+              style: const TextStyle(color: KickoffColors.muted, fontSize: 14),
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
-          ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right_rounded, color: KickoffColors.muted),
+          ],
         ),
       ),
     ),
