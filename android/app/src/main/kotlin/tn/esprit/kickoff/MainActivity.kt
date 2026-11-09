@@ -1,4 +1,4 @@
-package com.example.football_match_app
+package tn.esprit.kickoff
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
