@@ -265,7 +265,10 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pump();
 
       expect(find.text('Challenges'), findsOneWidget);
       expect(find.text('Mine'), findsOneWidget);
@@ -273,7 +276,10 @@ void main() {
       expect(find.text('Browse'), findsOneWidget);
 
       await tester.tap(find.text('Browse'));
-      await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pump();
 
       expect(find.text('Create'), findsOneWidget);
     });
