@@ -369,7 +369,10 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
 
   void _openLobby(MatchHomeMatch match) {
     Navigator.of(context).pushReplacement<void, void>(
-      MaterialPageRoute<void>(builder: (_) => MatchLobbyScreen(match: match)),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MatchLobbyScreen(match: match, controller: widget.controller),
+      ),
     );
   }
 

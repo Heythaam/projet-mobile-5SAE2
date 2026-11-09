@@ -270,7 +270,10 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
     if (_routeOpening) return;
     setState(() => _routeOpening = true);
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => MatchLobbyScreen(match: match)),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MatchLobbyScreen(match: match, controller: widget.controller),
+      ),
     );
     if (mounted) setState(() => _routeOpening = false);
   }

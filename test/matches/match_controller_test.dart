@@ -112,6 +112,75 @@ void main() {
     expect(controller.lastError, 'No match with that code.');
   });
 
+  group('leave and cancel', () {
+    test('a player leaves and the place is free again', () async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      final created = await host.createMatch(draft());
+      final guest = controllerFor('2', 'Sami');
+      await guest.load();
+      final joined = (await guest.joinByCode(created.code))!;
+      expect(guest.isHost(joined), isFalse);
+
+      expect(await guest.leaveMatch(created.code), isTrue);
+      expect(guest.hasJoined(joined), isFalse);
+      expect(guest.upcomingMatch, isNull);
+      expect(guest.findMatchByCode(created.code)?.players, 1);
+    });
+
+    test('the host cannot leave, and gets a message', () async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      final created = await host.createMatch(draft());
+      expect(host.isHost(created), isTrue);
+      expect(await host.leaveMatch(created.code), isFalse);
+      expect(host.lastError, 'The host cancels the match instead of leaving.');
+      expect(host.upcomingMatch?.code, created.code);
+    });
+
+    test('the host cancels and the match disappears for everyone', () async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      final created = await host.createMatch(draft());
+      expect(await host.cancelMatch(created.code), isTrue);
+      expect(host.upcomingMatch, isNull);
+      expect(host.publicMatches, isEmpty);
+      expect(host.findMatchByCode(created.code), isNull);
+
+      final guest = controllerFor('2', 'Sami');
+      await guest.load();
+      expect(await guest.joinByCode(created.code), isNull);
+    });
+
+    test('a guest cannot cancel the match', () async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      final created = await host.createMatch(draft());
+      final guest = controllerFor('2', 'Sami');
+      await guest.load();
+      await guest.joinByCode(created.code);
+      expect(await guest.cancelMatch(created.code), isFalse);
+      expect(guest.lastError, 'Only the host can cancel this match.');
+      expect(guest.findMatchByCode(created.code), isNotNull);
+    });
+
+    test('after leaving, the next match becomes the upcoming one', () async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      final later = await host.createMatch(draft(hours: 48));
+      final other = controllerFor('3', 'Yassine');
+      await other.load();
+      final soon = await other.createMatch(draft(hours: 5));
+      final guest = controllerFor('2', 'Sami');
+      await guest.load();
+      await guest.joinByCode(later.code);
+      await guest.joinByCode(soon.code);
+      expect(guest.upcomingMatch?.code, soon.code);
+      expect(await guest.leaveMatch(soon.code), isTrue);
+      expect(guest.upcomingMatch?.code, later.code);
+    });
+  });
+
   group('nearby matches', () {
     // Sample stadiums: Green Arena is about 2 km from the centre of Tunis,
     // Riverside Park about 9 km.

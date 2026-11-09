@@ -194,6 +194,31 @@ class MatchController extends ChangeNotifier {
     return _toHome(created);
   }
 
+  /// True when the player created this match.
+  bool isHost(MatchHomeMatch match) =>
+      _byCode[match.code.toUpperCase()]?.hostUid == uid;
+
+  /// Frees the player's place. The host cancels instead.
+  Future<bool> leaveMatch(String code) async =>
+      _change(() async => (await _ensureStore()).leave(code, uid));
+
+  /// Removes the match and everyone in it. Only the host can do this.
+  Future<bool> cancelMatch(String code) async =>
+      _change(() async => (await _ensureStore()).cancel(code, uid));
+
+  Future<bool> _change(Future<Object?> Function() action) async {
+    lastError = null;
+    try {
+      await action();
+      await _refresh();
+      notifyListeners();
+      return true;
+    } on LocalMatchException catch (error) {
+      lastError = error.message;
+      return false;
+    }
+  }
+
   MatchHomeMatch _toHome(LocalMatch match) => MatchHomeMatch(
     scheduledAt: match.scheduledAt.toLocal(),
     stadium: match.stadium,
