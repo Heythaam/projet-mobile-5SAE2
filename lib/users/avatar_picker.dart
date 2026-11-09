@@ -25,7 +25,7 @@ Future<int?> pickAvatarLook(
   ),
 );
 
-class _AvatarSheet extends StatelessWidget {
+class _AvatarSheet extends StatefulWidget {
   const _AvatarSheet({
     required this.username,
     required this.colour,
@@ -35,6 +35,36 @@ class _AvatarSheet extends StatelessWidget {
   final String username;
   final int colour;
   final int currentLook;
+
+  @override
+  State<_AvatarSheet> createState() => _AvatarSheetState();
+}
+
+class _AvatarSheetState extends State<_AvatarSheet> {
+  String get username => widget.username;
+  int get colour => widget.colour;
+  int get currentLook => widget.currentLook;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Start loading every face at once, not only the ones on screen.
+    for (var look = 0; look < avatarChoices; look++) {
+      final id = look * avatarColors.length + colour;
+      precacheImage(
+        NetworkImage(
+          diceBearUrl(
+            look == 0 ? username : '$username-$look',
+            avatarColor(id),
+            72,
+            pixels: 96,
+          ).toString(),
+        ),
+        context,
+        onError: (_, _) {},
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -84,6 +114,7 @@ class _AvatarSheet extends StatelessWidget {
                         username: username,
                         avatarId: look * avatarColors.length + colour,
                         size: 72,
+                        previewPixels: 96,
                       ),
                     ),
                   ),

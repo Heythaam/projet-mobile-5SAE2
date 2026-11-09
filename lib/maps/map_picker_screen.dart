@@ -23,7 +23,8 @@ class PickedPlace {
   final String label;
 }
 
-/// Names a point on the map, using OpenStreetMap's free Nominatim service.
+/// Names a point on the map, in French, using OpenStreetMap's free Nominatim
+/// service.
 /// Never throws: a missing connection gives the coordinates instead.
 class PlaceNamer {
   PlaceNamer({http.Client? client}) : _client = client ?? http.Client();
@@ -39,9 +40,13 @@ class PlaceNamer {
         'lat': '$latitude',
         'lon': '$longitude',
         'zoom': '18',
+        'accept-language': 'fr',
       });
       final response = await _client
-          .get(uri, headers: {'User-Agent': 'kickoff-football-app'})
+          .get(uri, headers: {
+            'User-Agent': 'kickoff-football-app',
+            'Accept-Language': 'fr',
+          })
           .timeout(const Duration(seconds: 6));
       if (response.statusCode != 200) return fallback;
       final json = jsonDecode(response.body);

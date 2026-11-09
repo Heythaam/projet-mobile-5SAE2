@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../location/player_location.dart';
 import '../kickoff_style.dart';
@@ -196,7 +197,7 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
       physics: const AlwaysScrollableScrollPhysics(),
       padding: _publicListPadding,
       children: [
-        if (widget.controller.publicMatches.isNotEmpty) _nearbyBar(),
+        _nearbyBar(),
         if (widget.controller.publicMatches.isEmpty)
           SizedBox(
             height: 240,
@@ -242,46 +243,79 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
     final sorted = controller.sortedByDistance;
     final blocked = status == LocationStatus.deniedForever;
     final message = sorted
-        ? 'Nearest matches first'
+        ? 'Showing the nearest matches first.'
         : switch (status) {
-            LocationStatus.denied => 'Location permission was refused',
+            LocationStatus.denied =>
+              'Location permission was refused. Allow it to get suggestions.',
             LocationStatus.deniedForever =>
               'Location is blocked. Turn it on in the phone settings.',
             LocationStatus.serviceOff =>
-              'Location is switched off on your phone',
-            LocationStatus.unavailable => 'Could not read your location',
-            _ => 'Show matches near you',
+              'Location is switched off on your phone. Switch it on, then retry.',
+            LocationStatus.unavailable =>
+              'Could not read your location. Try again.',
+            _ => 'Turn on your location to get matches close to you first.',
           };
     final action = controller.locating
         ? 'Locating…'
+        : blocked
+        ? 'Open settings'
         : status == null
-        ? 'Use my location'
+        ? 'Enable location'
         : 'Try again';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+    return Container(
+      key: const ValueKey('nearby_card'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: KickoffColors.panel,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            sorted ? Icons.near_me_rounded : Icons.near_me_disabled_rounded,
-            color: sorted ? KickoffColors.yellow : KickoffColors.muted,
-            size: 20,
+          Row(
+            children: [
+              Icon(
+                sorted ? Icons.near_me_rounded : Icons.location_off_rounded,
+                color: sorted ? KickoffColors.yellow : KickoffColors.muted,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Matches near you',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: KickoffColors.muted,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: const TextStyle(color: KickoffColors.muted, fontSize: 14),
+          ),
+          if (!sorted) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const ValueKey('enable_location'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: KickoffColors.yellow,
+                  foregroundColor: KickoffColors.ink,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: controller.locating
+                    ? null
+                    : blocked
+                    ? Geolocator.openAppSettings
+                    : controller.useMyLocation,
+                icon: const Icon(Icons.my_location_rounded),
+                label: Text(action),
               ),
             ),
-          ),
-          if (!sorted && !blocked)
-            TextButton(
-              onPressed: controller.locating ? null : controller.useMyLocation,
-              child: Text(action),
-            ),
+          ],
         ],
       ),
     );

@@ -72,7 +72,8 @@ void main() {
       ),
     ]);
     // The default time is 18:00, so the pitch free then is offered.
-    expect(find.text('A · 5v5'), findsOneWidget);
+    expect(find.text('A'), findsOneWidget);
+    expect(find.text('5v5 · 18:00'), findsOneWidget);
     expect(find.text('Choose a pitch'), findsOneWidget);
     expect(find.byKey(const ValueKey('pick_date')), findsOneWidget);
     expect(find.byKey(const ValueKey('pick_time')), findsOneWidget);

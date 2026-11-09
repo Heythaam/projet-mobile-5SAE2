@@ -13,7 +13,7 @@ void main() {
     expect(url.queryParameters['backgroundColor'], 'ffd21f');
   });
 
-  testWidgets('shows the initial when the image cannot load', (tester) async {
+  testWidgets('shows only the colour when the image cannot load', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -22,7 +22,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('F'), findsOneWidget);
+    expect(find.text('F'), findsNothing);
     expect(find.byKey(const ValueKey('avatar_dicebear')), findsOneWidget);
   });
 
@@ -42,7 +42,7 @@ void main() {
     await tester.pump();
     expect(find.byKey(const ValueKey('avatar_photo')), findsOneWidget);
     expect(find.byKey(const ValueKey('avatar_dicebear')), findsNothing);
-    expect(find.text('F'), findsOneWidget);
+    expect(find.text('F'), findsNothing);
   });
 
   test('the saved number is look * 6 + colour', () {

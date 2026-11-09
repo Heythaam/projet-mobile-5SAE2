@@ -406,6 +406,7 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
       initialDate: _day,
       firstDate: today,
       lastDate: today.add(const Duration(days: 90)),
+      builder: _darkPicker,
     );
     if (picked == null || !mounted) return;
     setState(() => _day = DateUtils.dateOnly(picked));
@@ -413,12 +414,60 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _time);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time,
+      builder: _darkPicker,
+    );
     if (picked == null || !mounted) return;
     setState(() {
       _time = picked;
       _selectedSlot = null;
     });
+  }
+
+  /// Dark pickers in the app's colours, with a yellow selection.
+  static Widget _darkPicker(BuildContext context, Widget? child) {
+    const scheme = ColorScheme.dark(
+      primary: KickoffColors.yellow,
+      onPrimary: KickoffColors.ink,
+      surface: KickoffColors.panel,
+      onSurface: Colors.white,
+      secondary: KickoffColors.yellow,
+      onSecondary: KickoffColors.ink,
+    );
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: scheme,
+        dialogTheme: const DialogThemeData(backgroundColor: KickoffColors.panel),
+        datePickerTheme: const DatePickerThemeData(
+          backgroundColor: KickoffColors.panel,
+          headerBackgroundColor: KickoffColors.panelDark,
+          headerForegroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        timePickerTheme: TimePickerThemeData(
+          backgroundColor: KickoffColors.panel,
+          hourMinuteColor: KickoffColors.panelDark,
+          hourMinuteTextColor: Colors.white,
+          dayPeriodColor: KickoffColors.panelDark,
+          dayPeriodTextColor: Colors.white,
+          dialBackgroundColor: KickoffColors.panelDark,
+          dialHandColor: KickoffColors.yellow,
+          dialTextColor: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? KickoffColors.ink
+                : Colors.white,
+          ),
+          entryModeIconColor: KickoffColors.yellow,
+          helpTextStyle: const TextStyle(color: KickoffColors.muted),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: KickoffColors.yellow),
+        ),
+      ),
+      child: child!,
+    );
   }
 
   bool get _inPast {
@@ -481,9 +530,9 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
                   const Text(
                     'Choose a pitch',
                     style: TextStyle(
-                      color: KickoffColors.muted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -554,16 +603,14 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
         ),
       );
     }
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
       children: [
         for (final slot in pitches)
-          ChoiceChip(
+          _PitchCard(
             key: ValueKey('pitch_${slot.pitch.id}'),
-            label: Text('${slot.pitch.name} · ${slot.pitch.size}'),
+            slot: slot,
             selected: identical(_selectedSlot, slot),
-            onSelected: (_) => setState(() => _selectedSlot = slot),
+            onTap: () => setState(() => _selectedSlot = slot),
           ),
       ],
     );
@@ -609,6 +656,103 @@ class _DateTimePickScreenState extends State<DateTimePickScreen> {
     setState(() => _openingVisibility = false);
     if (result == true && mounted) Navigator.of(context).pop(true);
   }
+}
+
+class _PitchCard extends StatelessWidget {
+  const _PitchCard({
+    required this.slot,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final FreeSlot slot;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Semantics(
+      button: true,
+      selected: selected,
+      label: 'Pitch ${slot.pitch.name}, ${slot.pitch.size}',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0x33FFD60A) : KickoffColors.panel,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? KickoffColors.yellow : Colors.transparent,
+              width: 3,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.sports_soccer_rounded,
+                size: 36,
+                color: selected ? KickoffColors.yellow : KickoffColors.muted,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      slot.pitch.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${slot.pitch.size} · ${slot.startLabel}',
+                      style: const TextStyle(
+                        color: KickoffColors.muted,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${slot.price}',
+                    style: const TextStyle(
+                      color: KickoffColors.yellow,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Text(
+                    'coins',
+                    style: TextStyle(color: KickoffColors.muted, fontSize: 13),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected ? KickoffColors.yellow : KickoffColors.dim,
+                size: 28,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _PickerTile extends StatelessWidget {

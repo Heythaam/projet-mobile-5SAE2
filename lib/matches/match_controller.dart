@@ -331,6 +331,12 @@ class MatchController extends ChangeNotifier {
     return _change(() async => (await _ensureStore()).cancel(code, uid));
   }
 
+  /// Makes the match public or private. Only the host can.
+  Future<bool> setPublic(String code, {required bool isPublic}) => _change(
+    () async =>
+        (await _ensureStore()).setPublic(code, uid, isPublic: isPublic),
+  );
+
   Future<bool> _change(Future<Object?> Function() action) async {
     lastError = null;
     try {

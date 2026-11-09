@@ -43,6 +43,17 @@ class MatchLobbyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = this.controller;
+    if (controller == null) return _page(context, match);
+    // Rebuild when the host changes the match, for example public or private.
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) =>
+          _page(context, controller.findMatchByCode(match.code) ?? match),
+    );
+  }
+
+  Widget _page(BuildContext context, MatchHomeMatch match) {
     final slots = match.capacity == 8 ? _pitchSlots8 : _pitchSlots10;
     return Scaffold(
       backgroundColor: KickoffColors.bg,
@@ -84,7 +95,42 @@ class MatchLobbyScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _CodeCard(code: match.code, shareText: _shareText(match)),
-              const SizedBox(height: 12),
+              if (controller != null && controller!.isHost(match))
+                SwitchListTile(
+                  key: const ValueKey('visibility_switch'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  activeThumbColor: KickoffColors.yellow,
+                  title: Text(
+                    match.isPublic ? 'Public match' : 'Private match',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    match.isPublic
+                        ? 'Anyone can find it in the list.'
+                        : 'Only people with the code can join.',
+                    style: const TextStyle(color: KickoffColors.muted),
+                  ),
+                  value: match.isPublic,
+                  onChanged: (value) async {
+                    final ok = await controller!.setPublic(
+                      match.code,
+                      isPublic: value,
+                    );
+                    if (!ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            controller!.lastError ?? 'Could not change that.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              const SizedBox(height: 8),
               Expanded(
                 child: PitchView(
                   capacity: match.capacity,

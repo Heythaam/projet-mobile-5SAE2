@@ -324,6 +324,28 @@ class MatchLocalStore {
     });
   }
 
+  // ---- Update -----------------------------------------------------------
+
+  /// Makes the match public or private. Only the host can do this.
+  Future<void> setPublic(String code, String uid, {required bool isPublic}) {
+    return _db.transaction((txn) async {
+      final match = await _load(txn, code);
+      if (match == null) throw _notFound();
+      if (match.hostUid != uid) {
+        throw const LocalMatchException(
+          LocalMatchError.notHost,
+          'Only the host can change who sees this match.',
+        );
+      }
+      await txn.update(
+        'matches',
+        {'is_public': isPublic ? 1 : 0},
+        where: 'code = ?',
+        whereArgs: [match.code],
+      );
+    });
+  }
+
   // ---- Delete -----------------------------------------------------------
 
   /// Removes the match and all its players. Only the host can do this.

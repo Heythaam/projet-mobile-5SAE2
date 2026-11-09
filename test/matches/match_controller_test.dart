@@ -100,6 +100,24 @@ void main() {
     expect(host.stats, (played: 0, hosted: 0));
   });
 
+  test('only the host can switch a match between public and private', () async {
+    final host = controllerFor('1', 'Farouk');
+    await host.load();
+    final created = await host.createMatch(draft());
+    expect(created.isPublic, isTrue);
+    expect(await host.setPublic(created.code, isPublic: false), isTrue);
+    expect(host.findMatchByCode(created.code)!.isPublic, isFalse);
+    expect(host.publicMatches, isEmpty);
+    expect(await host.setPublic(created.code, isPublic: true), isTrue);
+    expect(host.publicMatches, hasLength(1));
+
+    final guest = controllerFor('2', 'Sami');
+    await guest.load();
+    await guest.joinByCode(created.code);
+    expect(await guest.setPublic(created.code, isPublic: false), isFalse);
+    expect(guest.lastError, contains('host'));
+  });
+
   test('a match with more than 5 players cannot be cancelled', () async {
     final host = controllerFor('1', 'Farouk');
     await host.load();

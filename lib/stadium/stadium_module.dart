@@ -15,11 +15,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../maps/map_picker_screen.dart';
 import '../screens/kickoff_style.dart';
+import '../users/dial_codes.dart';
 
 // ===========================================================================
 // Constants
@@ -879,7 +881,10 @@ class _StadiumEditorScreenState extends State<StadiumEditorScreen> {
       ? StadiumDraft()
       : StadiumDraft.from(widget.stadium!);
   late final _name = TextEditingController(text: _draft.name);
-  late final _phone = TextEditingController(text: _draft.phone);
+  late DialCode _dial = splitPhone(_draft.phone).dial;
+  late final _phone = TextEditingController(
+    text: splitPhone(_draft.phone).digits,
+  );
   late final _address = TextEditingController(text: _draft.address);
   final _formKey = GlobalKey<FormState>();
   int _step = 0;
@@ -908,13 +913,50 @@ class _StadiumEditorScreenState extends State<StadiumEditorScreen> {
     }
   }
 
+  Future<void> _pickDial() async {
+    final picked = await showModalBottomSheet<DialCode>(
+      context: context,
+      backgroundColor: KickoffColors.panel,
+      builder: (context) => SafeArea(
+        child: ListView(
+          children: [
+            for (final dial in dialCodes)
+              ListTile(
+                key: ValueKey('dial_${dial.code}_${dial.country}'),
+                title: Text(
+                  dial.country,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                trailing: Text(
+                  dial.code,
+                  style: const TextStyle(
+                    color: KickoffColors.yellow,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () => Navigator.of(context).pop(dial),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _dial = picked;
+      final digits = _phone.text;
+      if (digits.length > picked.maxDigits) {
+        _phone.text = digits.substring(0, picked.maxDigits);
+      }
+    });
+  }
+
   Future<void> _next() async {
     FocusScope.of(context).unfocus();
     if (_step == 0) {
       if (!(_formKey.currentState?.validate() ?? false)) return;
       _draft
         ..name = _name.text
-        ..phone = _phone.text
+        ..phone = '${_dial.code} ${_phone.text.trim()}'
         ..address = _address.text;
     }
     if (_step == 2) {
@@ -1102,16 +1144,66 @@ class _StadiumEditorScreenState extends State<StadiumEditorScreen> {
           },
         ),
         SizedBox(height: 12 * scale),
-        PillField(
-          key: const ValueKey('stadium_phone'),
-          controller: _phone,
-          hint: 'Contact number',
-          icon: Icons.call_rounded,
-          keyboardType: TextInputType.phone,
-          validator: (value) =>
-              RegExp(r'^\+?[0-9 ]{6,20}$').hasMatch(value?.trim() ?? '')
-              ? null
-              : 'Enter a phone number (digits, spaces, +).',
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.only(top: 2 * scale),
+              child: InkWell(
+                key: const ValueKey('stadium_dial'),
+                borderRadius: BorderRadius.circular(30 * scale),
+                onTap: _pickDial,
+                child: Container(
+                  height: 52 * scale,
+                  padding: EdgeInsets.symmetric(horizontal: 14 * scale),
+                  decoration: BoxDecoration(
+                    color: KickoffColors.panel,
+                    borderRadius: BorderRadius.circular(30 * scale),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _dial.code,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16 * scale,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down_rounded,
+                        color: KickoffColors.yellow,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 8 * scale),
+            Expanded(
+              child: PillField(
+                key: const ValueKey('stadium_phone'),
+                controller: _phone,
+                hint: 'Contact number',
+                icon: Icons.call_rounded,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(_dial.maxDigits),
+                ],
+                validator: (value) {
+                  final digits = value?.trim() ?? '';
+                  return digits.length >= _dial.minDigits &&
+                          digits.length <= _dial.maxDigits
+                      ? null
+                      : _dial.exactDigits != null
+                      ? '${_dial.code} numbers have ${_dial.exactDigits} digits.'
+                      : 'Enter a valid phone number.';
+                },
+              ),
+            ),
+          ],
         ),
         SizedBox(height: 12 * scale),
         PillField(

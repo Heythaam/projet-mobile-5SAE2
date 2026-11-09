@@ -112,7 +112,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Use 2-40 characters.'), findsOneWidget);
     expect(
-      find.text('Enter a phone number (digits, spaces, +).'),
+      find.text('+216 numbers have 8 digits.'),
       findsOneWidget,
     );
 
@@ -122,7 +122,7 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const ValueKey('stadium_phone')),
-      '+216 20 123 456',
+      '20123456',
     );
     await tester.enterText(
       find.byKey(const ValueKey('stadium_address')),
