@@ -155,15 +155,28 @@ class _ChunkyButtonState extends State<ChunkyButton> {
                           ),
                         ),
                       ],
-                      Flexible(
-                        child: Text(
-                          widget.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (widget.showIcon) ...[
+                          Icon(
+                            widget.icon,
+                            size: 24 * scale,
                             color: widget.foregroundColor,
-                            fontSize: 17 * scale,
-                            fontWeight: FontWeight.w600,
+                          ),
+                          SizedBox(width: 6 * scale),
+                        ],
+                        Flexible(
+                          child: Text(
+                            widget.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: widget.foregroundColor,
+                              fontSize: 17 * scale,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
