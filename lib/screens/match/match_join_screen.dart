@@ -217,6 +217,14 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                   onPressed: _creatingFromEmpty ? null : _startCreateFromEmpty,
                   child: const Text('Create one'),
                 ),
+                TextButton(
+                  key: const ValueKey('load_demo_matches'),
+                  onPressed: () async {
+                    await widget.controller.loadDemoMatches();
+                    if (mounted) setState(() {});
+                  },
+                  child: const Text('Add sample matches'),
+                ),
               ],
             ),
           )
@@ -255,8 +263,11 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
               'Could not read your location. Try again.',
             _ => 'Turn on your location to get matches close to you first.',
           };
+    final serviceOff = status == LocationStatus.serviceOff;
     final action = controller.locating
         ? 'Locating…'
+        : serviceOff
+        ? 'Turn on location'
         : blocked
         ? 'Open settings'
         : status == null
@@ -308,6 +319,8 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                 ),
                 onPressed: controller.locating
                     ? null
+                    : serviceOff
+                    ? Geolocator.openLocationSettings
                     : blocked
                     ? Geolocator.openAppSettings
                     : controller.useMyLocation,
@@ -315,6 +328,17 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                 label: Text(action),
               ),
             ),
+            if (serviceOff)
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  key: const ValueKey('retry_location'),
+                  onPressed: controller.locating
+                      ? null
+                      : controller.useMyLocation,
+                  child: const Text('I turned it on, try again'),
+                ),
+              ),
           ],
         ],
       ),

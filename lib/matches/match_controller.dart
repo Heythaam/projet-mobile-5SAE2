@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../demo/demo_data.dart';
 import '../local/local_database.dart';
 import '../location/player_location.dart';
 import '../local/match_local_store.dart';
@@ -329,6 +330,14 @@ class MatchController extends ChangeNotifier {
       }
     }
     return _change(() async => (await _ensureStore()).cancel(code, uid));
+  }
+
+  /// Adds sample public matches by other players, for trying the app out.
+  Future<int> loadDemoMatches() async {
+    final added = await seedDemoMatches(await _ensureStore());
+    await _refresh();
+    notifyListeners();
+    return added;
   }
 
   /// Makes the match public or private. Only the host can.
