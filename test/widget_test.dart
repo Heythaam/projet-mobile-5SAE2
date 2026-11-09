@@ -19,6 +19,7 @@ void main() {
         home: AuthScreen(
           api: ApiClient(),
           onAuthenticated: (user) => signedInUser = user,
+          onGuest: () {},
         ),
       ),
     );
@@ -267,7 +268,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     await tester.pumpWidget(
       MaterialApp(
-        home: AuthScreen(api: ApiClient(), onAuthenticated: (_) {}),
+        home: AuthScreen(
+          api: ApiClient(),
+          onAuthenticated: (_) {},
+          onGuest: () {},
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -383,6 +388,17 @@ Widget _shell({
   ),
 );
 
+Widget _guestShell() => MaterialApp(
+  home: KickoffShell(
+    api: _GuestApiClient(),
+    user: const UserAccount(id: 0, username: 'guest', email: 'guest@local'),
+    isGuest: true,
+    onLogout: () {},
+    onOpenAuth: () {},
+    matchRepository: const EmptyMatchRepository(),
+  ),
+);
+
 class _FakeApiClient extends Fake implements ApiClient {
   _FakeApiClient({this.pendingRequests = 0});
 
@@ -415,3 +431,5 @@ class _FakeApiClient extends Fake implements ApiClient {
         : {'tournaments': <Object>[]};
   }
 }
+
+class _GuestApiClient extends Fake implements ApiClient {}

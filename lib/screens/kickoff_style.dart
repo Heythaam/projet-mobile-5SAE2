@@ -69,6 +69,7 @@ class ChunkyButton extends StatefulWidget {
     this.foregroundColor = KickoffColors.ink,
     this.busy = false,
     this.showIcon = true,
+    this.largeCard = false,
     super.key,
   });
 
@@ -80,6 +81,7 @@ class ChunkyButton extends StatefulWidget {
   final Color foregroundColor;
   final bool busy;
   final bool showIcon;
+  final bool largeCard;
 
   @override
   State<ChunkyButton> createState() => _ChunkyButtonState();
@@ -91,52 +93,67 @@ class _ChunkyButtonState extends State<ChunkyButton> {
   @override
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
+    final edgeHeight = (widget.largeCard ? 6 : 4) * scale;
+    final radius = (widget.largeCard ? 22 : 28) * scale;
     return Semantics(
       button: true,
       enabled: widget.onPressed != null,
       child: GestureDetector(
         onTapDown: widget.onPressed == null
             ? null
-            : (_) => setState(() => _pressed = true),
+            : (_) {
+                setState(() => _pressed = true);
+                HapticFeedback.lightImpact();
+              },
         onTapCancel: () => setState(() => _pressed = false),
         onTapUp: widget.onPressed == null
             ? null
             : (_) => setState(() => _pressed = false),
         onTap: widget.onPressed,
-        child: Transform.translate(
-          offset: Offset(0, (_pressed ? 2 : 0) * scale),
-          child: Container(
-            height: 56 * scale,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: widget.backgroundColor,
-              borderRadius: BorderRadius.circular(28 * scale),
-              border: Border(
-                bottom: BorderSide(
-                  color: widget.bottomColor,
-                  width: (_pressed ? 2 : 4) * scale,
+        child: Opacity(
+          opacity: widget.onPressed == null ? 0.4 : 1,
+          child: Transform.translate(
+            offset: Offset(0, (_pressed ? edgeHeight : 0)),
+            child: Container(
+              height: (widget.largeCard ? 150 : 56) * scale,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: widget.backgroundColor,
+                borderRadius: BorderRadius.circular(radius),
+                border: Border(
+                  bottom: BorderSide(
+                    color: widget.bottomColor,
+                    width: _pressed ? 0 : edgeHeight,
+                  ),
                 ),
               ),
-            ),
-            child: widget.busy
-                ? SizedBox(
-                    width: 20 * scale,
-                    height: 20 * scale,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2 * scale,
-                      color: widget.foregroundColor,
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (widget.showIcon) ...[
+              child: widget.busy
+                  ? SizedBox(
+                      width: 20 * scale,
+                      height: 20 * scale,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2 * scale,
+                        color: widget.foregroundColor,
+                      ),
+                    )
+                  : widget.largeCard
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                         Icon(
                           widget.icon,
-                          size: 24 * scale,
+                          size: 44 * scale,
                           color: widget.foregroundColor,
                         ),
-                        SizedBox(width: 6 * scale),
+                        SizedBox(height: 6 * scale),
+                        Text(
+                          widget.label,
+                          style: TextStyle(
+                            color: widget.foregroundColor,
+                            fontSize: 18 * scale,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                       Flexible(
                         child: Text(
@@ -149,9 +166,9 @@ class _ChunkyButtonState extends State<ChunkyButton> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
@@ -256,13 +273,13 @@ class PillField extends StatelessWidget {
 
 class StatChip extends StatelessWidget {
   const StatChip({
-    required this.icon,
+    this.icon,
     required this.label,
     this.iconColor = Colors.white,
     super.key,
   });
 
-  final IconData icon;
+  final IconData? icon;
   final String label;
   final Color iconColor;
 
@@ -279,8 +296,10 @@ class StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: iconColor, size: 16 * scale),
-          SizedBox(width: 3 * scale),
+          if (icon != null) ...[
+            Icon(icon, color: iconColor, size: 16 * scale),
+            SizedBox(width: 3 * scale),
+          ],
           Text(
             label,
             style: TextStyle(

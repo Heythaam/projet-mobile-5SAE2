@@ -13,14 +13,80 @@ import '../tournaments/widgets/requests_badge.dart';
 import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
+import 'match/match_home_screen.dart';
+import 'match/match_mock_data.dart';
 import 'placeholder_screen.dart';
 import 'profile_screen.dart';
+
+final _guestMatches = <FootballMatch>[
+  FootballMatch(
+    id: 'demo-upcoming',
+    scheduledAt: DateTime.now().add(const Duration(days: 2, hours: 2)),
+    stadium: 'Blue Arena',
+    joinedSlots: 5,
+    totalSlots: 10,
+    isPublic: true,
+    participation: MatchParticipation.joined,
+  ),
+  FootballMatch(
+    id: 'demo-created',
+    scheduledAt: DateTime.now().add(const Duration(days: 6, hours: 1)),
+    stadium: 'North Park',
+    joinedSlots: 8,
+    totalSlots: 10,
+    isPublic: false,
+    participation: MatchParticipation.created,
+  ),
+  FootballMatch(
+    id: 'demo-past',
+    scheduledAt: DateTime.now().subtract(const Duration(days: 3)),
+    stadium: 'Riverside Pitch',
+    joinedSlots: 10,
+    totalSlots: 10,
+    isPublic: true,
+    participation: MatchParticipation.created,
+  ),
+];
+
+const _guestGamification = GamificationProfile(
+  xp: 240,
+  level: 3,
+  rank: 'Striker',
+  xpIntoLevel: 40,
+  xpForNextLevel: 100,
+  currentStreak: 2,
+  bestStreak: 5,
+  sentMessages: 4,
+  achievements: [
+    Achievement(
+      code: 'demo-first-match',
+      title: 'First Kick',
+      description: 'Join your first match.',
+      icon: 'sports_soccer',
+      rewardXp: 50,
+      progress: 1,
+      total: 1,
+      unlockedAt: 'demo',
+    ),
+    Achievement(
+      code: 'demo-team-player',
+      title: 'Team Player',
+      description: 'Connect with teammates.',
+      icon: 'groups',
+      rewardXp: 100,
+      progress: 2,
+      total: 3,
+    ),
+  ],
+);
 
 class KickoffShell extends StatefulWidget {
   const KickoffShell({
     required this.api,
     required this.user,
     required this.onLogout,
+    this.isGuest = false,
+    this.onOpenAuth,
     this.matchRepository = const EmptyMatchRepository(),
     super.key,
   });
@@ -28,6 +94,8 @@ class KickoffShell extends StatefulWidget {
   final ApiClient api;
   final UserAccount user;
   final VoidCallback onLogout;
+  final bool isGuest;
+  final VoidCallback? onOpenAuth;
   final MatchRepository matchRepository;
 
   @override
@@ -44,6 +112,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   String? _profileError;
   String? _matchesError;
   bool _showHistoryOnCalendar = false;
+  final _matchDemoController = MatchDemoController();
 
   /// Join requests waiting for this captain; the home banner hides at zero.
   int _pendingJoinRequests = 0;
@@ -138,7 +207,9 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       _matchesError = null;
     });
     try {
-      final matches = await widget.matchRepository.listMatches();
+      final matches = widget.isGuest
+          ? _guestMatches
+          : await widget.matchRepository.listMatches();
       if (!mounted) return;
       setState(() {
         _matches = matches;
@@ -157,7 +228,9 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     setState(() => _menuOpen = false);
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => PlaceholderScreen(title: title, icon: icon),
+        builder: (_) => title == 'Match'
+            ? MatchHomeScreen(controller: _matchDemoController)
+            : PlaceholderScreen(title: title, icon: icon),
       ),
     );
   }
@@ -179,6 +252,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
           api: widget.api,
           user: widget.user,
           onLogout: widget.onLogout,
+          isGuest: widget.isGuest,
           showNavigation: false,
         ),
       ),
@@ -218,14 +292,26 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
                 ),
                 SizedBox(height: 12 * scale),
                 ChunkyButton(
-                  label: 'Sign out',
-                  icon: Icons.logout_rounded,
-                  backgroundColor: KickoffColors.red,
-                  bottomColor: KickoffColors.redDark,
-                  foregroundColor: Colors.white,
+                  label: widget.isGuest ? 'Sign in' : 'Sign out',
+                  icon: widget.isGuest
+                      ? Icons.login_rounded
+                      : Icons.logout_rounded,
+                  backgroundColor: widget.isGuest
+                      ? KickoffColors.yellow
+                      : KickoffColors.red,
+                  bottomColor: widget.isGuest
+                      ? KickoffColors.yellowDark
+                      : KickoffColors.redDark,
+                  foregroundColor: widget.isGuest
+                      ? KickoffColors.ink
+                      : Colors.white,
                   onPressed: () {
                     Navigator.of(context).pop();
-                    widget.onLogout();
+                    if (widget.isGuest) {
+                      widget.onOpenAuth?.call();
+                    } else {
+                      widget.onLogout();
+                    }
                   },
                 ),
               ],
