@@ -57,7 +57,13 @@ class UserAvatarFace extends StatelessWidget {
             errorBuilder: (_, _, _) => const SizedBox.shrink(),
           )
         : Image.network(
-            diceBearUrl(username, color, size).toString(),
+            diceBearUrl(
+              avatarLook(avatarId) == 0
+                  ? username
+                  : '$username-${avatarLook(avatarId)}',
+              color,
+              size,
+            ).toString(),
             key: const ValueKey('avatar_dicebear'),
             fit: BoxFit.cover,
             width: size,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:football_match_app/users/avatar_palette.dart';
 import 'package:football_match_app/users/user_avatar.dart';
 
 void main() {
@@ -42,5 +43,14 @@ void main() {
     expect(find.byKey(const ValueKey('avatar_photo')), findsOneWidget);
     expect(find.byKey(const ValueKey('avatar_dicebear')), findsNothing);
     expect(find.text('F'), findsOneWidget);
+  });
+
+  test('the saved number is look * 6 + colour', () {
+    expect(avatarLook(0), 0);
+    expect(avatarLook(5), 0);
+    expect(avatarLook(6), 1);
+    expect(avatarColor(6), avatarColor(0));
+    expect(avatarColor(8), avatarColors[2]);
+    expect(avatarLook(6 * 40 + 3), 40);
   });
 }

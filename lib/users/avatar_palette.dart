@@ -12,3 +12,9 @@ const avatarColors = <Color>[
 ];
 
 Color avatarColor(int id) => avatarColors[id.abs() % avatarColors.length];
+
+/// Which character the saved number stands for. The number is
+/// `look * 6 + colour`, so picking a colour keeps the character and "New look"
+/// changes the character and keeps the colour. Look 0 is the first character a
+/// username gets, so profiles saved before this existed look the same.
+int avatarLook(int id) => id.abs() ~/ avatarColors.length;

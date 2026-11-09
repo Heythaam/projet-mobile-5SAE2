@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -233,11 +235,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         for (var i = 0; i < avatarColors.length; i++)
                           _AvatarChoice(
                             color: avatarColors[i],
-                            selected: _avatarId == i,
-                            onTap: () => setState(() => _avatarId = i),
+                            selected: _avatarId % avatarColors.length == i,
+                            onTap: () => setState(
+                              () => _avatarId =
+                                  avatarLook(_avatarId) * avatarColors.length + i,
+                            ),
                           ),
                       ],
                     ),
+                    if (_photoPath == null)
+                      Center(
+                        child: TextButton.icon(
+                          key: const ValueKey('avatar_shuffle'),
+                          onPressed: () => setState(
+                            () => _avatarId =
+                                (1 + Random().nextInt(9999)) *
+                                    avatarColors.length +
+                                _avatarId % avatarColors.length,
+                          ),
+                          icon: const Icon(Icons.shuffle_rounded),
+                          label: const Text('New look'),
+                        ),
+                      ),
                     const SizedBox(height: 20),
                     const _Label('Username'),
                     TextField(
