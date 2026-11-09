@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../local/local_database.dart';
+import '../location/player_location.dart';
 import '../local/match_local_store.dart';
 import '../screens/match/match_mock_data.dart';
 import '../weather/weather_service.dart';
@@ -18,8 +19,10 @@ class MatchController extends ChangeNotifier {
     required this.username,
     MatchStoreOpener? openStore,
     WeatherService? weather,
+    LocationSource? location,
   }) : _openStore = openStore ?? _openDefaultStore,
-       weather = weather ?? WeatherService();
+       weather = weather ?? WeatherService(),
+       _location = location ?? const GeolocatorLocationSource();
 
   /// The signed-in player. Local ids are strings so Firebase uids fit later.
   final String uid;
@@ -38,6 +41,16 @@ class MatchController extends ChangeNotifier {
   // Stadiums are still sample data until the Stadium module has a player
   // booking screen.
   final List<MatchStadiumData> stadiums = matchStadiums;
+
+  final LocationSource _location;
+  PlayerLocation? _here;
+
+  /// Result of the last "use my location" tap, or null before the first one.
+  LocationStatus? locationStatus;
+  bool locating = false;
+
+  /// True when the public list is sorted by distance from the player.
+  bool get sortedByDistance => _here != null;
 
   MatchLocalStore? _store;
   Future<void>? _loading;
@@ -76,17 +89,60 @@ class MatchController extends ChangeNotifier {
     }
   }
 
-  List<MatchPublicListing> get publicMatches => [
-    for (final match in _byCode.values.where((match) => match.isPublic))
-      MatchPublicListing(
-        match: _toHome(match),
-        timeLabel: _publicTime(match.scheduledAt.toLocal()),
-        isToday: DateUtils.isSameDay(
-          match.scheduledAt.toLocal(),
-          DateTime.now(),
+  /// Asks for the phone's location once. The position stays in memory and is
+  /// never saved. Afterwards [publicMatches] lists the nearest matches first.
+  Future<void> useMyLocation() async {
+    if (locating) return;
+    locating = true;
+    notifyListeners();
+    final result = await _location.current();
+    locating = false;
+    locationStatus = result.status;
+    _here = result.status == LocationStatus.granted ? result.location : null;
+    notifyListeners();
+  }
+
+  /// Public matches. With the player's location on, matches with free places
+  /// come first, nearest first; otherwise soonest first.
+  List<MatchPublicListing> get publicMatches {
+    final here = _here;
+    final listings = [
+      for (final match in _byCode.values.where((match) => match.isPublic))
+        (
+          match: match,
+          distance: here != null && match.hasLocation
+              ? distanceKm(
+                  here.latitude,
+                  here.longitude,
+                  match.latitude!,
+                  match.longitude!,
+                )
+              : null,
         ),
-      ),
-  ];
+    ];
+    if (here != null) {
+      listings.sort((a, b) {
+        if (a.match.isFull != b.match.isFull) return a.match.isFull ? 1 : -1;
+        final da = a.distance, db = b.distance;
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return da.compareTo(db);
+      });
+    }
+    return [
+      for (final item in listings)
+        MatchPublicListing(
+          match: _toHome(item.match),
+          timeLabel: _publicTime(item.match.scheduledAt.toLocal()),
+          isToday: DateUtils.isSameDay(
+            item.match.scheduledAt.toLocal(),
+            DateTime.now(),
+          ),
+          distanceKm: item.distance,
+        ),
+    ];
+  }
 
   MatchHomeMatch? findMatchByCode(String code) {
     final match = _byCode[code.trim().toUpperCase()];
@@ -130,6 +186,8 @@ class MatchController extends ChangeNotifier {
       scheduledAt: draft.startsAt,
       capacity: draft.stadium.players,
       isPublic: draft.visibility == 'Public',
+      latitude: draft.stadium.latitude,
+      longitude: draft.stadium.longitude,
     );
     await _refresh(focusCode: created.code);
     notifyListeners();

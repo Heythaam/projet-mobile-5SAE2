@@ -44,11 +44,16 @@ class MatchPublicListing {
     required this.match,
     required this.timeLabel,
     required this.isToday,
+    this.distanceKm,
   });
 
   final MatchHomeMatch match;
   final String timeLabel;
   final bool isToday;
+
+  /// Kilometres from the player, when their location is on and the match has
+  /// a place.
+  final double? distanceKm;
 }
 
 class CreateMatchDraft {

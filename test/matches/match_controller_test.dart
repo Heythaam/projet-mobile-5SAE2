@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:football_match_app/local/local_database.dart';
 import 'package:football_match_app/local/match_local_store.dart';
+import 'package:football_match_app/location/player_location.dart';
 import 'package:football_match_app/matches/match_controller.dart';
 import 'package:football_match_app/screens/match/match_mock_data.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -11,10 +12,15 @@ void main() {
   late Database db;
   late MatchLocalStore store;
 
-  MatchController controllerFor(String uid, String name) => MatchController(
+  MatchController controllerFor(
+    String uid,
+    String name, {
+    LocationSource? location,
+  }) => MatchController(
     uid: uid,
     username: name,
     openStore: () async => store,
+    location: location,
   );
 
   CreateMatchDraft draft({String visibility = 'Public', int hours = 24}) =>
@@ -105,4 +111,137 @@ void main() {
     expect(await controller.joinByCode('ZZZZZ'), isNull);
     expect(controller.lastError, 'No match with that code.');
   });
+
+  group('nearby matches', () {
+    // Sample stadiums: Green Arena is about 2 km from the centre of Tunis,
+    // Riverside Park about 9 km.
+    final green = matchStadiums.firstWhere((s) => s.name == 'Green Arena');
+    final riverside = matchStadiums.firstWhere(
+      (s) => s.name == 'Riverside Park',
+    );
+    const tunisCentre = PlayerLocation(36.8065, 10.1815);
+
+    Future<void> twoPublicMatches() async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      // Riverside is sooner, Green Arena is nearer.
+      await host.createMatch(
+        CreateMatchDraft(
+          stadium: riverside,
+          startsAt: DateTime.now().add(const Duration(hours: 5)),
+          visibility: 'Public',
+        ),
+      );
+      await host.createMatch(
+        CreateMatchDraft(
+          stadium: green,
+          startsAt: DateTime.now().add(const Duration(hours: 30)),
+          visibility: 'Public',
+        ),
+      );
+    }
+
+    test('without location the list is soonest first', () async {
+      await twoPublicMatches();
+      final player = controllerFor('2', 'Sami');
+      await player.load();
+      expect(player.sortedByDistance, isFalse);
+      expect(player.publicMatches.map((l) => l.match.stadium), [
+        'Riverside Park',
+        'Green Arena',
+      ]);
+      expect(player.publicMatches.every((l) => l.distanceKm == null), isTrue);
+    });
+
+    test('with location the nearest match comes first with its distance', () async {
+      await twoPublicMatches();
+      final source = _FakeLocation(
+        const LocationResult(LocationStatus.granted, tunisCentre),
+      );
+      final player = controllerFor('2', 'Sami', location: source);
+      await player.load();
+      await player.useMyLocation();
+      expect(source.calls, 1);
+      expect(player.locationStatus, LocationStatus.granted);
+      expect(player.sortedByDistance, isTrue);
+      final listed = player.publicMatches;
+      expect(listed.map((l) => l.match.stadium), [
+        'Green Arena',
+        'Riverside Park',
+      ]);
+      expect(listed.first.distanceKm, inInclusiveRange(1, 4));
+      expect(listed.last.distanceKm, inInclusiveRange(6, 12));
+    });
+
+    test('a refused permission keeps the list as it was', () async {
+      await twoPublicMatches();
+      final player = controllerFor(
+        '2',
+        'Sami',
+        location: _FakeLocation(const LocationResult(LocationStatus.denied)),
+      );
+      await player.load();
+      await player.useMyLocation();
+      expect(player.locationStatus, LocationStatus.denied);
+      expect(player.sortedByDistance, isFalse);
+      expect(player.publicMatches.first.match.stadium, 'Riverside Park');
+    });
+
+    test('full matches go after matches with free places', () async {
+      final host = controllerFor('1', 'Farouk');
+      await host.load();
+      final tiny = MatchStadiumData(
+        name: 'Tiny Pitch',
+        distance: '1 km',
+        coins: 10,
+        players: 2,
+        latitude: 36.8066,
+        longitude: 10.1816,
+      );
+      final nearFull = await host.createMatch(
+        CreateMatchDraft(
+          stadium: tiny,
+          startsAt: DateTime.now().add(const Duration(hours: 5)),
+          visibility: 'Public',
+        ),
+      );
+      await host.createMatch(
+        CreateMatchDraft(
+          stadium: riverside,
+          startsAt: DateTime.now().add(const Duration(hours: 6)),
+          visibility: 'Public',
+        ),
+      );
+      final other = controllerFor('2', 'Sami');
+      await other.load();
+      await other.joinByCode(nearFull.code);
+
+      final player = controllerFor(
+        '3',
+        'Yassine',
+        location: _FakeLocation(
+          const LocationResult(LocationStatus.granted, tunisCentre),
+        ),
+      );
+      await player.load();
+      await player.useMyLocation();
+      expect(player.publicMatches.map((l) => l.match.stadium), [
+        'Riverside Park',
+        'Tiny Pitch',
+      ]);
+    });
+  });
+}
+
+class _FakeLocation implements LocationSource {
+  _FakeLocation(this.result);
+
+  final LocationResult result;
+  int calls = 0;
+
+  @override
+  Future<LocationResult> current() async {
+    calls++;
+    return result;
+  }
 }
