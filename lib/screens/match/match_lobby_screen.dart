@@ -282,25 +282,8 @@ class _CodeCard extends StatelessWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(const SnackBar(content: Text('Code copied')));
   }
-
-  void _share(BuildContext context) => _shareMatch(context, _shareText(match));
 }
 
-String _shareText(MatchHomeMatch match) =>
-    'Join my football match at ${match.stadium}! '
-    'Open Kickoff and enter code ${match.code}.';
-
-Future<void> _shareMatch(BuildContext context, String text) async {
-  try {
-    await SharePlus.instance.share(ShareParams(text: text));
-  } on Object {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Invite copied')));
-  }
-}
 
 class PitchView extends StatelessWidget {
   const PitchView({
