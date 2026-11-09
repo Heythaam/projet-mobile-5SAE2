@@ -82,4 +82,32 @@ void main() {
     expect(rows.single['code'], 'ABCDE');
     expect(rows.single['booking_id'], isNull);
   });
+
+  test('upgrading from version 3 adds country and photo to users', () async {
+    final dir = await Directory.systemTemp.createTemp('kickoff_local_db_');
+    final path = '${dir.path}/upgrade3.db';
+    addTearDown(() => dir.delete(recursive: true));
+
+    final v3 = await databaseFactoryFfi.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 3,
+        onConfigure: LocalDatabase.onConfigure,
+        onCreate: (db, version) => LocalDatabase.onUpgrade(db, 0, version),
+      ),
+    );
+    await UserLocalStore(v3).create(
+      uid: 'uid-1',
+      username: 'farouk',
+      email: 'farouk@example.com',
+    );
+    await v3.close();
+
+    final v4 = await LocalDatabase.open(factory: databaseFactoryFfi, path: path);
+    addTearDown(v4.close);
+    final user = await UserLocalStore(v4).getByUid('uid-1');
+    expect(user?.username, 'farouk');
+    expect(user?.country, isNull);
+    expect(user?.photoPath, isNull);
+  });
 }

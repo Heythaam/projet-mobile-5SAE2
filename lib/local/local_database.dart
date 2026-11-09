@@ -13,7 +13,7 @@ class LocalDatabase {
 
   /// Bump this and add an `if (oldVersion < N)` step in [onUpgrade] whenever
   /// the schema changes.
-  static const version = 3;
+  static const version = 4;
 
   /// [factory] and [path] exist so tests can open an in-memory database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -98,6 +98,12 @@ class LocalDatabase {
       // The Stadium module's booking for this match, when the match was made
       // in a real stadium. Lets the host release the slot on cancel.
       await db.execute('ALTER TABLE matches ADD COLUMN booking_id INTEGER');
+    }
+    if (oldVersion < 4 && newVersion >= 4) {
+      // Two-letter country code (ISO 3166) and the path of a profile photo
+      // kept in the app's own folder.
+      await db.execute('ALTER TABLE users ADD COLUMN country TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN photo_path TEXT');
     }
   }
 }

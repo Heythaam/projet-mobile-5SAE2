@@ -111,6 +111,17 @@ void main() {
     expect(await db.query('users'), hasLength(1));
   });
 
+  test('save keeps and clears the country', () async {
+    final controller = make();
+    await controller.load();
+    await controller.save(country: 'tn');
+    expect(controller.profile?.country, 'TN');
+    await controller.save(clearCountry: true);
+    expect(controller.profile?.country, isNull);
+    expect(await controller.save(country: 'XYZ'), isFalse);
+    expect(controller.lastError, isNotNull);
+  });
+
   test('avatarColor wraps around the palette', () {
     expect(avatarColor(0), avatarColors.first);
     expect(avatarColor(avatarColors.length), avatarColors.first);

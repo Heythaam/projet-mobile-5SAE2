@@ -9,6 +9,8 @@ enum LocalUserError {
   invalidBio,
   invalidPosition,
   invalidAvatar,
+  invalidCountry,
+  invalidPhoto,
   usernameTaken,
   uidTaken,
   notFound,
@@ -36,6 +38,8 @@ class LocalUser {
     this.bio = '',
     this.position,
     this.avatarId = 0,
+    this.country,
+    this.photoPath,
   });
 
   factory LocalUser.fromRow(Map<String, Object?> row) => LocalUser(
@@ -45,6 +49,8 @@ class LocalUser {
     bio: row['bio']! as String,
     position: row['position'] as String?,
     avatarId: row['avatar_id']! as int,
+    country: row['country'] as String?,
+    photoPath: row['photo_path'] as String?,
     createdAt: _fromMs(row['created_at']! as int),
     updatedAt: _fromMs(row['updated_at']! as int),
   );
@@ -57,6 +63,12 @@ class LocalUser {
   /// One of [UserLocalStore.positions], or null.
   final String? position;
   final int avatarId;
+
+  /// Two-letter country code such as `TN`, or null.
+  final String? country;
+
+  /// Path of the profile photo on the phone, or null.
+  final String? photoPath;
   final DateTime createdAt;
   final DateTime updatedAt;
 }
@@ -157,10 +169,22 @@ class UserLocalStore {
     String? position,
     bool clearPosition = false,
     int? avatarId,
+    String? country,
+    bool clearCountry = false,
+    String? photoPath,
+    bool clearPhoto = false,
   }) async {
     assert(
       !(clearPosition && position != null),
       'Pass either position or clearPosition, not both.',
+    );
+    assert(
+      !(clearCountry && country != null),
+      'Pass either country or clearCountry, not both.',
+    );
+    assert(
+      !(clearPhoto && photoPath != null),
+      'Pass either photoPath or clearPhoto, not both.',
     );
     return _db.transaction((txn) async {
       final current = await _find(txn, 'uid = ?', [uid]);
@@ -195,6 +219,16 @@ class UserLocalStore {
         _checkAvatar(avatarId);
         if (avatarId != current.avatarId) values['avatar_id'] = avatarId;
       }
+      if (country != null) {
+        final code = _checkCountry(country);
+        if (code != current.country) values['country'] = code;
+      }
+      if (clearCountry && current.country != null) values['country'] = null;
+      if (photoPath != null) {
+        final path = _checkPhoto(photoPath);
+        if (path != current.photoPath) values['photo_path'] = path;
+      }
+      if (clearPhoto && current.photoPath != null) values['photo_path'] = null;
 
       if (values.isEmpty) return current;
 
@@ -293,6 +327,28 @@ class UserLocalStore {
         'Position must be GK, DEF, MID or FWD.',
       );
     }
+  }
+
+  String _checkCountry(String value) {
+    final code = value.trim().toUpperCase();
+    if (!RegExp(r'^[A-Z]{2}$').hasMatch(code)) {
+      throw const LocalUserException(
+        LocalUserError.invalidCountry,
+        'Pick a country from the list.',
+      );
+    }
+    return code;
+  }
+
+  String _checkPhoto(String value) {
+    final path = value.trim();
+    if (path.isEmpty || path.length > 500) {
+      throw const LocalUserException(
+        LocalUserError.invalidPhoto,
+        'That photo could not be saved.',
+      );
+    }
+    return path;
   }
 
   void _checkAvatar(int value) {

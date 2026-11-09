@@ -3,15 +3,25 @@ import 'package:flutter/services.dart';
 
 import '../local/user_local_store.dart';
 import '../users/avatar_palette.dart';
+import '../users/country_picker.dart';
+import '../users/country_service.dart';
+import '../users/user_avatar.dart';
 import '../users/user_profile_controller.dart';
 import 'kickoff_style.dart';
 
 /// Lets the player change their username, bio, position and avatar colour.
 /// Everything is saved on the phone.
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({required this.controller, super.key});
+  const EditProfileScreen({
+    required this.controller,
+    this.countries,
+    super.key,
+  });
 
   final UserProfileController controller;
+
+  /// Source of the country list. A default one is made when null.
+  final CountryService? countries;
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -22,6 +32,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _bio;
   late String? _position;
   late int _avatarId;
+  late String? _country;
+  late final CountryService _countries =
+      widget.countries ?? CountryService();
   bool _saving = false;
   String? _error;
 
@@ -33,6 +46,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _bio = TextEditingController(text: profile?.bio ?? '');
     _position = profile?.position;
     _avatarId = profile?.avatarId ?? 0;
+    _country = profile?.country;
   }
 
   @override
@@ -54,6 +68,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       position: _position,
       clearPosition: _position == null,
       avatarId: _avatarId,
+      country: _country,
+      clearCountry: _country == null,
     );
     if (!mounted) return;
     if (saved) {
@@ -64,6 +80,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _error = widget.controller.lastError;
       });
     }
+  }
+
+  Future<void> _pickCountry() async {
+    final picked = await pickCountry(context, _countries);
+    if (picked != null && mounted) setState(() => _country = picked.code);
   }
 
   @override
@@ -118,13 +139,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             width: 4,
                           ),
                         ),
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            color: KickoffColors.ink,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        child: UserAvatarFace(
+                          username: _username.text.trim().isEmpty
+                              ? initial
+                              : _username.text.trim().toLowerCase(),
+                          avatarId: _avatarId,
+                          size: 80,
+                          photoPath: widget.controller.profile?.photoPath,
                         ),
                       ),
                     ),
@@ -196,6 +217,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                           ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    const _Label('Country'),
+                    Material(
+                      color: KickoffColors.field,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        key: const ValueKey('edit_profile_country'),
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _pickCountry,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                _country == null ? '🌍' : flagEmoji(_country!),
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _country ?? 'Not set',
+                                  style: TextStyle(
+                                    color: _country == null
+                                        ? KickoffColors.dim
+                                        : Colors.white,
+                                  ),
+                                ),
+                              ),
+                              if (_country != null)
+                                IconButton(
+                                  tooltip: 'Clear country',
+                                  onPressed: () =>
+                                      setState(() => _country = null),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    color: KickoffColors.muted,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 16),

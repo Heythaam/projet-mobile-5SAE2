@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../local/user_local_store.dart';
 import '../models.dart';
 import '../users/avatar_palette.dart';
+import '../users/country_service.dart';
+import '../users/user_avatar.dart';
 import 'kickoff_style.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -18,8 +20,12 @@ class ProfileScreen extends StatelessWidget {
     this.onEditProfile,
     this.matchesPlayed,
     this.matchesHosted,
+    this.countries,
     super.key,
   });
+
+  /// Looks up the country name for the flag line. Null shows the code only.
+  final CountryService? countries;
 
   /// Counted from the matches on this phone. Null shows a dash.
   final int? matchesPlayed;
@@ -88,13 +94,11 @@ class ProfileScreen extends StatelessWidget {
                               width: 4 * scale,
                             ),
                           ),
-                          child: Text(
-                            name.isEmpty ? '?' : name[0].toUpperCase(),
-                            style: TextStyle(
-                              color: KickoffColors.ink,
-                              fontSize: 34 * scale,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          child: UserAvatarFace(
+                            username: name,
+                            avatarId: localProfile?.avatarId ?? 0,
+                            size: 88 * scale,
+                            photoPath: localProfile?.photoPath,
                           ),
                         ),
                         SizedBox(height: 6 * scale),
@@ -106,6 +110,11 @@ class ProfileScreen extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (localProfile?.country != null)
+                          _CountryLine(
+                            code: localProfile!.country!,
+                            service: countries,
+                          ),
                         if (position != null)
                           Padding(
                             padding: EdgeInsets.only(top: 4 * scale),
@@ -242,6 +251,29 @@ class ProfileScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CountryLine extends StatelessWidget {
+  const _CountryLine({required this.code, required this.service});
+
+  final String code;
+  final CountryService? service;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = kickoffScale(context);
+    return Padding(
+      padding: EdgeInsets.only(top: 4 * scale),
+      child: FutureBuilder<Country?>(
+        future: service?.byCode(code),
+        builder: (context, snapshot) => Text(
+          '${flagEmoji(code)} ${snapshot.data?.name ?? code}',
+          key: const ValueKey('profile_country'),
+          style: TextStyle(color: KickoffColors.muted, fontSize: 13 * scale),
         ),
       ),
     );

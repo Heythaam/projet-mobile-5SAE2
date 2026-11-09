@@ -69,6 +69,10 @@ class UserProfileController extends ChangeNotifier {
     String? position,
     bool clearPosition = false,
     int? avatarId,
+    String? country,
+    bool clearCountry = false,
+    String? photoPath,
+    bool clearPhoto = false,
   }) async {
     lastError = null;
     try {
@@ -80,6 +84,10 @@ class UserProfileController extends ChangeNotifier {
         position: position,
         clearPosition: clearPosition,
         avatarId: avatarId,
+        country: country,
+        clearCountry: clearCountry,
+        photoPath: photoPath,
+        clearPhoto: clearPhoto,
       );
       _notify();
       return true;

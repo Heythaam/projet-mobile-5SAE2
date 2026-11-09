@@ -194,6 +194,54 @@ void main() {
     });
   });
 
+  group('country and photo', () {
+    test('saves, changes and clears the country', () async {
+      await seed();
+      var user = await store.updateProfile('uid-1', country: 'tn');
+      expect(user.country, 'TN');
+      user = await store.updateProfile('uid-1', country: 'FR');
+      expect(user.country, 'FR');
+      user = await store.updateProfile('uid-1', bio: 'hi');
+      expect(user.country, 'FR');
+      user = await store.updateProfile('uid-1', clearCountry: true);
+      expect(user.country, isNull);
+    });
+
+    test('rejects a country that is not two letters', () async {
+      await seed();
+      for (final bad in ['T', 'TUN', 'T1', '']) {
+        await expectLater(
+          store.updateProfile('uid-1', country: bad),
+          throwsA(
+            isA<LocalUserException>().having(
+              (e) => e.error,
+              'error',
+              LocalUserError.invalidCountry,
+            ),
+          ),
+        );
+      }
+    });
+
+    test('saves and clears the photo path', () async {
+      await seed();
+      var user = await store.updateProfile('uid-1', photoPath: '/app/p.jpg');
+      expect(user.photoPath, '/app/p.jpg');
+      user = await store.updateProfile('uid-1', clearPhoto: true);
+      expect(user.photoPath, isNull);
+      await expectLater(
+        store.updateProfile('uid-1', photoPath: '  '),
+        throwsA(
+          isA<LocalUserException>().having(
+            (e) => e.error,
+            'error',
+            LocalUserError.invalidPhoto,
+          ),
+        ),
+      );
+    });
+  });
+
   group('delete and session', () {
     test('session tracks the signed-in user', () async {
       await seed();

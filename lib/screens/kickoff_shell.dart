@@ -11,6 +11,7 @@ import '../models.dart';
 import '../challenges/repository/challenge_repository.dart';
 import '../challenges/screens/challenges_dashboard_screen.dart';
 import '../stadium/stadium_module.dart';
+import '../users/country_service.dart';
 import '../users/user_profile_controller.dart';
 import 'edit_profile_screen.dart';
 import '../tournaments/screens/tournaments_list_screen.dart';
@@ -92,6 +93,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     username: widget.isGuest ? 'Guest' : widget.user.username,
   );
   static final _noChanges = ChangeNotifier();
+  final _countries = CountryService();
 
   /// The signed-in player's profile on this phone. Guests have none.
   late final UserProfileController? _profileController = widget.isGuest
@@ -412,6 +414,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
           user: widget.user,
           profile: _profile,
           localProfile: local,
+          countries: _countries,
           matchesPlayed: _matchController.stats?.played,
           matchesHosted: _matchController.stats?.hosted,
           // Only offered once the phone copy loaded; guests have none.
@@ -466,7 +469,8 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     if (controller == null) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => EditProfileScreen(controller: controller),
+        builder: (_) =>
+            EditProfileScreen(controller: controller, countries: _countries),
       ),
     );
   }
