@@ -9,6 +9,8 @@ import '../models.dart';
 import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
+import 'match/match_home_screen.dart';
+import 'match/match_mock_data.dart';
 import 'placeholder_screen.dart';
 import 'profile_screen.dart';
 
@@ -106,6 +108,7 @@ class _KickoffShellState extends State<KickoffShell> {
   String? _profileError;
   String? _matchesError;
   bool _showHistoryOnCalendar = false;
+  final _matchDemoController = MatchDemoController();
 
   @override
   void initState() {
@@ -167,9 +170,17 @@ class _KickoffShellState extends State<KickoffShell> {
     setState(() => _menuOpen = false);
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => PlaceholderScreen(title: title, icon: icon),
+        builder: (_) => title == 'Match'
+            ? MatchHomeScreen(controller: _matchDemoController)
+            : PlaceholderScreen(title: title, icon: icon),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _matchDemoController.dispose();
+    super.dispose();
   }
 
   void _openFriends() {
