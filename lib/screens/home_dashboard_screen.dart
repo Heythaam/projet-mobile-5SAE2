@@ -13,6 +13,7 @@ class HomeDashboardScreen extends StatelessWidget {
     required this.nextMatch,
     required this.onRetry,
     required this.onOpenBallMenu,
+    this.tournamentBanner,
     super.key,
   });
 
@@ -23,6 +24,9 @@ class HomeDashboardScreen extends StatelessWidget {
   final FootballMatch? nextMatch;
   final VoidCallback onRetry;
   final VoidCallback onOpenBallMenu;
+
+  /// Shortcut supplied by the tournaments module, e.g. pending join requests.
+  final Widget? tournamentBanner;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +46,10 @@ class HomeDashboardScreen extends StatelessWidget {
                 SliverList.list(
                   children: [
                     _TopStats(user: user, profile: profile),
+                    if (tournamentBanner case final banner?) ...[
+                      SizedBox(height: 10 * scale),
+                      banner,
+                    ],
                     if (loadError != null) ...[
                       SizedBox(height: 8 * scale),
                       _LoadError(message: loadError!, onRetry: onRetry),
@@ -81,8 +89,7 @@ class HomeDashboardScreen extends StatelessWidget {
                             progress:
                                 profile == null || profile!.bestStreak <= 0
                                 ? null
-                                : profile!.currentStreak /
-                                      profile!.bestStreak,
+                                : profile!.currentStreak / profile!.bestStreak,
                           ),
                         ),
                       ],
@@ -108,44 +115,44 @@ class _TopStats extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
     return Row(
-    children: [
-      Container(
-        width: 30 * scale,
-        height: 30 * scale,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: KickoffColors.yellow,
-          shape: BoxShape.circle,
-          border: Border.all(color: KickoffColors.ink, width: 2 * scale),
-        ),
-        child: Text(
-          user.username.isEmpty ? '?' : user.username[0].toUpperCase(),
-          style: TextStyle(
-            color: KickoffColors.ink,
-            fontSize: 13 * scale,
-            fontWeight: FontWeight.w500,
+      children: [
+        Container(
+          width: 30 * scale,
+          height: 30 * scale,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: KickoffColors.yellow,
+            shape: BoxShape.circle,
+            border: Border.all(color: KickoffColors.ink, width: 2 * scale),
+          ),
+          child: Text(
+            user.username.isEmpty ? '?' : user.username[0].toUpperCase(),
+            style: TextStyle(
+              color: KickoffColors.ink,
+              fontSize: 13 * scale,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
-      ),
-      SizedBox(width: 6 * scale),
-      StatChip(
-        icon: Icons.shield_rounded,
-        label: 'Lv ${profile?.level ?? '—'}',
-      ),
-      const Spacer(),
-      StatChip(
-        icon: Icons.local_fire_department_rounded,
-        label: profile?.currentStreak.toString() ?? '—',
-        iconColor: KickoffColors.orange,
-      ),
-      SizedBox(width: 5 * scale),
-      StatChip(
-        icon: Icons.bolt_rounded,
-        label: profile?.xp.toString() ?? '—',
-        iconColor: KickoffColors.yellow,
-      ),
-    ],
-  );
+        SizedBox(width: 6 * scale),
+        StatChip(
+          icon: Icons.shield_rounded,
+          label: 'Lv ${profile?.level ?? '—'}',
+        ),
+        const Spacer(),
+        StatChip(
+          icon: Icons.local_fire_department_rounded,
+          label: profile?.currentStreak.toString() ?? '—',
+          iconColor: KickoffColors.orange,
+        ),
+        SizedBox(width: 5 * scale),
+        StatChip(
+          icon: Icons.bolt_rounded,
+          label: profile?.xp.toString() ?? '—',
+          iconColor: KickoffColors.yellow,
+        ),
+      ],
+    );
   }
 }
 
@@ -156,14 +163,14 @@ class _NextLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
     return Text(
-    'NEXT',
-    style: TextStyle(
-      color: KickoffColors.dim,
-      fontSize: 12 * scale,
-      letterSpacing: 2 * scale,
-      fontWeight: FontWeight.w500,
-    ),
-  );
+      'NEXT',
+      style: TextStyle(
+        color: KickoffColors.dim,
+        fontSize: 12 * scale,
+        letterSpacing: 2 * scale,
+        fontWeight: FontWeight.w500,
+      ),
+    );
   }
 }
 
@@ -289,51 +296,51 @@ class _ProgressTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scale = kickoffScale(context);
     return Container(
-    constraints: BoxConstraints(minHeight: 110 * scale),
-    padding: EdgeInsets.all(12 * scale),
-    decoration: BoxDecoration(
-      color: KickoffColors.panel,
-      borderRadius: BorderRadius.circular(14 * scale),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, color: iconColor, size: 24 * scale),
-        SizedBox(height: 6 * scale),
-        Text(
-          value,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 13 * scale,
-            fontWeight: FontWeight.w500,
+      constraints: BoxConstraints(minHeight: 110 * scale),
+      padding: EdgeInsets.all(12 * scale),
+      decoration: BoxDecoration(
+        color: KickoffColors.panel,
+        borderRadius: BorderRadius.circular(14 * scale),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: iconColor, size: 24 * scale),
+          SizedBox(height: 6 * scale),
+          Text(
+            value,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13 * scale,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        SizedBox(height: 6 * scale),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3 * scale),
-          child: SizedBox(
-            height: 6 * scale,
-            child: LayoutBuilder(
-              builder: (context, constraints) => Stack(
-                children: [
-                  const Positioned.fill(
-                    child: ColoredBox(color: KickoffColors.bg),
-                  ),
-                  if (progress != null)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: constraints.maxWidth * progress!.clamp(0.0, 1.0),
-                      child: ColoredBox(color: iconColor),
+          SizedBox(height: 6 * scale),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3 * scale),
+            child: SizedBox(
+              height: 6 * scale,
+              child: LayoutBuilder(
+                builder: (context, constraints) => Stack(
+                  children: [
+                    const Positioned.fill(
+                      child: ColoredBox(color: KickoffColors.bg),
                     ),
-                ],
+                    if (progress != null)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: constraints.maxWidth * progress!.clamp(0.0, 1.0),
+                        child: ColoredBox(color: iconColor),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
   }
 }
 
