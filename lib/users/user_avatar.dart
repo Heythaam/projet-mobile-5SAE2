@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../screens/kickoff_style.dart';
 import 'avatar_palette.dart';
 
 /// DiceBear avatar for a username: a free web service, no key. [size] is in

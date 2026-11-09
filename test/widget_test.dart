@@ -262,7 +262,10 @@ void main() {
           tester.getTopLeft(find.text('@player')).dy,
           greaterThanOrEqualTo(34),
         );
-        expect(tester.getTopLeft(find.text('P')).dy, greaterThanOrEqualTo(34));
+        expect(
+          tester.getTopLeft(find.byKey(const ValueKey('profile_avatar'))).dy,
+          greaterThanOrEqualTo(34),
+        );
         expect(
           tester.getRect(find.byKey(const ValueKey('profile_avatar'))).height,
           closeTo(96 * (size.width / 360).clamp(1.0, 1.3), 0.1),
