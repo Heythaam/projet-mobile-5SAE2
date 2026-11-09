@@ -127,9 +127,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(destination.value));
       await tester.pumpAndSettle();
-      expect(find.text(destination.key), findsOneWidget);
-      expect(find.text('Coming soon'), findsOneWidget);
-      await tester.pageBack();
+      if (destination.key == 'Challenge') {
+        expect(find.text('Challenges'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      } else {
+        expect(find.text(destination.key), findsOneWidget);
+        expect(find.text('Coming soon'), findsOneWidget);
+        await tester.pageBack();
+      }
       await tester.pumpAndSettle();
     }
   });
