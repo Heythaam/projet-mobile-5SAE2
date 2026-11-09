@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../kickoff_style.dart';
 import 'match_create_screens.dart';
 import 'match_lobby_screen.dart';
+import '../../matches/match_controller.dart';
 import 'match_mock_data.dart';
 import 'match_widgets.dart';
 
@@ -16,7 +17,7 @@ const _allowedJoinCodeCharacters = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 class MatchJoinScreen extends StatefulWidget {
   const MatchJoinScreen({required this.controller, super.key});
 
-  final MatchDemoController controller;
+  final MatchController controller;
 
   @override
   State<MatchJoinScreen> createState() => _MatchJoinScreenState();
@@ -256,7 +257,7 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
     Navigator.of(context).maybePop();
   }
 
-  void _joinByCode() {
+  Future<void> _joinByCode() async {
     if (_joining) return;
     _joining = true;
     final found = widget.controller.findMatchByCode(_enteredCode);
@@ -272,23 +273,28 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
     }
     final joined = widget.controller.hasJoined(found)
         ? found
-        : widget.controller.joinByCode(_enteredCode);
-    if (joined != null) {
-      _openLobby(joined);
-    } else {
-      _joining = false;
-    }
+        : await widget.controller.joinByCode(_enteredCode);
+    if (!mounted) return;
+    _finishJoin(joined);
   }
 
-  void _joinPublicMatch(MatchHomeMatch match) {
+  Future<void> _joinPublicMatch(MatchHomeMatch match) async {
     if (_joining) return;
     _joining = true;
-    final joined = widget.controller.joinPublicMatch(match);
+    final joined = await widget.controller.joinPublicMatch(match);
+    if (!mounted) return;
+    _finishJoin(joined);
+  }
+
+  void _finishJoin(MatchHomeMatch? joined) {
     if (joined != null) {
       _openLobby(joined);
-    } else {
-      _joining = false;
+      return;
     }
+    _joining = false;
+    _showMessage(
+      widget.controller.lastError ?? 'Could not join this match',
+    );
   }
 
   Future<void> _startCreateFromEmpty() async {

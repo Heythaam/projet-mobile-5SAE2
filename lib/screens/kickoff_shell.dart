@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../matches/match_controller.dart';
 import '../app_route_observer.dart';
 import '../home_screen.dart';
 import '../matches/football_match.dart';
@@ -17,7 +18,6 @@ import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import 'kickoff_style.dart';
 import 'match/match_home_screen.dart';
-import 'match/match_mock_data.dart';
 import 'placeholder_screen.dart';
 import 'profile_screen.dart';
 
@@ -85,7 +85,10 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   String? _profileError;
   String? _matchesError;
   bool _showHistoryOnCalendar = false;
-  final _matchDemoController = MatchDemoController();
+  late final _matchController = MatchController(
+    uid: widget.isGuest ? 'guest' : '${widget.user.id}',
+    username: widget.isGuest ? 'Guest' : widget.user.username,
+  );
 
   /// Join requests waiting for this captain; the home banner hides at zero.
   int _pendingJoinRequests = 0;
@@ -213,7 +216,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => title == 'Match'
-              ? MatchHomeScreen(controller: _matchDemoController)
+              ? MatchHomeScreen(controller: _matchController)
               : PlaceholderScreen(title: title, icon: icon),
         ),
       );

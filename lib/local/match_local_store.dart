@@ -38,6 +38,7 @@ class LocalMatch {
     required this.capacity,
     required this.isPublic,
     required this.slots,
+    required this.slotNames,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -49,6 +50,10 @@ class LocalMatch {
   final int capacity;
   final bool isPublic;
   final List<String?> slots;
+
+  /// Display name of the player in each slot, same order as [slots]. Empty
+  /// when the name was not given.
+  final List<String?> slotNames;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -87,6 +92,7 @@ class MatchLocalStore {
     required DateTime scheduledAt,
     required int capacity,
     bool isPublic = false,
+    String hostName = '',
   }) async {
     if (hostUid.trim().isEmpty) {
       throw const LocalMatchException(
@@ -142,6 +148,7 @@ class MatchLocalStore {
         'match_code': code,
         'uid': hostUid,
         'slot': 0,
+        'display_name': hostName.trim(),
         'joined_at': ms,
       });
       return (await _load(txn, code))!;
@@ -165,6 +172,18 @@ class MatchLocalStore {
     return _loadAll(_db, rows);
   }
 
+  /// Every match that has not started, soonest first.
+  Future<List<LocalMatch>> allUpcoming() async {
+    final rows = await _db.query(
+      'matches',
+      columns: ['code'],
+      where: 'scheduled_at > ?',
+      whereArgs: [_clock().millisecondsSinceEpoch],
+      orderBy: 'scheduled_at ASC',
+    );
+    return _loadAll(_db, rows);
+  }
+
   /// The next match [uid] plays in that has not started, or null.
   Future<LocalMatch?> upcomingFor(String uid) async {
     final rows = await _db.rawQuery(
@@ -180,8 +199,8 @@ class MatchLocalStore {
 
   // ---- Update -----------------------------------------------------------
 
-  /// Puts [uid] in the lowest free slot.
-  Future<LocalMatch> join(String code, String uid) {
+  /// Puts [uid] in the lowest free slot. [name] is shown in the lobby.
+  Future<LocalMatch> join(String code, String uid, {String name = ''}) {
     return _db.transaction((txn) async {
       final match = await _requireOpen(txn, code);
       if (match.hasPlayer(uid)) {
@@ -202,6 +221,7 @@ class MatchLocalStore {
         'match_code': match.code,
         'uid': uid,
         'slot': free,
+        'display_name': name.trim(),
         'joined_at': ms,
       });
       await _touch(txn, match);
@@ -321,9 +341,12 @@ class MatchLocalStore {
       orderBy: 'slot ASC',
     );
     final slots = List<String?>.filled(capacity, null);
+    final names = List<String?>.filled(capacity, null);
     for (final player in players) {
       final slot = player['slot']! as int;
-      if (slot >= 0 && slot < capacity) slots[slot] = player['uid']! as String;
+      if (slot < 0 || slot >= capacity) continue;
+      slots[slot] = player['uid']! as String;
+      names[slot] = player['display_name']! as String;
     }
     return LocalMatch(
       code: row['code']! as String,
@@ -333,6 +356,7 @@ class MatchLocalStore {
       capacity: capacity,
       isPublic: (row['is_public']! as int) == 1,
       slots: slots,
+      slotNames: names,
       createdAt: _fromMs(row['created_at']! as int),
       updatedAt: _fromMs(row['updated_at']! as int),
     );

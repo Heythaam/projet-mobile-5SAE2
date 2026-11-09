@@ -65,6 +65,19 @@ void main() {
       expect(match.updatedAt, now);
     });
 
+    test('keeps player names next to their slots', () async {
+      final match = await store.create(
+        hostUid: 'host',
+        hostName: ' Farouk ',
+        stadium: 'Green Arena',
+        scheduledAt: inHours(24),
+        capacity: 4,
+      );
+      expect(match.slotNames, ['Farouk', null, null, null]);
+      final joined = await store.join(match.code, 'p1', name: 'Sami');
+      expect(joined.slotNames, ['Farouk', 'Sami', null, null]);
+    });
+
     test('rejects invalid input', () async {
       await expectLater(
         store.create(
@@ -141,6 +154,14 @@ void main() {
 
       now = inHours(3);
       expect((await store.publicUpcoming()).map((m) => m.code), [later.code]);
+    });
+
+    test('lists every upcoming match, public or not', () async {
+      final priv = await seed(host: 'a', hours: 5);
+      final pub = await seed(host: 'b', isPublic: true, hours: 2);
+      expect((await store.allUpcoming()).map((m) => m.code), [pub.code, priv.code]);
+      now = inHours(3);
+      expect((await store.allUpcoming()).map((m) => m.code), [priv.code]);
     });
 
     test('finds the next match a player is in', () async {

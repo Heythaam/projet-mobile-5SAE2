@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../kickoff_style.dart';
+import '../../local/match_local_store.dart';
+import '../../matches/match_controller.dart';
 import 'match_mock_data.dart';
 import 'match_widgets.dart';
 
@@ -12,7 +14,7 @@ const _matchTimes = 32;
 class StadiumPickScreen extends StatefulWidget {
   const StadiumPickScreen({required this.controller, super.key});
 
-  final MatchDemoController controller;
+  final MatchController controller;
 
   @override
   State<StadiumPickScreen> createState() => _StadiumPickScreenState();
@@ -315,7 +317,7 @@ class DateTimePickScreen extends StatefulWidget {
     super.key,
   });
 
-  final MatchDemoController controller;
+  final MatchController controller;
   final MatchStadiumData stadium;
 
   @override
@@ -617,7 +619,7 @@ class VisibilityScreen extends StatefulWidget {
     super.key,
   });
 
-  final MatchDemoController controller;
+  final MatchController controller;
   final CreateMatchDraft draft;
 
   @override
@@ -693,14 +695,30 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
   Future<void> _createMatch() async {
     if (_creating) return;
     setState(() => _creating = true);
-    widget.controller.createMatch(
-      CreateMatchDraft(
-        stadium: widget.draft.stadium,
-        startsAt: widget.draft.startsAt,
-        visibility: _visibility,
-      ),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    try {
+      await widget.controller.createMatch(
+        CreateMatchDraft(
+          stadium: widget.draft.stadium,
+          startsAt: widget.draft.startsAt,
+          visibility: _visibility,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _creating = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              error is LocalMatchException
+                  ? error.message
+                  : 'Could not save the match on this phone.',
+            ),
+          ),
+        );
+      return;
+    }
     if (!mounted) return;
     setState(() => _allowCompletionPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {

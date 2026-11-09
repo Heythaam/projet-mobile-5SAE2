@@ -82,6 +82,7 @@ class LocalDatabase {
           match_code TEXT NOT NULL REFERENCES matches(code) ON DELETE CASCADE,
           uid        TEXT NOT NULL,
           slot       INTEGER NOT NULL CHECK (slot >= 0),
+          display_name TEXT NOT NULL DEFAULT '',
           joined_at  INTEGER NOT NULL,
           PRIMARY KEY (match_code, uid),
           UNIQUE (match_code, slot)
