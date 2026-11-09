@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:backend/database.dart';
@@ -76,6 +77,26 @@ const _tournaments = [
 
 const _bracketTournament = 'Champions League';
 
+/// Extra users and tournaments from the app's `assets/sample_data.json`, the
+/// one file that also holds the sample matches and challenges.
+Map<String, dynamic> _sample() {
+  final file = File.fromUri(
+    Platform.script.resolve('../../assets/sample_data.json'),
+  );
+  if (!file.existsSync()) return const {};
+  return jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+}
+
+List<String> _sampleUsers() => [
+  for (final name in (_sample()['users'] as List<dynamic>? ?? const []))
+    if (!_users.contains(name)) name as String,
+];
+
+List<Map<String, dynamic>> _sampleTournaments() => [
+  for (final t in (_sample()['tournaments'] as List<dynamic>? ?? const []))
+    t as Map<String, dynamic>,
+];
+
 /// Team name and captain username.
 const _teams = [
   ('Real Madrid', 'alice'),
@@ -128,8 +149,9 @@ void main() {
     }
 
     // Hash outside the transaction so the API is not blocked meanwhile.
+    final sampleUsers = _sampleUsers();
     final hashes = {
-      for (final username in _users)
+      for (final username in [..._users, ...sampleUsers])
         username: BCrypt.hashpw(_password, BCrypt.gensalt()),
     };
 
@@ -214,6 +236,35 @@ void main() {
         print('  Round $round: $home $result $away$penalties');
       }
 
+      for (final username in sampleUsers) {
+        userIds[username] = _insertUser(db, username, hashes[username]!);
+      }
+      for (final t in _sampleTournaments()) {
+        db.execute(
+          '''
+            INSERT INTO tournaments (name, description, format, status,
+              start_date, end_date, max_teams, location, prize, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ''',
+          [
+            t['name'],
+            t['description'],
+            t['format'],
+            t['status'],
+            t['startDate'],
+            t['endDate'],
+            t['maxTeams'],
+            t['location'],
+            t['prize'],
+            userIds['alice'],
+          ],
+        );
+      }
+      print(
+        'Sample file: ${sampleUsers.length} more users, '
+        '${_sampleTournaments().length} more tournaments.',
+      );
+
       _verify(db, tournamentId);
       db.execute('COMMIT');
     } catch (_) {
@@ -232,14 +283,17 @@ void main() {
 /// Deletes previous seed data; teams, matches, requests, friendships,
 /// messages and achievements cascade.
 void _clear(Database db) {
-  final names = _tournaments.map((tournament) => tournament.name).toList();
+  final names = [
+    ..._tournaments.map((tournament) => tournament.name),
+    ..._sampleTournaments().map((t) => t['name'] as String),
+  ];
   db.execute(
     'DELETE FROM tournaments '
     'WHERE name IN (${List.filled(names.length, '?').join(', ')})',
     names,
   );
   final tournaments = db.updatedRows;
-  final emails = _users.map(_email).toList();
+  final emails = [..._users, ..._sampleUsers()].map(_email).toList();
   db.execute(
     'DELETE FROM users '
     'WHERE email IN (${List.filled(emails.length, '?').join(', ')}) '

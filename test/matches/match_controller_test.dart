@@ -118,15 +118,23 @@ void main() {
     expect(guest.lastError, contains('host'));
   });
 
-  test('sample matches are added once and can be removed', () async {
-    final c = controllerFor('1', 'Farouk');
+  test('the player can switch location off again', () async {
+    final c = controllerFor(
+      '1',
+      'Farouk',
+      location: _FakeLocation(
+        const LocationResult(
+          LocationStatus.granted,
+          PlayerLocation(36.8, 10.18),
+        ),
+      ),
+    );
     await c.load();
-    expect(await c.loadDemoMatches(), 12);
-    expect(c.publicMatches, hasLength(12));
-    expect(await c.loadDemoMatches(), 0);
-    expect(c.publicMatches, hasLength(12));
-    await c.removeDemoMatches();
-    expect(c.publicMatches, isEmpty);
+    await c.useMyLocation();
+    expect(c.sortedByDistance, isTrue);
+    c.stopUsingLocation();
+    expect(c.sortedByDistance, isFalse);
+    expect(c.locationStatus, isNull);
   });
 
   test('a match with more than 5 players cannot be cancelled', () async {

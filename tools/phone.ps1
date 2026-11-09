@@ -11,7 +11,7 @@ try {
   (Get-Content pubspec.yaml) -replace '^(\s*)sqflite_common_ffi:', '$1# sqflite_common_ffi:' | Set-Content pubspec.yaml
   flutter pub get
   & "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8080 tcp:8080
-  flutter run -d $Device --dart-define=API_BASE_URL=http://127.0.0.1:8080
+  flutter run -d $Device --dart-define=API_BASE_URL=http://127.0.0.1:8080 --dart-define=SAMPLE_DATA=true
 } finally {
   Move-Item pubspec.yaml.bak pubspec.yaml -Force
   Move-Item pubspec.lock.bak pubspec.lock -Force

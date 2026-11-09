@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../demo/demo_data.dart';
+import '../sample_data/sample_data.dart';
 import '../local/local_database.dart';
 import '../location/player_location.dart';
 import '../local/match_local_store.dart';
@@ -161,6 +161,7 @@ class MatchController extends ChangeNotifier {
   Future<void> _refresh({String? focusCode}) async {
     try {
       final store = await _ensureStore();
+      if (sampleDataEnabled) await loadSampleMatches(store);
       final upcoming = await store.allUpcoming();
       _byCode = {for (final match in upcoming) match.code: match};
       final next = focusCode != null
@@ -183,6 +184,13 @@ class MatchController extends ChangeNotifier {
     locating = false;
     locationStatus = result.status;
     _here = result.status == LocationStatus.granted ? result.location : null;
+    notifyListeners();
+  }
+
+  /// Forgets the phone's position, so matches go back to soonest first.
+  void stopUsingLocation() {
+    _here = null;
+    locationStatus = null;
     notifyListeners();
   }
 
@@ -330,24 +338,6 @@ class MatchController extends ChangeNotifier {
       }
     }
     return _change(() async => (await _ensureStore()).cancel(code, uid));
-  }
-
-  /// Adds sample public matches by other players, for trying the app out.
-  /// Does nothing (returns 0) when the samples are already there.
-  Future<int> loadDemoMatches() async {
-    final store = await _ensureStore();
-    if (await store.countHostedByPrefix(demoUidPrefix) > 0) return 0;
-    final added = await seedDemoMatches(store);
-    await _refresh();
-    notifyListeners();
-    return added;
-  }
-
-  /// Removes the sample matches and their players.
-  Future<void> removeDemoMatches() async {
-    await (await _ensureStore()).deleteHostedByPrefix(demoUidPrefix);
-    await _refresh();
-    notifyListeners();
   }
 
   /// Makes the match public or private. Only the host can.

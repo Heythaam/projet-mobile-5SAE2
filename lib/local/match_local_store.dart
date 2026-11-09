@@ -346,7 +346,7 @@ class MatchLocalStore {
     });
   }
 
-  // ---- Sample data --------------------------------------------------------
+  // ---- Sample data ------------------------------------------------------
 
   /// How many matches are hosted by a uid starting with [prefix].
   Future<int> countHostedByPrefix(String prefix) async {
@@ -356,14 +356,6 @@ class MatchLocalStore {
     );
     return rows.first['n']! as int;
   }
-
-  /// Removes every match hosted by a uid starting with [prefix], and with them
-  /// their players. Used to clear the sample matches.
-  Future<void> deleteHostedByPrefix(String prefix) => _db.delete(
-    'matches',
-    where: 'host_uid LIKE ?',
-    whereArgs: ['$prefix%'],
-  );
 
   // ---- Delete -----------------------------------------------------------
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../demo/demo_data.dart';
+import '../../sample_data/sample_data.dart';
 import '../../models.dart';
 import '../../screens/kickoff_style.dart';
 import '../models/challenge_model.dart';
@@ -59,6 +59,7 @@ class _ChallengesDashboardScreenState extends State<ChallengesDashboardScreen>
     });
 
     try {
+      if (sampleDataEnabled) await loadSampleChallenges(widget.repository);
       final userId = widget.user.id;
       final created = await widget.repository.getCreatedChallenges(userId);
       final joined = await widget.repository.getJoinedChallenges(userId);
@@ -310,20 +311,6 @@ class _ChallengesDashboardScreenState extends State<ChallengesDashboardScreen>
             ),
           ),
           actions: [
-            IconButton(
-              key: const ValueKey('load_demo_challenges'),
-              icon: const Icon(Icons.auto_awesome_rounded, color: KickoffColors.muted),
-              tooltip: 'Add sample challenges',
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                final added = await seedDemoChallenges(widget.repository);
-                if (!mounted) return;
-                messenger.showSnackBar(
-                  SnackBar(content: Text('Added $added sample challenges')),
-                );
-                _loadAllChallenges();
-              },
-            ),
             IconButton(
               icon: const Icon(Icons.key_rounded, color: KickoffColors.yellow),
               tooltip: 'Enter Join Code',

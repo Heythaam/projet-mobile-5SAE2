@@ -298,8 +298,33 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
             message,
             style: const TextStyle(color: KickoffColors.muted, fontSize: 14),
           ),
-          if (!sorted) ...[
-            const SizedBox(height: 10),
+          SwitchListTile(
+            key: const ValueKey('location_switch'),
+            contentPadding: EdgeInsets.zero,
+            activeThumbColor: KickoffColors.yellow,
+            title: const Text(
+              'Use my location',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: const Text(
+              'Switch it off any time. Your position is never saved.',
+              style: TextStyle(color: KickoffColors.muted, fontSize: 12),
+            ),
+            value: sorted || controller.locating,
+            onChanged: controller.locating
+                ? null
+                : (on) {
+                    if (on) {
+                      controller.useMyLocation();
+                    } else {
+                      controller.stopUsingLocation();
+                    }
+                  },
+          ),
+          if (!sorted && (serviceOff || blocked))
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -309,62 +334,24 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
                   foregroundColor: KickoffColors.ink,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                onPressed: controller.locating
-                    ? null
-                    : serviceOff
+                onPressed: serviceOff
                     ? Geolocator.openLocationSettings
-                    : blocked
-                    ? Geolocator.openAppSettings
-                    : controller.useMyLocation,
+                    : Geolocator.openAppSettings,
                 icon: const Icon(Icons.my_location_rounded),
                 label: Text(action),
               ),
             ),
-            if (serviceOff)
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  key: const ValueKey('retry_location'),
-                  onPressed: controller.locating
-                      ? null
-                      : controller.useMyLocation,
-                  child: const Text('I turned it on, try again'),
-                ),
+          if (!sorted && serviceOff)
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                key: const ValueKey('retry_location'),
+                onPressed: controller.locating
+                    ? null
+                    : controller.useMyLocation,
+                child: const Text('I turned it on, try again'),
               ),
-          ],
-          Wrap(
-            children: [
-              TextButton.icon(
-                key: const ValueKey('load_demo_matches'),
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final added = await widget.controller.loadDemoMatches();
-                  if (!mounted) return;
-                  setState(() {});
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        added == 0
-                            ? 'Sample matches are already added.'
-                            : 'Added $added sample matches.',
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                label: const Text('Add sample matches'),
-              ),
-              TextButton.icon(
-                key: const ValueKey('remove_demo_matches'),
-                onPressed: () async {
-                  await widget.controller.removeDemoMatches();
-                  if (mounted) setState(() {});
-                },
-                icon: const Icon(Icons.delete_sweep_rounded, size: 18),
-                label: const Text('Remove samples'),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
