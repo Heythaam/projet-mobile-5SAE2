@@ -41,6 +41,11 @@ class Challenge {
     required this.joinCode,
     required this.createdByUserId,
     this.status = ChallengeStatus.active,
+    this.gameFormat = '5v5',
+    this.pitchType = 'Turf',
+    this.skillLevel = 'All Levels',
+    this.durationMinutes = 60,
+    this.rulesNotes,
     this.isJoined = false,
     this.isCreatedByMe = false,
   });
@@ -58,6 +63,14 @@ class Challenge {
   final String joinCode;
   final int createdByUserId;
   final ChallengeStatus status;
+
+  // Detailed fields
+  final String gameFormat; // e.g. 5v5, 7v7, 11v11
+  final String pitchType; // e.g. Turf, Indoor, Grass
+  final String skillLevel; // e.g. All Levels, Beginner, Intermediate, Advanced
+  final int durationMinutes; // e.g. 60, 90, 120
+  final String? rulesNotes;
+
   final bool isJoined;
   final bool isCreatedByMe;
 
@@ -78,6 +91,11 @@ class Challenge {
     String? joinCode,
     int? createdByUserId,
     ChallengeStatus? status,
+    String? gameFormat,
+    String? pitchType,
+    String? skillLevel,
+    int? durationMinutes,
+    String? rulesNotes,
     bool? isJoined,
     bool? isCreatedByMe,
   }) =>
@@ -95,6 +113,11 @@ class Challenge {
         joinCode: joinCode ?? this.joinCode,
         createdByUserId: createdByUserId ?? this.createdByUserId,
         status: status ?? this.status,
+        gameFormat: gameFormat ?? this.gameFormat,
+        pitchType: pitchType ?? this.pitchType,
+        skillLevel: skillLevel ?? this.skillLevel,
+        durationMinutes: durationMinutes ?? this.durationMinutes,
+        rulesNotes: rulesNotes ?? this.rulesNotes,
         isJoined: isJoined ?? this.isJoined,
         isCreatedByMe: isCreatedByMe ?? this.isCreatedByMe,
       );
@@ -127,6 +150,11 @@ class Challenge {
       createdByUserId: creatorId,
       status: ChallengeStatus.fromString(
           map['challenge_status'] as String? ?? 'active'),
+      gameFormat: map['game_format'] as String? ?? '5v5',
+      pitchType: map['pitch_type'] as String? ?? 'Turf',
+      skillLevel: map['skill_level'] as String? ?? 'All Levels',
+      durationMinutes: map['duration_minutes'] as int? ?? 60,
+      rulesNotes: map['rules_notes'] as String?,
       isJoined: isJoinedVal,
       isCreatedByMe: isCreated,
     );
@@ -145,5 +173,10 @@ class Challenge {
         'join_code': joinCode,
         'created_by_user_id': createdByUserId,
         'challenge_status': status.nameString,
+        'game_format': gameFormat,
+        'pitch_type': pitchType,
+        'skill_level': skillLevel,
+        'duration_minutes': durationMinutes,
+        'rules_notes': rulesNotes,
       };
 }

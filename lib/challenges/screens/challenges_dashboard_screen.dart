@@ -94,6 +94,90 @@ class _ChallengesDashboardScreenState extends State<ChallengesDashboardScreen>
     }
   }
 
+  Future<void> _editChallenge(Challenge challenge) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => CreateChallengeScreen(
+          repository: widget.repository,
+          user: widget.user,
+          initialChallenge: challenge,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      _loadAllChallenges();
+    }
+  }
+
+  Future<void> _deleteChallenge(Challenge challenge) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: KickoffColors.panelDark,
+        title: const Text('Delete Challenge?', style: TextStyle(color: Colors.white)),
+        content: Text('Are you sure you want to delete "${challenge.description}"?',
+            style: const TextStyle(color: KickoffColors.muted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: KickoffColors.muted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: KickoffColors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && challenge.id != null) {
+      final success = await widget.repository.deleteChallenge(challenge.id!, widget.user.id);
+      if (!mounted) return;
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Challenge deleted.')),
+        );
+        _loadAllChallenges();
+      }
+    }
+  }
+
+  Future<void> _leaveChallenge(Challenge challenge) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: KickoffColors.panelDark,
+        title: const Text('Quit Challenge?', style: TextStyle(color: Colors.white)),
+        content: Text('Are you sure you want to quit "${challenge.description}"?',
+            style: const TextStyle(color: KickoffColors.muted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: KickoffColors.muted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: KickoffColors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Quit', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && challenge.id != null) {
+      final success = await widget.repository.leaveChallenge(challenge.id!, widget.user.id);
+      if (!mounted) return;
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You quit the challenge.')),
+        );
+        _loadAllChallenges();
+      }
+    }
+  }
+
   Future<void> _joinChallenge(Challenge challenge) async {
     try {
       final success = await widget.repository.joinChallenge(
@@ -368,6 +452,9 @@ class _ChallengesDashboardScreenState extends State<ChallengesDashboardScreen>
           return ChallengeCard(
             challenge: challenge,
             onJoin: () => _joinChallenge(challenge),
+            onLeave: () => _leaveChallenge(challenge),
+            onEdit: () => _editChallenge(challenge),
+            onDelete: () => _deleteChallenge(challenge),
           );
         },
       ),

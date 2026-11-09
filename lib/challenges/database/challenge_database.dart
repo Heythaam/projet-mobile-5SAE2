@@ -26,8 +26,9 @@ class ChallengeDatabase {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -55,6 +56,11 @@ class ChallengeDatabase {
         join_code TEXT UNIQUE NOT NULL,
         created_by_user_id INTEGER NOT NULL,
         challenge_status TEXT NOT NULL DEFAULT 'active',
+        game_format TEXT DEFAULT '5v5',
+        pitch_type TEXT DEFAULT 'Turf',
+        skill_level TEXT DEFAULT 'All Levels',
+        duration_minutes INTEGER DEFAULT 60,
+        rules_notes TEXT,
         FOREIGN KEY (team_id) REFERENCES teams(id)
       )
     ''');
@@ -94,12 +100,17 @@ class ChallengeDatabase {
         'max_players': 10,
         'current_players': 6,
         'join_code': 'KICK10',
-        'created_by_user_id': 999, // mock user
+        'created_by_user_id': 999,
         'challenge_status': 'active',
+        'game_format': '5v5',
+        'pitch_type': 'Turf',
+        'skill_level': 'Intermediate',
+        'duration_minutes': 90,
+        'rules_notes': 'Please bring light and dark shirts!',
       },
       {
         'type': 'team',
-        'team_id': 1, // Thunder FC
+        'team_id': 1,
         'description': 'Thunder FC vs Challengers Showcase',
         'difficulty': 4,
         'location_name': 'Downtown Sports Complex',
@@ -107,8 +118,13 @@ class ChallengeDatabase {
         'max_players': 14,
         'current_players': 8,
         'join_code': 'KICK77',
-        'created_by_user_id': 998, // mock user
+        'created_by_user_id': 998,
         'challenge_status': 'active',
+        'game_format': '7v7',
+        'pitch_type': 'Natural Grass',
+        'skill_level': 'Advanced',
+        'duration_minutes': 90,
+        'rules_notes': 'Competitive match. Cleats allowed.',
       },
       {
         'type': 'open',
@@ -120,15 +136,19 @@ class ChallengeDatabase {
         'max_players': 14,
         'current_players': 11,
         'join_code': 'KICK99',
-        'created_by_user_id': 997, // mock user
+        'created_by_user_id': 997,
         'challenge_status': 'active',
+        'game_format': '7v7',
+        'pitch_type': 'Turf',
+        'skill_level': 'Beginner',
+        'duration_minutes': 60,
+        'rules_notes': 'Friendly atmosphere for fun practice.',
       },
     ];
 
     for (final challenge in mockChallenges) {
       final challengeId = await db.insert('challenges', challenge);
 
-      // Add dummy participants for mock challenges
       final currentPlayers = challenge['current_players'] as int;
       final creatorId = challenge['created_by_user_id'] as int;
       await db.insert('challenge_participants', {
@@ -144,6 +164,16 @@ class ChallengeDatabase {
           'joined_at': DateTime.now().toIso8601String(),
         });
       }
+    }
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE challenges ADD COLUMN game_format TEXT DEFAULT '5v5'");
+      await db.execute("ALTER TABLE challenges ADD COLUMN pitch_type TEXT DEFAULT 'Turf'");
+      await db.execute("ALTER TABLE challenges ADD COLUMN skill_level TEXT DEFAULT 'All Levels'");
+      await db.execute("ALTER TABLE challenges ADD COLUMN duration_minutes INTEGER DEFAULT 60");
+      await db.execute("ALTER TABLE challenges ADD COLUMN rules_notes TEXT");
     }
   }
 
@@ -189,6 +219,58 @@ class ChallengeDatabase {
       });
 
       return challengeId;
+    });
+  }
+
+  Future<bool> updateChallenge(Challenge challenge) async {
+    if (challenge.id == null) return false;
+    final db = await database;
+    final rows = await db.update(
+      'challenges',
+      challenge.toMap(),
+      where: 'id = ? AND created_by_user_id = ?',
+      whereArgs: [challenge.id, challenge.createdByUserId],
+    );
+    return rows > 0;
+  }
+
+  Future<bool> deleteChallenge(int challengeId, int userId) async {
+    final db = await database;
+    return await db.transaction((txn) async {
+      await txn.delete(
+        'challenge_participants',
+        where: 'challenge_id = ?',
+        whereArgs: [challengeId],
+      );
+
+      final rows = await txn.delete(
+        'challenges',
+        where: 'id = ? AND created_by_user_id = ?',
+        whereArgs: [challengeId, userId],
+      );
+
+      return rows > 0;
+    });
+  }
+
+  Future<bool> leaveChallenge(int challengeId, int userId) async {
+    final db = await database;
+    return await db.transaction((txn) async {
+      final deleted = await txn.delete(
+        'challenge_participants',
+        where: 'challenge_id = ? AND user_id = ?',
+        whereArgs: [challengeId, userId],
+      );
+
+      if (deleted > 0) {
+        await txn.rawUpdate('''
+          UPDATE challenges
+          SET current_players = MAX(1, current_players - 1)
+          WHERE id = ?
+        ''', [challengeId]);
+        return true;
+      }
+      return false;
     });
   }
 
@@ -242,7 +324,6 @@ class ChallengeDatabase {
   Future<bool> joinChallenge(int challengeId, int userId) async {
     final db = await database;
     return await db.transaction((txn) async {
-      // Check if challenge exists and is not full
       final challenges = await txn.query(
         'challenges',
         where: 'id = ?',
@@ -256,22 +337,19 @@ class ChallengeDatabase {
 
       if (currentPlayers >= maxPlayers) return false;
 
-      // Check if user is already joined
       final existing = await txn.query(
         'challenge_participants',
         where: 'challenge_id = ? AND user_id = ?',
         whereArgs: [challengeId, userId],
       );
-      if (existing.isNotEmpty) return true; // Already joined
+      if (existing.isNotEmpty) return true;
 
-      // Add user to participants
       await txn.insert('challenge_participants', {
         'challenge_id': challengeId,
         'user_id': userId,
         'joined_at': DateTime.now().toIso8601String(),
       });
 
-      // Increment current_players
       await txn.rawUpdate('''
         UPDATE challenges
         SET current_players = current_players + 1
