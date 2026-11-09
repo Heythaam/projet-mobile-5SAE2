@@ -93,6 +93,24 @@ void main() {
     expect(controller.profile?.username, 'farouk');
   });
 
+  test('resetProfile goes back to the account details', () async {
+    final controller = make();
+    await controller.load();
+    await controller.save(
+      username: 'captain',
+      bio: 'hello',
+      position: 'GK',
+      avatarId: 4,
+    );
+    final reset = await controller.resetProfile();
+    expect(reset, isTrue);
+    expect(controller.profile?.username, 'farouk');
+    expect(controller.profile?.bio, '');
+    expect(controller.profile?.position, isNull);
+    expect(controller.profile?.avatarId, 0);
+    expect(await db.query('users'), hasLength(1));
+  });
+
   test('avatarColor wraps around the palette', () {
     expect(avatarColor(0), avatarColors.first);
     expect(avatarColor(avatarColors.length), avatarColors.first);

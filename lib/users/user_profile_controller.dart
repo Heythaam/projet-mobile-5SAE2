@@ -94,6 +94,30 @@ class UserProfileController extends ChangeNotifier {
     }
   }
 
+  /// Deletes the phone copy and starts again from the signed-in account, with
+  /// no bio, no position and the default avatar. Returns false and sets
+  /// [lastError] when it fails.
+  Future<bool> resetProfile() async {
+    lastError = null;
+    try {
+      final store = await _ensureStore();
+      await store.delete(uid);
+      profile = await store.create(
+        uid: uid,
+        username: accountUsername,
+        email: email,
+      );
+      _notify();
+      return true;
+    } on LocalUserException catch (error) {
+      lastError = error.message;
+    } catch (_) {
+      lastError = 'Your profile could not be reset on this phone.';
+    }
+    _notify();
+    return false;
+  }
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }

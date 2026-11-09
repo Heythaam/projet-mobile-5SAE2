@@ -292,6 +292,36 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
                   ),
                 ),
                 SizedBox(height: 12 * scale),
+                if (_profileController?.profile != null) ...[
+                  Text(
+                    '@${_profileController!.profile!.username} · '
+                    '${_profileController!.profile!.email}',
+                    key: const ValueKey('settings_account'),
+                    style: const TextStyle(color: KickoffColors.muted),
+                  ),
+                  SizedBox(height: 12 * scale),
+                  ChunkyButton(
+                    label: 'Edit profile',
+                    icon: Icons.edit_rounded,
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _editProfile();
+                    },
+                  ),
+                  SizedBox(height: 8 * scale),
+                  TextButton(
+                    key: const ValueKey('settings_reset_profile'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _confirmResetProfile();
+                    },
+                    child: const Text(
+                      'Reset profile on this phone',
+                      style: TextStyle(color: KickoffColors.orange),
+                    ),
+                  ),
+                  SizedBox(height: 8 * scale),
+                ],
                 ChunkyButton(
                   label: widget.isGuest ? 'Sign in' : 'Sign out',
                   icon: widget.isGuest
@@ -390,6 +420,41 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       },
     ),
   };
+
+  Future<void> _confirmResetProfile() async {
+    final controller = _profileController;
+    if (controller == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset profile?'),
+        content: const Text(
+          'This deletes your bio, position and avatar from this phone and '
+          'starts again from your account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final done = await controller.resetProfile();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          done ? 'Profile reset.' : controller.lastError ?? 'Reset failed.',
+        ),
+      ),
+    );
+  }
 
   Future<void> _editProfile() async {
     final controller = _profileController;
