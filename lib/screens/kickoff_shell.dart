@@ -440,7 +440,6 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
             _BallMenuOverlay(
               onDismiss: () => setState(() => _menuOpen = false),
               onSelect: _handleBallMenuSelect,
-              onSelect: _openPlaceholder,
               onTournaments: _openTournaments,
             ),
         ],
