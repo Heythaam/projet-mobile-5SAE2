@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../daylight/daylight_service.dart';
 import '../../screens/kickoff_style.dart';
-import '../../weather/match_weather_row.dart';
-import '../../weather/weather_service.dart';
 import '../models/challenge_model.dart';
 import 'star_rating.dart';
 
-final _weather = WeatherService();
+final _daylight = DaylightService();
 
 class ChallengeCard extends StatelessWidget {
   const ChallengeCard({
@@ -135,7 +134,11 @@ class ChallengeCard extends StatelessWidget {
               ),
               SizedBox(height: 8 * scale),
               if (challenge.status == ChallengeStatus.active) ...[
-                MatchWeatherRow(service: _weather, when: date),
+                DaylightRow(
+                  service: _daylight,
+                  start: date,
+                  minutes: challenge.durationMinutes,
+                ),
                 SizedBox(height: 8 * scale),
               ],
               Align(
