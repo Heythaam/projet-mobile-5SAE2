@@ -7,6 +7,8 @@ import '../tournament_constants.dart';
 import '../../app_route_observer.dart';
 import '../widgets/tournament_card.dart';
 import '../widgets/tournament_states.dart';
+import '../widgets/notification_bell.dart';
+import 'create_tournament_screen.dart';
 import 'tournament_detail_screen.dart';
 
 class TournamentsListScreen extends StatefulWidget {
@@ -25,13 +27,17 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
     TournamentStatus.active,
     TournamentStatus.upcoming,
     TournamentStatus.finished,
+    TournamentStatus.cancelled,
   ];
 
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   bool _isSearching = false;
   String? _error;
   List<Tournament> _tournaments = const [];
+  bool _hasMore = false;
   TournamentStatus? _filter;
   int _latestRequest = 0;
   ModalRoute<void>? _route;
@@ -46,6 +52,15 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
   }
 
   @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    _lifecycle.dispose();
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final route = ModalRoute.of(context);
@@ -55,14 +70,6 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
       _route = route;
       if (route != null) appRouteObserver.subscribe(this, route);
     }
-  }
-
-  @override
-  void dispose() {
-    appRouteObserver.unsubscribe(this);
-    _lifecycle.dispose();
-    _searchController.dispose();
-    super.dispose();
   }
 
   /// Back from any screen above this one: join state, team counts and
@@ -88,10 +95,11 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
       _error = null;
     });
     try {
-      final tournaments = await widget.service.getTournaments(status: _filter);
+      final result = await widget.service.getTournaments(status: _filter);
       if (!mounted || request != _latestRequest) return;
       setState(() {
-        _tournaments = tournaments;
+        _tournaments = result.tournaments;
+        _hasMore = result.hasMore;
         _isLoading = false;
       });
     } on TournamentException catch (error) {
@@ -100,6 +108,25 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
         _error = error.message;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final result = await widget.service.getTournaments(
+        status: _filter,
+        offset: _tournaments.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        _tournaments = [..._tournaments, ...result.tournaments];
+        _hasMore = result.hasMore;
+        _isLoadingMore = false;
+      });
+    } on TournamentException {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -112,6 +139,15 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
   void _toggleSearch() {
     setState(() => _isSearching = !_isSearching);
     if (!_isSearching) _searchController.clear();
+  }
+
+  Future<void> _createTournament() async {
+    final result = await Navigator.of(context).push<Tournament>(
+      MaterialPageRoute<Tournament>(
+        builder: (_) => CreateTournamentScreen(service: widget.service),
+      ),
+    );
+    if (result != null && mounted) _loadTournaments(showSkeleton: false);
   }
 
   /// The list refreshes in [didPopNext] once the detail screen closes.
@@ -140,17 +176,30 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
     final scale = kickoffScale(context);
     return Scaffold(
       backgroundColor: KickoffColors.bg,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: KickoffColors.yellow,
+        foregroundColor: KickoffColors.ink,
+        onPressed: _createTournament,
+        child: const Icon(Icons.add_rounded),
+      ),
       body: SafeArea(
         child: Column(
           children: [
             TournamentHeader(
               title: TournamentStrings.TITLE,
-              action: TournamentIconButton(
-                icon: _isSearching ? Icons.close_rounded : Icons.search_rounded,
-                tooltip: _isSearching
-                    ? TournamentStrings.CLOSE_SEARCH
-                    : TournamentStrings.SEARCH,
-                onPressed: _toggleSearch,
+              action: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NotificationBell(service: widget.service),
+                  TournamentIconButton(
+                    icon:
+                        _isSearching ? Icons.close_rounded : Icons.search_rounded,
+                    tooltip: _isSearching
+                        ? TournamentStrings.CLOSE_SEARCH
+                        : TournamentStrings.SEARCH,
+                    onPressed: _toggleSearch,
+                  ),
+                ],
               ),
             ),
             if (_isSearching)
@@ -219,15 +268,23 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
       color: KickoffColors.ink,
       backgroundColor: KickoffColors.yellow,
       child: ListView.separated(
+        controller: _scrollController,
         padding: EdgeInsets.fromLTRB(
           12 * scale,
           4 * scale,
           12 * scale,
           16 * scale,
         ),
-        itemCount: tournaments.length,
+        itemCount: tournaments.length + (_hasMore ? 1 : 0),
         separatorBuilder: (_, _) => SizedBox(height: 8 * scale),
         itemBuilder: (context, index) {
+          if (index == tournaments.length) {
+            return _LoadMoreButton(
+              isLoading: _isLoadingMore,
+              onPressed: _loadMore,
+              scale: scale,
+            );
+          }
           final tournament = tournaments[index];
           return TournamentCard(
             tournament: tournament,
@@ -238,6 +295,44 @@ class _TournamentsListScreenState extends State<TournamentsListScreen>
       ),
     );
   }
+}
+
+class _LoadMoreButton extends StatelessWidget {
+  const _LoadMoreButton({
+    required this.isLoading,
+    required this.onPressed,
+    required this.scale,
+  });
+
+  final bool isLoading;
+  final VoidCallback onPressed;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: EdgeInsets.symmetric(vertical: 8 * scale),
+      child: isLoading
+          ? SizedBox(
+              width: 24 * scale,
+              height: 24 * scale,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            )
+          : TextButton(
+              onPressed: onPressed,
+              style: TextButton.styleFrom(
+                foregroundColor: KickoffColors.muted,
+              ),
+              child: Text(
+                TournamentStrings.LOAD_MORE,
+                style: TextStyle(
+                  fontSize: TournamentSizes.BODY * scale,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+    ),
+  );
 }
 
 class _FilterChip extends StatelessWidget {

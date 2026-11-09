@@ -3,8 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../api_client.dart';
+import '../../core/local_database.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
 import '../models/bracket.dart';
 import '../models/player_profile.dart';
+import '../models/tournament_notification.dart';
+import '../models/tournament_stats.dart';
 import '../models/team_details.dart';
 import '../models/tournament.dart';
 import '../tournament_constants.dart';
@@ -31,28 +36,180 @@ class TournamentService {
 
   final ApiClient _api;
 
-  Future<List<Tournament>> getTournaments({TournamentStatus? status}) async {
-    final path = status == null
-        ? TournamentEndpoints.LIST
-        : '${TournamentEndpoints.LIST}?status=${status.apiValue}';
-    return _guard(TournamentStrings.ERROR_LOAD_LIST, () async {
-      final response = await _api.sendAuthenticated('GET', path);
-      return (response['tournaments'] as List<dynamic>)
-          .map((item) => Tournament.fromJson(item as Map<String, dynamic>))
-          .toList();
-    });
-  }
+  Future<Tournament> createTournament({
+    required String name,
+    required String format,
+    required String startDate,
+    required String endDate,
+    required int maxTeams,
+    required int teamSize,
+    String? description,
+    String? location,
+    String? prize,
+  }) => _guard(TournamentStrings.ERROR_CREATE, () async {
+    final response = await _api.sendAuthenticated(
+      'POST',
+      TournamentEndpoints.LIST,
+      body: {
+        'name': name,
+        'format': format,
+        'startDate': startDate,
+        'endDate': endDate,
+        'maxTeams': maxTeams,
+        'teamSize': teamSize,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+        if (location != null && location.isNotEmpty) 'location': location,
+        if (prize != null && prize.isNotEmpty) 'prize': prize,
+      },
+    );
+    return Tournament.fromJson(
+      response['tournament'] as Map<String, dynamic>,
+    );
+  });
 
-  Future<Tournament> getTournament(int id) =>
-      _guard(TournamentStrings.ERROR_LOAD_DETAIL, () async {
-        final response = await _api.sendAuthenticated(
-          'GET',
-          TournamentEndpoints.detail(id),
-        );
-        return Tournament.fromJson(
-          response['tournament'] as Map<String, dynamic>,
+  Future<Tournament> editTournament(
+    int id, {
+    String? name,
+    String? description,
+    String? location,
+    String? prize,
+    String? startDate,
+    String? endDate,
+    String? status,
+  }) => _guard(TournamentStrings.ERROR_EDIT, () async {
+    final response = await _api.sendAuthenticated(
+      'PATCH',
+      TournamentEndpoints.detail(id),
+      body: {
+        'name': ?name,
+        'description': ?description,
+        'location': ?location,
+        'prize': ?prize,
+        'startDate': ?startDate,
+        'endDate': ?endDate,
+        'status': ?status,
+      },
+    );
+    return Tournament.fromJson(
+      response['tournament'] as Map<String, dynamic>,
+    );
+  });
+
+  Future<Tournament> updateTournamentStatus(int id, String status) =>
+      editTournament(id, status: status);
+
+  Future<void> recordMatchResult(
+    int tournamentId,
+    int matchId, {
+    required int homeScore,
+    required int awayScore,
+    int? winnerId,
+  }) => _guard(TournamentStrings.ERROR_RECORD_RESULT, () async {
+    await _api.sendAuthenticated(
+      'POST',
+      TournamentEndpoints.matchResult(tournamentId, matchId),
+      body: {
+        'homeScore': homeScore,
+        'awayScore': awayScore,
+        'winnerId': ?winnerId,
+      },
+    );
+  });
+
+  Future<void> scheduleMatch(
+    int tournamentId,
+    int matchId, {
+    DateTime? scheduledAt,
+    String? location,
+  }) => _guard(TournamentStrings.ERROR_SCHEDULE_MATCH, () async {
+    await _api.sendAuthenticated(
+      'PATCH',
+      TournamentEndpoints.match(tournamentId, matchId),
+      body: {
+        'scheduledAt': ?scheduledAt?.toIso8601String(),
+        'location': ?location,
+      },
+    );
+  });
+
+  Future<void> generateFixtures(int id) =>
+      _guard(TournamentStrings.ERROR_GENERATE_FIXTURES, () async {
+        await _api.sendAuthenticated(
+          'POST',
+          TournamentEndpoints.generateFixtures(id),
         );
       });
+
+  Future<({List<Tournament> tournaments, bool hasMore})> getTournaments({
+    TournamentStatus? status,
+    int offset = 0,
+  }) async {
+    final params = <String>[];
+    if (status != null) params.add('status=${status.apiValue}');
+    if (offset > 0) params.add('offset=$offset');
+    final path = params.isEmpty
+        ? TournamentEndpoints.LIST
+        : '${TournamentEndpoints.LIST}?${params.join('&')}';
+
+    try {
+      final response = await _guard(
+        TournamentStrings.ERROR_LOAD_LIST,
+        () => _api.sendAuthenticated('GET', path),
+      );
+      final rawTournaments = (response['tournaments'] as List<dynamic>? ?? const [])
+          .map((item) => (item as Map).cast<String, dynamic>())
+          .toList();
+
+      if (offset == 0) {
+        await LocalDatabase.instance.cacheTournaments(rawTournaments);
+      }
+
+      return (
+        tournaments: rawTournaments
+            .map((item) => Tournament.fromJson(item))
+            .toList(),
+        hasMore: response['hasMore'] as bool? ?? false,
+      );
+    } catch (e) {
+      final cached = await LocalDatabase.instance.getCachedTournaments();
+      if (cached.isNotEmpty) {
+        var tournaments = cached
+            .map((item) => Tournament.fromJson(item))
+            .toList();
+        if (status != null) {
+          tournaments = tournaments.where((t) => t.status == status).toList();
+        }
+        return (
+          tournaments: tournaments,
+          hasMore: false,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<Tournament> getTournament(int id) async {
+    try {
+      final response = await _guard(
+        TournamentStrings.ERROR_LOAD_DETAIL,
+        () => _api.sendAuthenticated(
+          'GET',
+          TournamentEndpoints.detail(id),
+        ),
+      );
+      final rawTournament =
+          (response['tournament'] as Map).cast<String, dynamic>();
+      await LocalDatabase.instance.cacheTournamentDetail(id, rawTournament);
+      return Tournament.fromJson(rawTournament);
+    } catch (e) {
+      final cached = await LocalDatabase.instance.getCachedTournament(id);
+      if (cached != null) {
+        return Tournament.fromJson(cached);
+      }
+      rethrow;
+    }
+  }
 
   /// Registers the signed-in user as captain of a team named [teamName].
   Future<Tournament> joinTournament(int id, String teamName) =>
@@ -112,6 +269,15 @@ class TournamentService {
         await _api.sendAuthenticated(
           'DELETE',
           TournamentEndpoints.disbandNotice(id),
+        );
+      });
+
+  /// Stops reporting that the user was removed from a team, on every device.
+  Future<void> dismissRemovedNotice(int id) =>
+      _guard(TournamentStrings.ERROR_DISMISS_NOTICE, () async {
+        await _api.sendAuthenticated(
+          'DELETE',
+          TournamentEndpoints.removedNotice(id),
         );
       });
 
@@ -201,29 +367,106 @@ class TournamentService {
         );
       });
 
-  Future<List<StandingRow>> getStandings(int id) =>
-      _guard(TournamentStrings.ERROR_LOAD_STANDINGS, () async {
-        final response = await _api.sendAuthenticated(
+  Future<List<StandingRow>> getStandings(int id) async {
+    try {
+      final response = await _guard(
+        TournamentStrings.ERROR_LOAD_STANDINGS,
+        () => _api.sendAuthenticated(
           'GET',
           TournamentEndpoints.standings(id),
-        );
-        return (response['standings'] as List<dynamic>)
+        ),
+      );
+      final rawStandings = response['standings'] as List<dynamic>? ?? const [];
+      await LocalDatabase.instance.cacheJson('standings_$id', rawStandings);
+      return rawStandings
+          .map((item) => StandingRow.fromJson(item as Map<String, dynamic>))
+          .toList()
+        ..sort(_byGroupThenPosition);
+    } catch (e) {
+      final cached = await LocalDatabase.instance.getCachedJson('standings_$id');
+      if (cached is List<dynamic> && cached.isNotEmpty) {
+        return cached
             .map((item) => StandingRow.fromJson(item as Map<String, dynamic>))
             .toList()
           ..sort(_byGroupThenPosition);
-      });
+      }
+      rethrow;
+    }
+  }
 
   /// Knockout rounds with every slot; empty until the draw is made.
-  Future<List<BracketRound>> getBracket(int id) =>
-      _guard(TournamentStrings.ERROR_LOAD_BRACKET, () async {
-        final response = await _api.sendAuthenticated(
+  Future<List<BracketRound>> getBracket(int id) async {
+    try {
+      final response = await _guard(
+        TournamentStrings.ERROR_LOAD_BRACKET,
+        () => _api.sendAuthenticated(
           'GET',
           TournamentEndpoints.bracket(id),
-        );
-        final bracket = response['bracket'] as Map<String, dynamic>;
-        return (bracket['rounds'] as List<dynamic>)
+        ),
+      );
+      final bracket = response['bracket'] as Map<String, dynamic>;
+      final rawRounds = bracket['rounds'] as List<dynamic>? ?? const [];
+      await LocalDatabase.instance.cacheJson('bracket_$id', rawRounds);
+      return rawRounds
+          .map((item) => BracketRound.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      final cached = await LocalDatabase.instance.getCachedJson('bracket_$id');
+      if (cached is List<dynamic> && cached.isNotEmpty) {
+        return cached
             .map((item) => BracketRound.fromJson(item as Map<String, dynamic>))
             .toList();
+      }
+      rethrow;
+    }
+  }
+
+  Future<TournamentStats> getTournamentStats(int id) async {
+    try {
+      final response = await _guard(
+        TournamentStrings.ERROR_LOAD_STATS,
+        () => _api.sendAuthenticated(
+          'GET',
+          TournamentEndpoints.stats(id),
+        ),
+      );
+      await LocalDatabase.instance.cacheJson('stats_$id', response);
+      return TournamentStats.fromJson(response);
+    } catch (e) {
+      final cached = await LocalDatabase.instance.getCachedJson('stats_$id');
+      if (cached is Map<String, dynamic>) {
+        return TournamentStats.fromJson(cached);
+      }
+      rethrow;
+    }
+  }
+
+  /// Connects to live match updates via WebSocket.
+  Stream<dynamic> connectToLiveMatches(int id) {
+    final uri = Uri.parse('${_api.wsBaseUrl}${TournamentEndpoints.live(id)}');
+    final channel = WebSocketChannel.connect(uri);
+    return channel.stream;
+  }
+
+  /// Lists recent notifications for the signed-in user.
+  Future<List<TournamentNotification>> getNotifications() =>
+      _guard(TournamentStrings.ERROR_LOAD_NOTIFICATIONS, () async {
+        final response = await _api.sendAuthenticated(
+          'GET',
+          TournamentEndpoints.NOTIFICATIONS,
+        );
+        return (response['notifications'] as List<dynamic>? ?? const [])
+            .map((item) =>
+                TournamentNotification.fromJson(item as Map<String, dynamic>))
+            .toList();
+      });
+
+  /// Marks a single notification as read.
+  Future<void> markNotificationRead(int id) => _guard('', () async {
+        await _api.sendAuthenticated(
+          'PUT',
+          TournamentEndpoints.notificationRead(id),
+        );
       });
 
   /// Groups in label order (teams without a group last), then by position.

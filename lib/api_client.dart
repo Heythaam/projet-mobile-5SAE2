@@ -37,6 +37,10 @@ class ApiClient {
   final FlutterSecureStorage _storage;
   final String _baseUrl;
 
+  String get baseUrl => _baseUrl;
+  String get wsBaseUrl =>
+      _baseUrl.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
+
   Future<UserAccount?> restoreSession() async {
     final token = await _storage.read(key: _tokenKey);
     if (token == null) return null;

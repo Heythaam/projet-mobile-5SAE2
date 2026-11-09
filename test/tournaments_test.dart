@@ -10,6 +10,7 @@ import 'package:football_match_app/tournaments/screens/tournament_detail_screen.
 import 'package:football_match_app/tournaments/screens/tournament_standings_screen.dart';
 import 'package:football_match_app/tournaments/screens/tournaments_list_screen.dart';
 import 'package:football_match_app/tournaments/services/tournament_service.dart';
+import 'package:football_match_app/core/local_database.dart';
 import 'package:football_match_app/tournaments/tournament_constants.dart';
 import 'package:football_match_app/app_route_observer.dart';
 import 'package:football_match_app/tournaments/widgets/bracket_widget.dart';
@@ -17,6 +18,10 @@ import 'package:football_match_app/tournaments/widgets/sheet_frame.dart';
 import 'package:football_match_app/tournaments/widgets/tournament_states.dart';
 
 void main() {
+  setUp(() async {
+    await LocalDatabase.instance.clearCache();
+  });
+
   group('TeamName', () {
     test('normalizes spaces like the API', () {
       expect(TeamName.normalize('  Red   Lions '), 'Red Lions');
@@ -44,16 +49,18 @@ void main() {
       final api = _FakeApi({
         'GET /tournaments?status=upcoming': {
           'tournaments': [_tournamentJson()],
+          'hasMore': false,
         },
       });
-      final tournaments = await TournamentService(api)
+      final result = await TournamentService(api)
           .getTournaments(status: TournamentStatus.upcoming);
 
       expect(api.calls, ['GET /tournaments?status=upcoming']);
-      expect(tournaments.single.name, 'Sunday Cup');
-      expect(tournaments.single.format, TournamentFormat.league);
-      expect(tournaments.single.spotsLeft, 12);
-      expect(tournaments.single.canJoin, isTrue);
+      expect(result.tournaments.single.name, 'Sunday Cup');
+      expect(result.tournaments.single.format, TournamentFormat.league);
+      expect(result.tournaments.single.spotsLeft, 12);
+      expect(result.tournaments.single.canJoin, isTrue);
+      expect(result.hasMore, isFalse);
     });
 
     test('wraps API errors and keeps the status code', () async {
