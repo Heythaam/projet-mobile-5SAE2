@@ -146,6 +146,31 @@ class UserLocalStore {
 
   Future<LocalUser?> getByUid(String uid) => _find(_db, 'uid = ?', [uid]);
 
+  /// Profiles saved on this phone, A to Z by username. [query] matches part of
+  /// the username or bio, ignoring case; empty returns everyone.
+  Future<List<LocalUser>> search(String query, {int limit = 50}) async {
+    final text = query.trim().toLowerCase();
+    final escaped = text
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+    final rows = await _db.query(
+      'users',
+      where: text.isEmpty
+          ? null
+          : "(lower(username) LIKE ? ESCAPE '\\' OR lower(bio) LIKE ? ESCAPE '\\')",
+      whereArgs: text.isEmpty ? null : ['%$escaped%', '%$escaped%'],
+      orderBy: 'username COLLATE NOCASE ASC',
+      limit: limit,
+    );
+    return rows.map(LocalUser.fromRow).toList();
+  }
+
+  Future<int> count() async {
+    final rows = await _db.rawQuery('SELECT COUNT(*) AS n FROM users');
+    return rows.first['n']! as int;
+  }
+
   Future<LocalUser?> getByUsername(String username) =>
       _find(_db, 'username = ?', [username.trim().toLowerCase()]);
 

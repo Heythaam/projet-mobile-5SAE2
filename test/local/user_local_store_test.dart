@@ -194,6 +194,56 @@ void main() {
     });
   });
 
+  group('search', () {
+    Future<void> add(String uid, String name, {String bio = ''}) async {
+      await store.create(
+        uid: uid,
+        username: name,
+        email: '$name@example.com',
+        bio: bio,
+      );
+    }
+
+    test('lists everyone A to Z and counts them', () async {
+      await add('3', 'sami');
+      await add('1', 'Amine');
+      await add('2', 'farouk');
+      expect((await store.search('')).map((u) => u.username), [
+        'amine',
+        'farouk',
+        'sami',
+      ]);
+      expect(await store.count(), 3);
+    });
+
+    test('matches part of the username or bio, ignoring case', () async {
+      await add('1', 'farouk', bio: 'Left winger');
+      await add('2', 'sami', bio: 'Goalkeeper');
+      await add('3', 'amine');
+      expect((await store.search('FAR')).map((u) => u.username), ['farouk']);
+      expect((await store.search('keeper')).map((u) => u.username), ['sami']);
+      expect((await store.search(' mi ')).map((u) => u.username), [
+        'amine',
+        'sami',
+      ]);
+      expect(await store.search('zzz'), isEmpty);
+    });
+
+    test('treats % and _ as plain characters', () async {
+      await add('1', 'a_b');
+      await add('2', 'axb');
+      expect((await store.search('a_b')).map((u) => u.username), ['a_b']);
+      expect(await store.search('%'), isEmpty);
+    });
+
+    test('respects the limit', () async {
+      for (var i = 0; i < 5; i++) {
+        await add('$i', 'user$i');
+      }
+      expect(await store.search('', limit: 3), hasLength(3));
+    });
+  });
+
   group('country and photo', () {
     test('saves, changes and clears the country', () async {
       await seed();

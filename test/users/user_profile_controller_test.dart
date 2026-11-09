@@ -122,6 +122,28 @@ void main() {
     expect(controller.lastError, isNotNull);
   });
 
+  test('search lists profiles on the phone', () async {
+    await store.create(uid: '8', username: 'sami', email: 's@example.com');
+    final controller = make();
+    await controller.load();
+    expect((await controller.search('')).map((u) => u.username), [
+      'farouk',
+      'sami',
+    ]);
+    expect((await controller.search('sa')).map((u) => u.username), ['sami']);
+  });
+
+  test('deleteOther removes another profile but never your own', () async {
+    await store.create(uid: '8', username: 'sami', email: 's@example.com');
+    final controller = make();
+    await controller.load();
+    expect(await controller.deleteOther('7'), isFalse);
+    expect(controller.lastError, isNotNull);
+    expect(await controller.deleteOther('8'), isTrue);
+    expect(await store.getByUid('8'), isNull);
+    expect(await controller.deleteOther('8'), isFalse);
+  });
+
   test('avatarColor wraps around the palette', () {
     expect(avatarColor(0), avatarColors.first);
     expect(avatarColor(avatarColors.length), avatarColors.first);

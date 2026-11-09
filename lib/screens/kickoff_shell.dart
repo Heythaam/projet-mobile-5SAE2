@@ -14,6 +14,7 @@ import '../stadium/stadium_module.dart';
 import '../users/country_service.dart';
 import '../users/user_profile_controller.dart';
 import 'edit_profile_screen.dart';
+import 'people_screen.dart';
 import '../tournaments/screens/tournaments_list_screen.dart';
 import '../tournaments/services/tournament_service.dart';
 import '../tournaments/widgets/requests_badge.dart';
@@ -312,6 +313,14 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
                   ),
                   SizedBox(height: 8 * scale),
                   TextButton(
+                    key: const ValueKey('settings_people'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _openPeople();
+                    },
+                    child: const Text('Profiles on this phone'),
+                  ),
+                  TextButton(
                     key: const ValueKey('settings_reset_profile'),
                     onPressed: () {
                       Navigator.of(context).pop();
@@ -460,6 +469,16 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
         content: Text(
           done ? 'Profile reset.' : controller.lastError ?? 'Reset failed.',
         ),
+      ),
+    );
+  }
+
+  void _openPeople() {
+    final controller = _profileController;
+    if (controller == null) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => PeopleScreen(controller: controller),
       ),
     );
   }

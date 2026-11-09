@@ -102,6 +102,29 @@ class UserProfileController extends ChangeNotifier {
     }
   }
 
+  /// Profiles saved on this phone that match [query], A to Z.
+  Future<List<LocalUser>> search(String query) async =>
+      (await _ensureStore()).search(query);
+
+  /// Deletes another profile saved on this phone. Your own profile cannot be
+  /// deleted here; use [resetProfile]. Returns false and sets [lastError] when
+  /// it fails.
+  Future<bool> deleteOther(String otherUid) async {
+    lastError = null;
+    if (otherUid == uid) {
+      lastError = 'Your own profile cannot be deleted here.';
+      return false;
+    }
+    try {
+      final done = await (await _ensureStore()).delete(otherUid);
+      if (!done) lastError = 'That profile was already removed.';
+      return done;
+    } catch (_) {
+      lastError = 'That profile could not be deleted.';
+      return false;
+    }
+  }
+
   /// Deletes the phone copy and starts again from the signed-in account, with
   /// no bio, no position and the default avatar. Returns false and sets
   /// [lastError] when it fails.
