@@ -315,9 +315,10 @@ class _ChallengesDashboardScreenState extends State<ChallengesDashboardScreen>
               icon: const Icon(Icons.auto_awesome_rounded, color: KickoffColors.muted),
               tooltip: 'Add sample challenges',
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 final added = await seedDemoChallenges(widget.repository);
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(content: Text('Added $added sample challenges')),
                 );
                 _loadAllChallenges();
