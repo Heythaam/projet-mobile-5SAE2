@@ -30,6 +30,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   MatchFilter _filter = MatchFilter.all;
   DateTime _selectedDate = DateTime.now();
 
+  /// Set when a day is tapped: only that day's matches are listed. Tapping the
+  /// same day again shows every match again.
+  DateTime? _dayFilter;
+
   @override
   Widget build(BuildContext context) {
     final sortedMatches = widget.matches.toList()
@@ -38,15 +42,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         .where(
           (match) =>
               !match.scheduledAt.isBefore(DateTime.now()) &&
-              _matchesFilter(match),
+              _matchesFilter(match) &&
+              _onChosenDay(match),
         )
         .toList();
-    final past = _showHistory
+    final past = _showHistory || _dayFilter != null
         ? sortedMatches
               .where(
                 (match) =>
                     match.scheduledAt.isBefore(DateTime.now()) &&
-                    _matchesFilter(match),
+                    _matchesFilter(match) &&
+                    _onChosenDay(match),
               )
               .toList()
         : const <FootballMatch>[];
@@ -83,7 +89,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     _WeekStrip(
                       selectedDate: _selectedDate,
                       matches: widget.matches,
-                      onSelect: (date) => setState(() => _selectedDate = date),
+                      onSelect: (date) => setState(() {
+                        final same = DateUtils.isSameDay(_dayFilter, date);
+                        _selectedDate = date;
+                        _dayFilter = same ? null : date;
+                      }),
                     ),
                     SizedBox(height: 6 * scale),
                     _FilterRow(
@@ -141,6 +151,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
+
+  bool _onChosenDay(FootballMatch match) =>
+      _dayFilter == null || DateUtils.isSameDay(match.scheduledAt, _dayFilter);
 
   bool _matchesFilter(FootballMatch match) => switch (_filter) {
     MatchFilter.all => true,
