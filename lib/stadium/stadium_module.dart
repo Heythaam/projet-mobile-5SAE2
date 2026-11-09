@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../maps/map_picker_screen.dart';
 import '../screens/kickoff_style.dart';
 
 // ===========================================================================
@@ -1127,6 +1128,10 @@ class _StadiumEditorScreenState extends State<StadiumEditorScreen> {
             }
             return null;
           },
+        ),
+        PickOnMapButton(
+          title: 'Where is the stadium?',
+          onPicked: (place) => setState(() => _address.text = place.label),
         ),
       ],
     ),

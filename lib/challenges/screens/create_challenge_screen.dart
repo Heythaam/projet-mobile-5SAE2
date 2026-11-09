@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../maps/map_picker_screen.dart';
 import '../../models.dart';
 import '../../screens/kickoff_style.dart';
 import '../models/challenge_model.dart';
@@ -632,6 +633,11 @@ class _CreateChallengeScreenState extends State<CreateChallengeScreen> {
           hint: 'Location / Pitch Name (e.g. Arena Pitch 2)',
           icon: Icons.location_on_rounded,
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+        ),
+        PickOnMapButton(
+          title: 'Where is the challenge?',
+          onPicked: (place) =>
+              setState(() => _locationController.text = place.label),
         ),
         SizedBox(height: 16 * scale),
 
