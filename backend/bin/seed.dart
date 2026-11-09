@@ -236,9 +236,20 @@ void main() {
         print('  Round $round: $home $result $away$penalties');
       }
 
+      var skipped = 0;
       for (final username in sampleUsers) {
+        // A real account with that username is left alone.
+        final taken = db.select(
+          'SELECT 1 FROM users WHERE username = ? OR email = ?',
+          [username, _email(username)],
+        );
+        if (taken.isNotEmpty) {
+          skipped++;
+          continue;
+        }
         userIds[username] = _insertUser(db, username, hashes[username]!);
       }
+      if (skipped > 0) print('Skipped $skipped sample users that already exist.');
       for (final t in _sampleTournaments()) {
         db.execute(
           '''
