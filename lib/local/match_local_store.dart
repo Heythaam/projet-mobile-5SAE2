@@ -7,6 +7,7 @@ enum LocalMatchError {
   invalidStadium,
   invalidCapacity,
   invalidTime,
+  invalidLocation,
   codeUnavailable,
   notFound,
   full,
@@ -39,6 +40,8 @@ class LocalMatch {
     required this.isPublic,
     required this.slots,
     required this.slotNames,
+    this.latitude,
+    this.longitude,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -57,6 +60,11 @@ class LocalMatch {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Where the match is played, when known.
+  final double? latitude;
+  final double? longitude;
+
+  bool get hasLocation => latitude != null && longitude != null;
   int get players => slots.where((uid) => uid != null).length;
   bool get isFull => players >= capacity;
   bool hasPlayer(String uid) => slots.contains(uid);
@@ -93,6 +101,8 @@ class MatchLocalStore {
     required int capacity,
     bool isPublic = false,
     String hostName = '',
+    double? latitude,
+    double? longitude,
   }) async {
     if (hostUid.trim().isEmpty) {
       throw const LocalMatchException(
@@ -111,6 +121,14 @@ class MatchLocalStore {
       throw const LocalMatchException(
         LocalMatchError.invalidCapacity,
         'A match needs between 2 and 30 players.',
+      );
+    }
+    if ((latitude == null) != (longitude == null) ||
+        (latitude != null && (latitude < -90 || latitude > 90)) ||
+        (longitude != null && (longitude < -180 || longitude > 180))) {
+      throw const LocalMatchException(
+        LocalMatchError.invalidLocation,
+        'That location is not valid.',
       );
     }
     final now = _clock();
@@ -141,6 +159,8 @@ class MatchLocalStore {
         'scheduled_at': scheduledAt.millisecondsSinceEpoch,
         'capacity': capacity,
         'is_public': isPublic ? 1 : 0,
+        'latitude': latitude,
+        'longitude': longitude,
         'created_at': ms,
         'updated_at': ms,
       });
@@ -357,6 +377,8 @@ class MatchLocalStore {
       isPublic: (row['is_public']! as int) == 1,
       slots: slots,
       slotNames: names,
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
       createdAt: _fromMs(row['created_at']! as int),
       updatedAt: _fromMs(row['updated_at']! as int),
     );

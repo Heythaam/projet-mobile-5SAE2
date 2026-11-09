@@ -7,12 +7,16 @@ class MatchStadiumData {
     required this.distance,
     required this.coins,
     required this.players,
+    this.latitude,
+    this.longitude,
   });
 
   final String name;
   final String distance;
   final int coins;
   final int players;
+  final double? latitude;
+  final double? longitude;
 }
 
 class MatchHomeMatch {
@@ -65,23 +69,31 @@ const matchStadiums = [
     distance: '2 km',
     coins: 40,
     players: 10,
+    latitude: 36.8190,
+    longitude: 10.1658,
   ),
   MatchStadiumData(
     name: 'City Pitch',
     distance: '3.5 km',
     coins: 30,
     players: 8,
+    latitude: 36.8065,
+    longitude: 10.1815,
   ),
   MatchStadiumData(
     name: 'Sport Hall',
     distance: '5.2 km',
     coins: 25,
     players: 8,
+    latitude: 36.8470,
+    longitude: 10.2730,
   ),
   MatchStadiumData(
     name: 'Riverside Park',
     distance: '7.8 km',
     coins: 20,
     players: 10,
+    latitude: 36.7480,
+    longitude: 10.2100,
   ),
 ];

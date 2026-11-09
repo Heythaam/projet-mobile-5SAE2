@@ -73,6 +73,8 @@ class LocalDatabase {
           scheduled_at INTEGER NOT NULL,
           capacity     INTEGER NOT NULL CHECK (capacity BETWEEN 2 AND 30),
           is_public    INTEGER NOT NULL DEFAULT 0 CHECK (is_public IN (0, 1)),
+          latitude     REAL CHECK (latitude BETWEEN -90 AND 90),
+          longitude    REAL CHECK (longitude BETWEEN -180 AND 180),
           created_at   INTEGER NOT NULL,
           updated_at   INTEGER NOT NULL
         )

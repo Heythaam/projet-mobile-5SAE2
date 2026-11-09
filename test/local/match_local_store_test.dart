@@ -78,6 +78,39 @@ void main() {
       expect(joined.slotNames, ['Farouk', 'Sami', null, null]);
     });
 
+    test('saves the place of the match when given', () async {
+      final withPlace = await store.create(
+        hostUid: 'h',
+        stadium: 'Arena',
+        scheduledAt: inHours(5),
+        capacity: 8,
+        latitude: 36.8065,
+        longitude: 10.1815,
+      );
+      expect(withPlace.hasLocation, isTrue);
+      expect(withPlace.latitude, 36.8065);
+      expect(withPlace.longitude, 10.1815);
+      final without = await seed(host: 'x');
+      expect(without.hasLocation, isFalse);
+      expect(without.latitude, isNull);
+    });
+
+    test('rejects a half or out of range location', () async {
+      for (final place in [(36.0, null), (null, 10.0), (95.0, 10.0), (36.0, 200.0)]) {
+        await expectLater(
+          store.create(
+            hostUid: 'h',
+            stadium: 'Arena',
+            scheduledAt: inHours(5),
+            capacity: 8,
+            latitude: place.$1,
+            longitude: place.$2,
+          ),
+          throwsMatch(LocalMatchError.invalidLocation),
+        );
+      }
+    });
+
     test('rejects invalid input', () async {
       await expectLater(
         store.create(
