@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../screens/kickoff_style.dart';
@@ -43,6 +45,7 @@ class TournamentStandingsView extends StatefulWidget {
     required this.service,
     required this.tournamentId,
     this.grouped = false,
+    this.autoRefresh = false,
     super.key,
   });
 
@@ -51,6 +54,9 @@ class TournamentStandingsView extends StatefulWidget {
 
   /// Groups + knockout tournaments show one titled table per group.
   final bool grouped;
+
+  /// Polls for updates when the tournament is active.
+  final bool autoRefresh;
 
   @override
   State<TournamentStandingsView> createState() =>
@@ -61,16 +67,31 @@ class _TournamentStandingsViewState extends State<TournamentStandingsView> {
   bool _isLoading = true;
   String? _error;
   List<StandingRow> _standings = const [];
+  Timer? _refreshTimer;
+
+  static const _refreshInterval = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
     _loadStandings();
+    if (widget.autoRefresh) {
+      _refreshTimer = Timer.periodic(
+        _refreshInterval,
+        (_) => _loadStandings(showLoading: false),
+      );
+    }
   }
 
-  Future<void> _loadStandings() async {
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadStandings({bool showLoading = true}) async {
     setState(() {
-      _isLoading = true;
+      _isLoading = showLoading;
       _error = null;
     });
     try {

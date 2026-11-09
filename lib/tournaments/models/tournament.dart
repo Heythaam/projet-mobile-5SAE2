@@ -166,11 +166,13 @@ class Tournament {
     required this.currentTeams,
     required this.location,
     required this.createdBy,
+    this.isOrganizer = false,
     required this.joined,
     required this.canLeave,
     this.canTransfer = false,
     this.canDisband = false,
     this.teamDisbanded = false,
+    this.removedFromTeam = false,
     this.teamSize = 1,
     this.myTeamId,
     this.pendingRequests = 0,
@@ -191,6 +193,9 @@ class Tournament {
   final String location;
   final String createdBy;
 
+  /// Whether the signed-in user created this tournament.
+  final bool isOrganizer;
+
   /// Whether the signed-in user is already registered, as reported by the API.
   final bool joined;
 
@@ -207,6 +212,10 @@ class Tournament {
   /// A team the user played for was disbanded and they have not dismissed
   /// the notice yet; detail endpoint only.
   final bool teamDisbanded;
+
+  /// The captain removed this user from their team and they have not dismissed
+  /// the notice yet; detail endpoint only.
+  final bool removedFromTeam;
 
   /// Players per team, captain included.
   final int teamSize;
@@ -279,11 +288,13 @@ class Tournament {
     currentTeams: json['currentTeams'] as int,
     location: json['location'] as String? ?? '',
     createdBy: json['createdBy'] as String? ?? '',
+    isOrganizer: json['isOrganizer'] as bool? ?? false,
     joined: json['joined'] as bool? ?? false,
     canLeave: json['canLeave'] as bool? ?? false,
     canTransfer: json['canTransfer'] as bool? ?? false,
     canDisband: json['canDisband'] as bool? ?? false,
     teamDisbanded: json['teamDisbanded'] as bool? ?? false,
+    removedFromTeam: json['removedFromTeam'] as bool? ?? false,
     teamSize: json['teamSize'] as int? ?? 1,
     myTeamId: json['myTeamId'] as int?,
     pendingRequests: json['pendingRequests'] as int? ?? 0,

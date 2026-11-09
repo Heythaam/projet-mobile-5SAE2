@@ -32,6 +32,15 @@ abstract final class TournamentEndpoints {
       '$LIST/$id/teams/$teamId/members/$memberId';
   static String profile(int userId) => '/users/$userId/profile';
   static const PENDING_REQUESTS = '/me/tournament-requests';
+  static String removedNotice(int id) => '$LIST/$id/removed-notice';
+  static String match(int id, int matchId) => '$LIST/$id/matches/$matchId';
+  static String matchResult(int id, int matchId) =>
+      '$LIST/$id/matches/$matchId/result';
+  static String generateFixtures(int id) => '$LIST/$id/generate-fixtures';
+  static String stats(int id) => '$LIST/$id/stats';
+  static String live(int id) => '$LIST/$id/live';
+  static const NOTIFICATIONS = '/notifications';
+  static String notificationRead(int id) => '$NOTIFICATIONS/$id/read';
 }
 
 /// Reason codes the API sends with some errors (`{"error", "code"}`).
@@ -90,6 +99,14 @@ abstract final class TournamentSizes {
   static const SHEET_HEIGHT = 0.7;
   static const TEAM_NAME_MIN_LENGTH = 3;
   static const TEAM_NAME_MAX_LENGTH = 30;
+  static const TOURNAMENT_NAME_MIN_LENGTH = 3;
+  static const TOURNAMENT_NAME_MAX_LENGTH = 60;
+  static const DESCRIPTION_MAX_LENGTH = 300;
+  static const LOCATION_MAX_LENGTH = 100;
+  static const PRIZE_MAX_LENGTH = 100;
+  static const TEAM_SIZE_MIN = 1;
+  static const TEAM_SIZE_MAX = 11;
+  static const ALLOWED_MAX_TEAMS = [2, 4, 8, 16, 32];
 }
 
 /// User-facing copy for the Tournaments module.
@@ -227,6 +244,103 @@ abstract final class TournamentStrings {
   static const RESULT_LOSS = 'L';
   static const PENDING_REQUEST_FALLBACK = 'your pending request';
 
+  static const CREATE_TOURNAMENT = 'Create tournament';
+  static const EDIT_TOURNAMENT = 'Edit tournament';
+  static const FIELD_NAME = 'Tournament name';
+  static const FIELD_DESCRIPTION = 'Description';
+  static const FIELD_FORMAT = 'Format';
+  static const FIELD_START_DATE = 'Start date';
+  static const FIELD_END_DATE = 'End date';
+  static const FIELD_MAX_TEAMS = 'Max teams';
+  static const FIELD_TEAM_SIZE = 'Players per team';
+  static const FIELD_LOCATION = 'Location';
+  static const FIELD_PRIZE = 'Prize';
+  static const SAVE = 'Save';
+  static const CREATE = 'Create';
+  static const CREATE_SUCCESS = 'Tournament created.';
+  static const EDIT_SUCCESS = 'Tournament updated.';
+  static const ERROR_CREATE = 'Could not create the tournament.';
+  static const ERROR_EDIT = 'Could not update the tournament.';
+  static const ERROR_RECORD_RESULT = 'Could not record the result.';
+  static const ERROR_GENERATE_FIXTURES = 'Could not generate fixtures.';
+  static const ERROR_SCHEDULE_MATCH = 'Could not update match schedule.';
+  static const START_TOURNAMENT = 'Start tournament';
+  static const FINISH_TOURNAMENT = 'Finish tournament';
+  static const CANCEL_TOURNAMENT = 'Cancel tournament';
+  static const CONFIRM_START = 'Start';
+  static const CONFIRM_FINISH = 'Finish';
+  static const CONFIRM_CANCEL_TOURNAMENT = 'Cancel tournament';
+  static const START_TITLE = 'Start this tournament?';
+  static const START_MESSAGE =
+      'Registration will close and matches can begin.';
+  static const FINISH_TITLE = 'Finish this tournament?';
+  static const FINISH_MESSAGE =
+      'The tournament will be marked as finished.';
+  static const CANCEL_TITLE = 'Cancel this tournament?';
+  static const CANCEL_MESSAGE =
+      'The tournament will be cancelled for all participants.';
+  static const STATUS_CHANGED = 'Tournament status updated.';
+  static String statusChangeMessage(String name, String status) =>
+      switch (status) {
+        'active' => 'Registration will close and matches can begin for "$name".',
+        'finished' => '"$name" will be marked as finished.',
+        'cancelled' => '"$name" will be cancelled for all participants.',
+        _ => 'Change "$name" status to $status?',
+      };
+  static String statusChangeSuccess(String status) =>
+      switch (status) {
+        'active' => 'Tournament started.',
+        'finished' => 'Tournament finished.',
+        'cancelled' => 'Tournament cancelled.',
+        _ => 'Status updated.',
+      };
+  static const TEAM_REMOVED_NOTICE = 'Removed from team';
+  static const TEAM_REMOVED_HINT =
+      'The captain removed you. You can join another team.';
+  static const GENERATE_FIXTURES_CONFIRM =
+      'This will create the match schedule. Existing matches are kept.';
+  static const GENERATE_FIXTURES_SUCCESS = 'Fixtures generated.';
+  static const GENERATE = 'Generate';
+  static const SCHEDULE_MATCH = 'Schedule match';
+  static const FIELD_MATCH_DATE = 'Date & time';
+  static const TAP_TO_SET = 'Tap to set';
+  static const RECORD_RESULT = 'Record result';
+  static const HOME_SCORE = 'Home score';
+  static const AWAY_SCORE = 'Away score';
+  static const RESULT_RECORDED = 'Save result';
+  static const RESULT_SAVE_SUCCESS = 'Result recorded.';
+  static const SCORES_INVALID = 'Scores must be non-negative numbers.';
+  static const DRAW_WINNER_REQUIRED =
+      'The scores are equal — pick the winner (penalty shootout).';
+  static const DRAW_PICK_WINNER = 'Draw — pick the penalty winner:';
+  static const GENERATE_FIXTURES = 'Generate fixtures';
+  static const FIXTURES_GENERATED = 'Fixtures generated.';
+  static const GENERATE_FIXTURES_TITLE = 'Generate fixtures?';
+  static const GENERATE_FIXTURES_MESSAGE =
+      'This will create the match schedule. Existing matches are kept.';
+  static const CONFIRM_GENERATE = 'Generate';
+  static const NO_MATCHES = 'No matches yet';
+  static const NO_MATCHES_HINT = 'Generate fixtures to create the schedule.';
+  static const STATS = 'Stats';
+  static const TOP_SCORERS = 'Top Scorers';
+  static const WIN_RATES = 'Win Rates';
+  static const TOURNAMENT_TOTALS = 'Tournament Totals';
+  static const TOTAL_GOALS = 'Total Goals';
+  static const MATCHES_PLAYED = 'Matches Played';
+  static const AVG_GOALS = 'Avg Goals / Match';
+  static const NO_STATS_YET = 'No stats yet';
+  static const NO_STATS_HINT = 'Stats will update once matches are played.';
+  static const SHARE = 'Share';
+  static const SHARE_BRACKET = 'Share Bracket';
+  static const SHARE_IMAGE = 'Share as Image';
+  static const SHARE_LINK = 'Share Link';
+  static const NOTIFICATIONS_TITLE = 'Notifications';
+  static const NO_NOTIFICATIONS = 'No notifications yet';
+  static const NO_NOTIFICATIONS_HINT = 'You are all caught up!';
+  static const ERROR_LOAD_STATS = 'Could not load tournament stats.';
+  static const ERROR_LOAD_NOTIFICATIONS = 'Could not load notifications.';
+
+  static const LOAD_MORE = 'Load more';
   static const EMPTY_LIST = 'No tournaments yet';
   static const EMPTY_LIST_HINT = 'New tournaments will show up here.';
   static const EMPTY_SEARCH = 'No matching tournaments';
@@ -406,5 +520,48 @@ abstract final class TournamentStrings {
       return '${day(localStart)}, ${localStart.year}';
     }
     return '${day(localStart)} – ${day(localEnd)}, ${localEnd.year}';
+  }
+}
+
+/// Validation rules for the create/edit tournament form, mirrored from the API.
+abstract final class TournamentFormRules {
+  static final _controlCharacters =
+      RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]');
+  static final _whitespaceRun = RegExp(r'\s+');
+
+  static String normalize(String input) => input
+      .trim()
+      .replaceAll(_controlCharacters, '')
+      .replaceAll(_whitespaceRun, ' ');
+
+  static String? validateName(String input) {
+    final name = normalize(input);
+    if (name.length < TournamentSizes.TOURNAMENT_NAME_MIN_LENGTH ||
+        name.length > TournamentSizes.TOURNAMENT_NAME_MAX_LENGTH) {
+      return 'Use ${TournamentSizes.TOURNAMENT_NAME_MIN_LENGTH} to '
+          '${TournamentSizes.TOURNAMENT_NAME_MAX_LENGTH} characters.';
+    }
+    return null;
+  }
+
+  static String? validateDescription(String input) {
+    if (normalize(input).length > TournamentSizes.DESCRIPTION_MAX_LENGTH) {
+      return 'At most ${TournamentSizes.DESCRIPTION_MAX_LENGTH} characters.';
+    }
+    return null;
+  }
+
+  static String? validateLocation(String input) {
+    if (normalize(input).length > TournamentSizes.LOCATION_MAX_LENGTH) {
+      return 'At most ${TournamentSizes.LOCATION_MAX_LENGTH} characters.';
+    }
+    return null;
+  }
+
+  static String? validatePrize(String input) {
+    if (normalize(input).length > TournamentSizes.PRIZE_MAX_LENGTH) {
+      return 'At most ${TournamentSizes.PRIZE_MAX_LENGTH} characters.';
+    }
+    return null;
   }
 }
