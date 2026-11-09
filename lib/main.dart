@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api_client.dart';
 import 'auth_screen.dart';
+import 'local/session_store.dart';
 import 'models.dart';
 import 'screens/kickoff_shell.dart';
 import 'app_route_observer.dart';
@@ -19,6 +20,7 @@ class FootballMatchApp extends StatefulWidget {
 
 class _FootballMatchAppState extends State<FootballMatchApp> {
   final _api = ApiClient();
+  final Future<SessionStore> _session = SessionStore.open();
   UserAccount? _user;
   bool _guest = false;
   Object? _startupError;
@@ -30,9 +32,27 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     _restoreSession();
   }
 
+  /// Keeps the phone's saved session in step with the sign-in. Best effort:
+  /// the app works without it.
+  Future<void> _remember(UserAccount? user) async {
+    try {
+      final store = await _session;
+      if (user == null) {
+        await store.clear();
+      } else {
+        await store.save(
+          uid: '${user.id}',
+          username: user.username,
+          email: user.email,
+        );
+      }
+    } catch (_) {}
+  }
+
   Future<void> _restoreSession() async {
     try {
       final user = await _api.restoreSession();
+      if (user != null) await _remember(user);
       if (!mounted) return;
       setState(() {
         _user = user;
@@ -51,6 +71,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
 
   Future<void> _logout() async {
     await _api.logout();
+    await _remember(null);
     if (mounted) {
       setState(() {
         _user = null;
@@ -105,6 +126,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         ? AuthScreen(
             api: _api,
             onAuthenticated: (user) {
+              _remember(user);
               setState(() {
                 _user = user;
                 _guest = false;
