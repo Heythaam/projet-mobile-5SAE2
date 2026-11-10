@@ -5,6 +5,8 @@ import 'auth/account_service.dart';
 import 'auth/firebase_account_service.dart';
 import 'auth/google_auth.dart';
 import 'auth_screen.dart';
+import 'friends/firestore_friends_service.dart';
+import 'friends/friends_service.dart';
 import 'local/session_store.dart';
 import 'security/app_lock.dart';
 import 'models.dart';
@@ -20,17 +22,29 @@ Future<void> main() async {
   final AccountService account = cloud is FirebaseCloudSync
       ? FirebaseAccountService(google: PlatformGoogleAuth())
       : const UnavailableAccountService();
-  runApp(FootballMatchApp(account: account, cloud: cloud));
+  runApp(
+    FootballMatchApp(
+      account: account,
+      cloud: cloud,
+      friendsFor: cloud is FirebaseCloudSync
+          ? (user) => FirestoreFriendsService(me: user)
+          : (_) => const EmptyFriendsService(),
+    ),
+  );
 }
 
 class FootballMatchApp extends StatefulWidget {
   const FootballMatchApp({
     required this.account,
+    required this.friendsFor,
     this.cloud = const NoopCloudSync(),
     super.key,
   });
 
   final AccountService account;
+
+  /// Friends and chat for the signed-in player.
+  final FriendsService Function(UserAccount user) friendsFor;
   final CloudSync cloud;
 
   @override
@@ -204,6 +218,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               key: ValueKey(_user!.id),
               api: _api,
               account: widget.account,
+              friends: widget.friendsFor(_user!),
               cloud: widget.cloud,
               user: _user!,
               onLogout: _logout,

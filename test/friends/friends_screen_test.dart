@@ -1,71 +1,66 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/friends/friends_screen.dart';
+import 'package:football_match_app/friends/friends_service.dart';
 import 'package:football_match_app/models.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
+
+class _FakeFriends implements FriendsService {
+  final calls = <String>[];
+  bool accepted = false;
+
+  @override
+  Future<List<Friend>> getFriends() async => [
+    const Friend(id: 2, uid: 'u2', username: 'samira'),
+    if (accepted) const Friend(id: 3, uid: 'u3', username: 'noah'),
+  ];
+
+  @override
+  Future<List<FriendRequest>> getFriendRequests() async => accepted
+      ? const []
+      : const [
+          FriendRequest(
+            id: 9,
+            user: Friend(id: 3, uid: 'u3', username: 'noah'),
+            createdAt: '2026-11-10',
+          ),
+        ];
+
+  @override
+  Future<void> acceptFriendRequest(FriendRequest request) async {
+    calls.add('accept ${request.user.username}');
+    accepted = true;
+  }
+
+  @override
+  Future<void> sendFriendRequest(String username) async {
+    calls.add('send $username');
+    if (username == 'ghost') {
+      throw const FriendsException('No player is called @ghost.');
+    }
+  }
+
+  @override
+  Future<void> removeFriend(Friend friend) async =>
+      calls.add('remove ${friend.username}');
+
+  @override
+  Future<List<ChatMessage>> getMessages(Friend friend, {int after = 0}) async =>
+      const [];
+
+  @override
+  Future<ChatMessage> sendMessage(Friend friend, String body) async =>
+      throw UnimplementedError();
+}
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  final calls = <String>[];
-  var accepted = false;
-
-  ApiClient api() => ApiClient(
-    baseUrl: 'http://api.test',
-    client: MockClient((request) async {
-      calls.add('${request.method} ${request.url.path}');
-      Map<String, Object?> body;
-      switch ('${request.method} ${request.url.path}') {
-        case 'GET /friends':
-          body = {
-            'friends': [
-              {'id': 2, 'username': 'samira'},
-              if (accepted) {'id': 3, 'username': 'noah'},
-            ],
-          };
-        case 'GET /friend-requests':
-          body = {
-            'requests': accepted
-                ? []
-                : [
-                    {
-                      'id': 9,
-                      'user': {'id': 3, 'username': 'noah'},
-                      'createdAt': '2026-11-10',
-                    },
-                  ],
-          };
-        case 'POST /friend-requests/9/accept':
-          accepted = true;
-          body = {};
-        default:
-          body = {};
-      }
-      return http.Response(jsonEncode(body), 200);
-    }),
-  );
-
-  setUp(() {
-    calls.clear();
-    accepted = false;
-    FlutterSecureStorage.setMockInitialValues({'auth_token': 't'});
-  });
+  const me = UserAccount(id: 1, username: 'me', email: 'm@x.tn');
 
   testWidgets('lists friends and requests, and accepting adds a friend', (
     tester,
   ) async {
+    final friends = _FakeFriends();
     await tester.pumpWidget(
-      MaterialApp(
-        home: FriendsScreen(
-          api: api(),
-          user: const UserAccount(id: 1, username: 'me', email: 'm@x.tn'),
-        ),
-      ),
+      MaterialApp(home: FriendsScreen(friends: friends, user: me)),
     );
     await tester.pumpAndSettle();
 
@@ -77,8 +72,33 @@ void main() {
     await tester.tap(find.text('Accept'));
     await tester.pumpAndSettle();
 
-    expect(calls, contains('POST /friend-requests/9/accept'));
+    expect(friends.calls, ['accept noah']);
     expect(find.text('Friends (2)'), findsOneWidget);
     expect(find.byKey(const ValueKey('request_9')), findsNothing);
+  });
+
+  testWidgets('a friend request to an unknown username shows why', (
+    tester,
+  ) async {
+    final friends = _FakeFriends();
+    await tester.pumpWidget(
+      MaterialApp(home: FriendsScreen(friends: friends, user: me)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('friends_add')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '@ghost');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('friend_send')));
+    await tester.pumpAndSettle();
+
+    expect(friends.calls, ['send ghost']);
+    expect(find.text('No player is called @ghost.'), findsOneWidget);
+  });
+
+  test('both friends get the same chat id', () {
+    expect(pairId('b', 'a'), pairId('a', 'b'));
+    expect(pairId('a', 'b'), 'a_b');
   });
 }

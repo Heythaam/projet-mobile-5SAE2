@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../api_client.dart';
 import '../chat_screen.dart';
 import '../models.dart';
 import '../screens/kickoff_style.dart';
+import 'friends_service.dart';
 
 /// The player's friends: pending requests, the friend list, adding someone by
 /// username, and an invite message for people who are not on the app yet.
 class FriendsScreen extends StatefulWidget {
-  const FriendsScreen({required this.api, required this.user, super.key});
+  const FriendsScreen({required this.friends, required this.user, super.key});
 
-  final ApiClient api;
+  final FriendsService friends;
   final UserAccount user;
 
   @override
@@ -36,7 +36,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   String _message(Object error) =>
-      error is ApiException ? error.message : 'Could not reach the server.';
+      error is FriendsException ? error.message : 'Could not reach the cloud.';
 
   Future<void> _load() async {
     setState(() {
@@ -44,8 +44,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
       _error = null;
     });
     try {
-      final friends = await widget.api.getFriends();
-      final requests = await widget.api.getFriendRequests();
+      final friends = await widget.friends.getFriends();
+      final requests = await widget.friends.getFriendRequests();
       if (!mounted) return;
       setState(() {
         _friends = friends;
@@ -96,7 +96,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     );
     if (username == null || username.isEmpty) return;
     await _run(
-      () => widget.api.sendFriendRequest(username.replaceFirst('@', '')),
+      () => widget.friends.sendFriendRequest(username.replaceFirst('@', '')),
       done: 'Request sent to @${username.replaceFirst('@', '')}',
     );
   }
@@ -120,13 +120,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
       ),
     );
     if (ok != true) return;
-    await _run(() => widget.api.removeFriend(friend.id));
+    await _run(() => widget.friends.removeFriend(friend));
   }
 
   void _chat(Friend friend) => Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       builder: (_) => ChatScreen(
-        api: widget.api,
+        friends: widget.friends,
         currentUser: widget.user,
         friend: friend,
       ),
@@ -211,7 +211,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 subtitle: 'Wants to be your friend',
                 trailing: FilledButton(
                   onPressed: () => _run(
-                    () => widget.api.acceptFriendRequest(request.id),
+                    () => widget.friends.acceptFriendRequest(request),
                     done: 'You are now friends with @${request.user.username}',
                   ),
                   child: const Text('Accept'),

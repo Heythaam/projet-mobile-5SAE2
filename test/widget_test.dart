@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
 import 'package:football_match_app/auth_screen.dart';
+import 'package:football_match_app/friends/friends_service.dart';
 import 'package:football_match_app/matches/football_match.dart';
 import 'package:football_match_app/matches/match_repository.dart';
 import 'package:football_match_app/models.dart';
@@ -425,6 +426,7 @@ Widget _shell({
   home: KickoffShell(
     api: api ?? _FakeApiClient(pendingRequests: pendingRequests),
     account: FakeAccountService(),
+    friends: const EmptyFriendsService(),
     user: const UserAccount(id: 1, username: 'player', email: 'p@example.com'),
     onLogout: () {},
     matchRepository: const EmptyMatchRepository(),
@@ -436,6 +438,7 @@ Widget _guestShell() => MaterialApp(
   home: KickoffShell(
     api: _GuestApiClient(),
     account: FakeAccountService(),
+    friends: const EmptyFriendsService(),
     user: const UserAccount(id: 0, username: 'guest', email: 'guest@local'),
     isGuest: true,
     onLogout: () {},

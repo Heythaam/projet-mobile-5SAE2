@@ -13,7 +13,7 @@ class LocalDatabase {
 
   /// Bump this and add an `if (oldVersion < N)` step in [onUpgrade] whenever
   /// the schema changes.
-  static const version = 4;
+  static const version = 5;
 
   /// [factory] and [path] exist so tests can open an in-memory database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -104,6 +104,19 @@ class LocalDatabase {
       // kept in the app's own folder.
       await db.execute('ALTER TABLE users ADD COLUMN country TEXT');
       await db.execute('ALTER TABLE users ADD COLUMN photo_path TEXT');
+    }
+    if (oldVersion < 5 && newVersion >= 5) {
+      // Phone copy of what modules read from Firestore (friends, chats,
+      // challenges, tournaments...), as JSON documents in collections.
+      await db.execute('''
+        CREATE TABLE docs(
+          collection TEXT NOT NULL,
+          id         TEXT NOT NULL,
+          json       TEXT NOT NULL,
+          updated_at INTEGER NOT NULL,
+          PRIMARY KEY (collection, id)
+        )
+      ''');
     }
   }
 }

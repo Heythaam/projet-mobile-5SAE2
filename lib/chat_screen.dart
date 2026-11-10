@@ -2,18 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'api_client.dart';
+import 'friends/friends_service.dart';
 import 'models.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
-    required this.api,
+    required this.friends,
     required this.currentUser,
     required this.friend,
     super.key,
   });
 
-  final ApiClient api;
+  final FriendsService friends;
   final UserAccount currentUser;
   final Friend friend;
 
@@ -62,8 +62,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_fetching) return;
     _fetching = true;
     try {
-      final messages = await widget.api.getMessages(
-        widget.friend.id,
+      final messages = await widget.friends.getMessages(
+        widget.friend,
         after: _lastMessageId,
       );
       if (!mounted) return;
@@ -110,7 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (body.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      final message = await widget.api.sendMessage(widget.friend.id, body);
+      final message = await widget.friends.sendMessage(widget.friend, body);
       if (!mounted) return;
       setState(() {
         _messages.add(message);

@@ -41,6 +41,7 @@ void main() {
       "AND name NOT LIKE 'sqlite_%' ORDER BY name",
     );
     expect(after.map((t) => t['name']), [
+      'docs',
       'match_players',
       'matches',
       'session',

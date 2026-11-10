@@ -29,9 +29,12 @@ class UserAccount {
 }
 
 class Friend {
-  const Friend({required this.id, required this.username});
+  const Friend({required this.id, required this.username, this.uid});
 
   final int id;
+
+  /// Firebase user id, when the friend comes from the cloud.
+  final String? uid;
   final String username;
 
   factory Friend.fromJson(Map<String, dynamic> json) =>

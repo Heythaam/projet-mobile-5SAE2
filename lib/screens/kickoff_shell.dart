@@ -5,6 +5,7 @@ import '../api_client.dart';
 import '../auth/account_service.dart';
 import '../firebase/cloud_sync.dart';
 import '../friends/friends_screen.dart';
+import '../friends/friends_service.dart';
 import '../settings/settings_screen.dart';
 import '../matches/match_controller.dart';
 import '../app_route_observer.dart';
@@ -65,6 +66,7 @@ class KickoffShell extends StatefulWidget {
   const KickoffShell({
     required this.api,
     required this.account,
+    required this.friends,
     required this.user,
     required this.onLogout,
     this.isGuest = false,
@@ -86,6 +88,7 @@ class KickoffShell extends StatefulWidget {
 
   final ApiClient api;
   final AccountService account;
+  final FriendsService friends;
   final CloudSync cloud;
 
   /// Account switching from Settings → Profiles; null hides nothing, the
@@ -279,7 +282,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   void _openFriends() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => FriendsScreen(api: widget.api, user: widget.user),
+        builder: (_) => FriendsScreen(friends: widget.friends, user: widget.user),
       ),
     );
   }
