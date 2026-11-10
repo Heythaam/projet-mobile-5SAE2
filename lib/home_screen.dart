@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'achievement_icons.dart';
 import 'api_client.dart';
@@ -99,7 +100,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final username = await showDialog<String>(
       context: context,
-      builder: (context) => const _InviteDialog(),
+      builder: (context) => _InviteDialog(
+        shareText:
+            'Join me on Kickoff and play football with friends! '
+            'Add me as a friend: @${widget.user.username}',
+      ),
     );
     if (username == null || username.isEmpty || !mounted) return;
     try {
@@ -1982,7 +1987,11 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _InviteDialog extends StatefulWidget {
-  const _InviteDialog();
+  const _InviteDialog({required this.shareText});
+
+  /// Message sent from "Invite by message" for friends who are not on the
+  /// app yet.
+  final String shareText;
 
   @override
   State<_InviteDialog> createState() => _InviteDialogState();
@@ -1997,6 +2006,18 @@ class _InviteDialogState extends State<_InviteDialog> {
     super.dispose();
   }
 
+  Future<void> _share() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await SharePlus.instance.share(ShareParams(text: widget.shareText));
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: widget.shareText));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Invite copied')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     backgroundColor: _nightPanel,
@@ -2008,28 +2029,41 @@ class _InviteDialogState extends State<_InviteDialog> {
       'Add a player',
       style: TextStyle(color: _nightText, fontWeight: FontWeight.w900),
     ),
-    content: TextField(
-      controller: _controller,
-      autofocus: true,
-      textCapitalization: TextCapitalization.none,
-      decoration: InputDecoration(
-        labelText: 'Their username',
-        prefixText: '@',
-        filled: true,
-        fillColor: _nightRaised,
-        labelStyle: const TextStyle(color: _nightMuted),
-        hintStyle: const TextStyle(color: _nightMuted),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _ink, width: 2),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.none,
+          decoration: InputDecoration(
+            labelText: 'Their username',
+            prefixText: '@',
+            filled: true,
+            fillColor: _nightRaised,
+            labelStyle: const TextStyle(color: _nightMuted),
+            hintStyle: const TextStyle(color: _nightMuted),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _ink, width: 2),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _ink, width: 2),
+            ),
+          ),
+          style: const TextStyle(color: _nightText),
+          onSubmitted: (_) => Navigator.pop(context, _controller.text.trim()),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _ink, width: 2),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          key: const ValueKey('invite_share'),
+          onPressed: _share,
+          icon: const Icon(Icons.ios_share_rounded, size: 18),
+          label: const Text('Not on Kickoff yet? Invite by message'),
         ),
-      ),
-      style: const TextStyle(color: _nightText),
-      onSubmitted: (_) => Navigator.pop(context, _controller.text.trim()),
+      ],
     ),
     actions: [
       TextButton(

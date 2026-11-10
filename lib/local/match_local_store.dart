@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 
+import '../awards/local_awards.dart';
+
 enum LocalMatchError {
   invalidHost,
   invalidStadium,
@@ -241,6 +243,52 @@ class MatchLocalStore {
     return (
       played: (played.first['n']! as int),
       hosted: (hosted.first['n']! as int),
+    );
+  }
+
+  /// Matches [uid] was in that already started, newest first.
+  Future<List<LocalMatch>> pastFor(String uid, {int limit = 100}) async {
+    final rows = await _db.rawQuery(
+      'SELECT m.code FROM matches m '
+      'JOIN match_players p ON p.match_code = m.code '
+      'WHERE p.uid = ? AND m.scheduled_at <= ? '
+      'ORDER BY m.scheduled_at DESC LIMIT ?',
+      [uid, _clock().millisecondsSinceEpoch, limit],
+    );
+    return _loadAll(_db, rows);
+  }
+
+  /// The numbers the awards are worked out from.
+  Future<AwardStats> awardStatsFor(String uid) async {
+    final now = _clock().millisecondsSinceEpoch;
+    Future<int> count(String sql, List<Object> args) async =>
+        (await _db.rawQuery(sql, args)).first['n']! as int;
+    return AwardStats(
+      played: await count(
+        'SELECT COUNT(*) AS n FROM match_players WHERE uid = ?',
+        [uid],
+      ),
+      hosted: await count(
+        'SELECT COUNT(*) AS n FROM matches WHERE host_uid = ?',
+        [uid],
+      ),
+      hostedPublic: await count(
+        'SELECT COUNT(*) AS n FROM matches '
+        'WHERE host_uid = ? AND is_public = 1',
+        [uid],
+      ),
+      finished: await count(
+        'SELECT COUNT(*) AS n FROM matches m '
+        'JOIN match_players p ON p.match_code = m.code '
+        'WHERE p.uid = ? AND m.scheduled_at <= ?',
+        [uid, now],
+      ),
+      stadiums: await count(
+        'SELECT COUNT(DISTINCT m.stadium) AS n FROM matches m '
+        'JOIN match_players p ON p.match_code = m.code '
+        'WHERE p.uid = ?',
+        [uid],
+      ),
     );
   }
 

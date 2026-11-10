@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../awards/local_awards.dart';
 import '../firebase/cloud_sync.dart';
 import '../sample_data/sample_data.dart';
 import '../local/local_database.dart';
@@ -131,9 +132,20 @@ class MatchController extends ChangeNotifier {
   /// Matches the player is in, and how many they created. Null until loaded.
   ({int played, int hosted})? stats;
 
-  /// The upcoming matches the player is in, shaped for the calendar.
+  /// Matches the player was in that already started, newest first.
+  List<LocalMatch> _past = const [];
+  AwardStats _awardStats = const AwardStats();
+
+  /// Awards worked out from the matches on this phone.
+  List<LocalAward> get awards => localAwards(_awardStats);
+
+  /// The matches the player is in, past ones included, shaped for the
+  /// calendar. The calendar's history view lists the past ones.
   List<FootballMatch> get calendarMatches => [
-    for (final match in _byCode.values.where((m) => m.hasPlayer(uid)))
+    for (final match in [
+      ..._byCode.values.where((m) => m.hasPlayer(uid)),
+      ..._past,
+    ])
       FootballMatch(
         id: match.code,
         scheduledAt: match.scheduledAt,
@@ -176,6 +188,8 @@ class MatchController extends ChangeNotifier {
           : await store.upcomingFor(uid);
       upcomingMatch = next == null ? null : _toHome(next);
       stats = await store.statsFor(uid);
+      _past = await store.pastFor(uid);
+      _awardStats = await store.awardStatsFor(uid);
     } catch (_) {
       lastError = 'Matches could not be loaded from this phone.';
     }

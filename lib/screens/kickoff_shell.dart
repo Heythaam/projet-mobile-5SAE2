@@ -401,7 +401,12 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
 
   void _openAwards() {
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => AwardsScreen(profile: _profile)),
+      MaterialPageRoute<void>(
+        builder: (_) => AwardsScreen(
+          profile: _profile,
+          localAwards: widget.isGuest ? const [] : _matchController.awards,
+        ),
+      ),
     );
   }
 
