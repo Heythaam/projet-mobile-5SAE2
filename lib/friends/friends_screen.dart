@@ -129,9 +129,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   );
 
   @override
-  Widget build(BuildContext context) => Material(
-    type: MaterialType.transparency,
-    child: ArcadeBackdrop(
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
+    body: ArcadeBackdrop(
       child: SafeArea(
         child: Column(
           children: [
