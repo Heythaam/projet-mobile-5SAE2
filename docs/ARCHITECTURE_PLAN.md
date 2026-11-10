@@ -142,7 +142,7 @@ lib/
 ## 5. Method
 
 - Work in a separate folder: a `git worktree` on the branch
-  `refactor/prof-architecture` (created from `feat/firebase-only`), so the
+  `refactor/architecture` (created from `feat/firebase-only`), so the
   working app is never broken.
 - Phase 1, moves: a script does `git mv` and rewrites every `import`,
   `export` and `part` in `lib/` and `test/`. No code changes.
