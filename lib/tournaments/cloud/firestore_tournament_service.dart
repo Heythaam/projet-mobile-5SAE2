@@ -11,6 +11,7 @@ import '../models/tournament.dart';
 import '../models/tournament_notification.dart';
 import '../models/tournament_stats.dart';
 import '../tournament_constants.dart';
+import 'tournament_fixtures.dart';
 import 'tournament_rules.dart';
 import 'tournament_store.dart';
 import '../services/tournament_service.dart';
@@ -473,11 +474,7 @@ class FirestoreTournamentService implements TournamentService {
     await _store.markNotificationRead(id);
   });
 
-  // ---- Fixtures, results, tables (next step) ----------------------------
-
-  static const _soon = TournamentException(
-    'Fixtures and results are not available yet.',
-  );
+  // ---- Fixtures, results, tables -----------------------------------------
 
   @override
   Future<void> recordMatchResult(
@@ -486,7 +483,42 @@ class FirestoreTournamentService implements TournamentService {
     required int homeScore,
     required int awayScore,
     int? winnerId,
-  }) async => throw _soon;
+  }) => _guard(TournamentStrings.ERROR_RECORD_RESULT, () async {
+    late Doc match;
+    final doc = await _change(
+      tournamentId,
+      (doc) => match = TournamentFixtures.recordResult(
+        doc,
+        meId,
+        matchId,
+        homeScore: homeScore,
+        awayScore: awayScore,
+        winnerId: winnerId,
+      ),
+    );
+    await _remember(doc);
+    String teamName(Object? id, String fallback) =>
+        TournamentRules.teamById(doc, id as int, activeOnly: false)?['name']
+            as String? ??
+        fallback;
+    final home = teamName(match['home'], 'Home');
+    final away = teamName(match['away'], 'Away');
+    final captains = <int>{};
+    for (final id in [match['home'], match['away']]) {
+      if (id == null) continue;
+      final team = TournamentRules.teamById(doc, id as int, activeOnly: false);
+      final captain = team?['captain'];
+      if (captain is int) captains.add(captain);
+    }
+    for (final captain in captains) {
+      await _notify(
+        captain,
+        'Match Result Recorded',
+        'Result recorded: $home $homeScore - $awayScore $away',
+        tournamentId,
+      );
+    }
+  });
 
   @override
   Future<void> scheduleMatch(
@@ -494,20 +526,74 @@ class FirestoreTournamentService implements TournamentService {
     int matchId, {
     DateTime? scheduledAt,
     String? location,
-  }) async => throw _soon;
+  }) => _guard(TournamentStrings.ERROR_SCHEDULE_MATCH, () async {
+    final doc = await _change(
+      tournamentId,
+      (doc) => TournamentFixtures.schedule(
+        doc,
+        meId,
+        matchId,
+        scheduledAt: scheduledAt?.toIso8601String(),
+        location: location,
+      ),
+    );
+    await _remember(doc);
+  });
 
   @override
-  Future<void> generateFixtures(int id) async => throw _soon;
+  Future<void> generateFixtures(int id) =>
+      _guard(TournamentStrings.ERROR_GENERATE_FIXTURES, () async {
+        final doc = await _change(
+          id,
+          (doc) => TournamentFixtures.generate(doc, meId),
+        );
+        await _remember(doc);
+      });
+
+  /// Reads the tournament from the cloud, or from the phone copy offline.
+  Future<Doc> _read(int id) async {
+    try {
+      final doc = await _store
+          .get(id)
+          .timeout(TournamentEndpoints.REQUEST_TIMEOUT);
+      if (doc == null) throw const TournamentMissing();
+      await _remember(doc);
+      return doc;
+    } on TournamentMissing {
+      rethrow;
+    } catch (_) {
+      final cached = await _cachedOne(id);
+      if (cached != null) return cached;
+      rethrow;
+    }
+  }
 
   @override
-  Future<List<StandingRow>> getStandings(int id) async => const [];
+  Future<List<StandingRow>> getStandings(int id) =>
+      _guard(TournamentStrings.ERROR_LOAD_STANDINGS, () async {
+        final doc = await _read(id);
+        return [
+          for (final row in TournamentFixtures.standings(doc, meId))
+            StandingRow.fromJson(row),
+        ];
+      });
 
   @override
-  Future<List<BracketRound>> getBracket(int id) async => const [];
+  Future<List<BracketRound>> getBracket(int id) =>
+      _guard(TournamentStrings.ERROR_LOAD_BRACKET, () async {
+        final doc = await _read(id);
+        return [
+          for (final round in TournamentFixtures.bracket(doc))
+            BracketRound.fromJson(round),
+        ];
+      });
 
   @override
-  Future<TournamentStats> getTournamentStats(int id) async =>
-      TournamentStats.fromJson(const {});
+  Future<TournamentStats> getTournamentStats(int id) =>
+      _guard(TournamentStrings.ERROR_LOAD_STATS, () async {
+        final doc = await _read(id);
+        return TournamentStats.fromJson(TournamentFixtures.stats(doc));
+      });
 
   @override
   Stream<dynamic> connectToLiveMatches(int id) => const Stream.empty();

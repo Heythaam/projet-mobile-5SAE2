@@ -30,6 +30,8 @@ Matcher _fails(int status, [String? code]) => throwsA(
 );
 
 void main() {
+  group('fixtures', fixtureTests);
+
   late InMemoryTournamentStore store;
   late FirestoreTournamentService organizer;
   late FirestoreTournamentService ana;
@@ -211,5 +213,104 @@ void main() {
   test('with no connection and no phone copy the list reports an error', () {
     store.offline = true;
     expect(ana.getTournaments(), throwsA(isA<TournamentException>()));
+  });
+}
+
+void fixtureTests() {
+  late InMemoryTournamentStore store;
+  late FirestoreTournamentService organizer;
+  late List<FirestoreTournamentService> players;
+
+  Future<Tournament> setUpCup(String format, int teams) async {
+    store = InMemoryTournamentStore();
+    organizer = _as(store, 1, 'org');
+    players = [
+      for (var i = 0; i < teams; i++) _as(store, 10 + i, 'p$i'),
+    ];
+    final t = await organizer.createTournament(
+      name: 'Cup',
+      format: format,
+      startDate: '2026-12-01',
+      endDate: '2026-12-10',
+      maxTeams: 8,
+      teamSize: 1,
+    );
+    for (var i = 0; i < teams; i++) {
+      await players[i].joinTournament(t.id, 'Team $i');
+    }
+    await organizer.updateTournamentStatus(t.id, 'active');
+    return t;
+  }
+
+  test('a league plays everyone once and ranks by points', () async {
+    final t = await setUpCup('league', 3);
+    await organizer.generateFixtures(t.id);
+    expect(organizer.generateFixtures(t.id), _fails(409));
+
+    final doc = (await store.get(t.id))!;
+    final matches = (doc['matches'] as List).cast<Map<String, dynamic>>();
+    expect(matches.length, 3);
+
+    // The lower team id always wins: team 1 beats 2 and 3, team 2 beats 3.
+    for (final m in matches) {
+      final home = m['home'] as int;
+      final away = m['away'] as int;
+      final low = home < away ? home : away;
+      final lowIsHome = low == home;
+      await organizer.recordMatchResult(
+        t.id,
+        m['id'] as int,
+        homeScore: lowIsHome ? 2 : 0,
+        awayScore: lowIsHome ? 0 : 2,
+      );
+    }
+    final table = await players[0].getStandings(t.id);
+    expect(table.length, 3);
+    expect(table.first.points, 6);
+    expect(table.first.position, 1);
+    expect(table.first.isUserTeam, isTrue);
+
+    final stats = await organizer.getTournamentStats(t.id);
+    expect(stats.totals.totalMatches, 3);
+    expect(stats.totals.totalGoals, 6);
+    expect(
+      organizer.recordMatchResult(
+        t.id,
+        matches.first['id'] as int,
+        homeScore: 1,
+        awayScore: 0,
+      ),
+      _fails(409),
+    );
+  });
+
+  test('a knockout with 3 teams gives one a bye', () async {
+    final t = await setUpCup('knockout', 3);
+    await organizer.generateFixtures(t.id);
+    final rounds = await organizer.getBracket(t.id);
+    expect(rounds.length, 2); // semi-finals and final
+    expect(rounds.first.matches.length, 2);
+    expect(rounds.first.matches.where((m) => m.isBye).length, 1);
+    expect(rounds[1].matches.length, 1);
+  });
+
+  test('only the organizer records results', () async {
+    final t = await setUpCup('league', 2);
+    await organizer.generateFixtures(t.id);
+    final doc = (await store.get(t.id))!;
+    final id = ((doc['matches'] as List).first as Map)['id'] as int;
+    expect(
+      players[0].recordMatchResult(t.id, id, homeScore: 1, awayScore: 0),
+      _fails(403),
+    );
+    await organizer.scheduleMatch(
+      t.id,
+      id,
+      scheduledAt: DateTime.utc(2026, 12, 5, 18),
+      location: 'Pitch 2',
+    );
+    final saved = (await store.get(t.id))!;
+    final match = ((saved['matches'] as List).first as Map);
+    expect(match['location'], 'Pitch 2');
   });
 }
