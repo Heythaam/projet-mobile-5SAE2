@@ -429,6 +429,54 @@ class MatchLocalStore {
     });
   }
 
+  // ---- Cloud copy -------------------------------------------------------
+
+  /// Saves a match as the cloud has it, replacing the phone's copy. A stadium
+  /// booking the phone already knows about is kept.
+  Future<void> upsertFromCloud(LocalMatch match) {
+    return _db.transaction((txn) async {
+      final existing = await _load(txn, match.code);
+      await txn.delete(
+        'matches',
+        where: 'code = ?',
+        whereArgs: [match.code],
+      );
+      final now = _clock().millisecondsSinceEpoch;
+      await txn.insert('matches', {
+        'code': match.code,
+        'host_uid': match.hostUid,
+        'stadium': match.stadium,
+        'scheduled_at': match.scheduledAt.millisecondsSinceEpoch,
+        'capacity': match.capacity,
+        'is_public': match.isPublic ? 1 : 0,
+        'latitude': match.latitude,
+        'longitude': match.longitude,
+        'booking_id': existing?.bookingId ?? match.bookingId,
+        'created_at': existing?.createdAt.millisecondsSinceEpoch ?? now,
+        'updated_at': now,
+      });
+      for (var slot = 0; slot < match.slots.length; slot++) {
+        final uid = match.slots[slot];
+        if (uid == null) continue;
+        await txn.insert('match_players', {
+          'match_code': match.code,
+          'uid': uid,
+          'slot': slot,
+          'display_name': match.slotNames[slot] ?? '',
+          'joined_at': now,
+        });
+      }
+    });
+  }
+
+  /// Forgets a match on this phone only, for example when the host cancelled it
+  /// on another phone.
+  Future<void> removeLocal(String code) => _db.delete(
+    'matches',
+    where: 'code = ?',
+    whereArgs: [code.trim().toUpperCase()],
+  );
+
   // ---- Helpers ----------------------------------------------------------
 
   String _randomCode() => List.generate(

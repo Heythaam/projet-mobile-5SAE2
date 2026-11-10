@@ -14,6 +14,11 @@ class _FakeCloud extends NoopCloudSync {
   final profiles = <LocalUser>[];
   Map<String, dynamic>? remoteProfile;
 
+  /// What other phones saved: matches, and codes that were cancelled.
+  final remoteMatches = <LocalMatch>[];
+  final remoteCancelled = <String>{};
+  bool offline = false;
+
   @override
   Future<void> pushMatch(LocalMatch match) async => pushed.add(match);
 
@@ -25,6 +30,25 @@ class _FakeCloud extends NoopCloudSync {
 
   @override
   Future<Map<String, dynamic>?> pullProfile() async => remoteProfile;
+
+  @override
+  Future<CloudMatches?> pullMatches(String uid) async => offline
+      ? null
+      : CloudMatches(
+          [
+            for (final m in remoteMatches)
+              if (m.isPublic || m.hasPlayer(uid)) m,
+          ],
+          {...remoteCancelled},
+        );
+
+  @override
+  Future<({LocalMatch? match, bool cancelled})> fetchMatch(String code) async {
+    if (offline) return (match: null, cancelled: false);
+    if (remoteCancelled.contains(code)) return (match: null, cancelled: true);
+    final found = remoteMatches.where((m) => m.code == code);
+    return (match: found.isEmpty ? null : found.first, cancelled: false);
+  }
 }
 
 void main() {
@@ -124,5 +148,99 @@ void main() {
 
     expect(controller.profile?.username, 'farouk');
     expect(controller.profile?.bio, '');
+  });
+
+  LocalMatch cloudMatch(
+    String code, {
+    String host = 'other',
+    List<String?>? slots,
+    bool isPublic = true,
+    int hoursAhead = 24,
+  }) {
+    final at = DateTime.now().toUtc().add(Duration(hours: hoursAhead));
+    final list = slots ?? [host, null, null, null];
+    return LocalMatch(
+      code: code,
+      hostUid: host,
+      stadium: 'Camp Nou',
+      scheduledAt: at,
+      capacity: list.length,
+      isPublic: isPublic,
+      slots: list,
+      slotNames: [for (final s in list) s == null ? null : 'Name $s'],
+      createdAt: at,
+      updatedAt: at,
+    );
+  }
+
+  test('public matches made on another phone show up after load', () async {
+    cloud.remoteMatches.add(cloudMatch('ABCDE'));
+    final controller = matches('me');
+    await controller.load();
+
+    expect(controller.publicMatches.map((m) => m.match.code), ['ABCDE']);
+    expect(controller.publicMatches.single.match.stadium, 'Camp Nou');
+  });
+
+  test('a match made offline is sent to the cloud on the next load', () async {
+    cloud.offline = true;
+    final host = matches('me');
+    await host.load();
+    final created = await host.createMatch(draft());
+    cloud.pushed.clear();
+
+    cloud.offline = false;
+    final again = matches('me');
+    await again.load();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(cloud.pushed.map((m) => m.code), [created.code]);
+  });
+
+  test('joining a match that only exists in the cloud works', () async {
+    cloud.remoteMatches.add(cloudMatch('JOIN2', isPublic: false));
+    final controller = matches('me');
+    await controller.load();
+    expect(controller.findMatchByCode('JOIN2'), isNull);
+
+    final joined = await controller.joinByCode('JOIN2');
+
+    expect(joined?.code, 'JOIN2');
+    expect(controller.hasJoined(joined!), isTrue);
+    expect(cloud.pushed.single.slots.contains('me'), isTrue);
+  });
+
+  test('a match the host cancelled elsewhere disappears and cannot be joined',
+      () async {
+    final mine = cloudMatch('GONE2', slots: ['other', 'me', null, null]);
+    cloud.remoteMatches.add(mine);
+    final controller = matches('me');
+    await controller.load();
+    expect(controller.upcomingMatch?.code, 'GONE2');
+
+    cloud.remoteMatches.clear();
+    cloud.remoteCancelled.add('GONE2');
+    final later = matches('me');
+    await later.load();
+    expect(later.upcomingMatch, isNull);
+
+    expect(await later.joinByCode('GONE2'), isNull);
+    expect(later.lastError, 'That match was cancelled.');
+  });
+
+  test('cloud matches replace the phone copy but keep a stadium booking',
+      () async {
+    final store = MatchLocalStore(db);
+    await store.upsertFromCloud(cloudMatch('KEEP2'));
+    await store.upsertFromCloud(
+      cloudMatch('KEEP2', slots: ['other', 'me', null, null]),
+    );
+
+    final saved = await store.getByCode('KEEP2');
+    expect(saved?.slots, ['other', 'me', null, null]);
+    expect(saved?.slotNames[1], 'Name me');
+
+    await store.removeLocal('keep2');
+    expect(await store.getByCode('KEEP2'), isNull);
   });
 }

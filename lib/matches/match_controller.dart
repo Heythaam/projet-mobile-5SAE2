@@ -29,8 +29,8 @@ class MatchBookingException implements Exception {
 /// Match state for the Match screens, saved on the phone with SQFlite.
 ///
 /// Reads are synchronous and come from a cache filled by [load]; every write
-/// goes to the store first and then refreshes the cache. Matches live on this
-/// phone only until Firebase sync exists.
+/// goes to the store first and then refreshes the cache. Matches are copied to
+/// Firestore, and matches from other phones are pulled in when it loads.
 class MatchController extends ChangeNotifier {
   MatchController({
     required this.uid,
@@ -169,13 +169,46 @@ class MatchController extends ChangeNotifier {
       MatchLocalStore(await LocalDatabase.open());
 
   /// Opens the database once and fills the cache. Safe to call again.
-  Future<void> load() => _loading ??= _refresh().whenComplete(() {
+  Future<void> load() => _loading ??= _syncFromCloud().then((_) => _refresh()).whenComplete(() {
     loaded = true;
     notifyListeners();
   });
 
   Future<MatchLocalStore> _ensureStore() async =>
       _store ??= await _openStore();
+
+  /// Brings in the matches other phones saved: the ones this player is in and
+  /// the public ones. Best effort; offline it does nothing.
+  Future<void> _syncFromCloud() async {
+    try {
+      final store = await _ensureStore();
+      final remote = await cloud.pullMatches(uid);
+      if (remote == null) return;
+      for (final code in remote.cancelled) {
+        await store.removeLocal(code);
+      }
+      final now = DateTime.now();
+      final inCloud = <String>{};
+      for (final match in remote.matches) {
+        inCloud.add(match.code);
+        // Public matches that already started are not worth keeping.
+        if (!match.hasPlayer(uid) && !match.scheduledAt.isAfter(now)) continue;
+        try {
+          await store.upsertFromCloud(match);
+        } catch (_) {
+          // One bad cloud record must not stop the others.
+        }
+      }
+      // Matches made offline that the cloud has not seen yet.
+      for (final local in await store.allUpcoming()) {
+        if (local.hasPlayer(uid) &&
+            !inCloud.contains(local.code) &&
+            !remote.cancelled.contains(local.code)) {
+          unawaited(cloud.pushMatch(local));
+        }
+      }
+    } catch (_) {}
+  }
 
   Future<void> _refresh({String? focusCode}) async {
     try {
@@ -275,6 +308,21 @@ class MatchController extends ChangeNotifier {
     lastError = null;
     try {
       final store = await _ensureStore();
+      // The match may have been made on another phone: fetch its latest state.
+      final remote = await cloud.fetchMatch(code.trim().toUpperCase());
+      if (remote.cancelled) {
+        await store.removeLocal(code);
+        await _refresh();
+        notifyListeners();
+        lastError = 'That match was cancelled.';
+        return null;
+      }
+      final shared = remote.match;
+      if (shared != null) {
+        try {
+          await store.upsertFromCloud(shared);
+        } catch (_) {}
+      }
       final joined = await store.join(code, uid, name: username);
       await _refresh(focusCode: joined.code);
       notifyListeners();

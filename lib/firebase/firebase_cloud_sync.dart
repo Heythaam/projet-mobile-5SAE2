@@ -69,6 +69,7 @@ class FirebaseCloudSync implements CloudSync {
         'slotNames': match.slotNames,
         'latitude': match.latitude,
         'longitude': match.longitude,
+        'cancelled': false,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (_) {}
@@ -78,7 +79,91 @@ class FirebaseCloudSync implements CloudSync {
   Future<void> deleteMatch(String code) async {
     if (_auth.currentUser == null) return;
     try {
-      await _db.collection('matches').doc(code).delete();
+      // Kept as a cancelled match so other phones can drop their copy.
+      await _db.collection('matches').doc(code).set({
+        'cancelled': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (_) {}
+  }
+
+  @override
+  Future<CloudMatches?> pullMatches(String uid) async {
+    if (_auth.currentUser == null) return null;
+    try {
+      final matches = _db.collection('matches');
+      final mine = await matches
+          .where('slots', arrayContains: uid)
+          .get()
+          .timeout(_wait);
+      final open = await matches
+          .where('isPublic', isEqualTo: true)
+          .limit(100)
+          .get()
+          .timeout(_wait);
+      final found = <String, LocalMatch>{};
+      final cancelled = <String>{};
+      for (final doc in [...mine.docs, ...open.docs]) {
+        final data = doc.data();
+        if (data['cancelled'] == true) {
+          cancelled.add(doc.id);
+          continue;
+        }
+        final match = _matchFrom(data);
+        if (match != null) found[match.code] = match;
+      }
+      return CloudMatches(found.values.toList(), cancelled);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<({LocalMatch? match, bool cancelled})> fetchMatch(String code) async {
+    if (_auth.currentUser == null) return (match: null, cancelled: false);
+    try {
+      final data = (await _db
+              .collection('matches')
+              .doc(code)
+              .get()
+              .timeout(_wait))
+          .data();
+      if (data == null) return (match: null, cancelled: false);
+      if (data['cancelled'] == true) return (match: null, cancelled: true);
+      return (match: _matchFrom(data), cancelled: false);
+    } catch (_) {
+      return (match: null, cancelled: false);
+    }
+  }
+
+  static const _wait = Duration(seconds: 6);
+
+  static LocalMatch? _matchFrom(Map<String, dynamic> data) {
+    try {
+      final slots = [for (final s in data['slots'] as List) s as String?];
+      final names = [
+        for (final n in (data['slotNames'] as List?) ?? const []) n as String?,
+      ];
+      while (names.length < slots.length) {
+        names.add(null);
+      }
+      final at = (data['scheduledAt'] as Timestamp).toDate();
+      return LocalMatch(
+        code: data['code'] as String,
+        hostUid: data['hostUid'] as String,
+        stadium: data['stadium'] as String,
+        scheduledAt: at.toUtc(),
+        capacity: (data['capacity'] as num).toInt(),
+        isPublic: data['isPublic'] == true,
+        slots: slots,
+        slotNames: names,
+        latitude: (data['latitude'] as num?)?.toDouble(),
+        longitude: (data['longitude'] as num?)?.toDouble(),
+        createdAt: at.toUtc(),
+        updatedAt: at.toUtc(),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }
