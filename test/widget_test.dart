@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
+import 'package:football_match_app/auth/google_auth.dart';
 import 'package:football_match_app/auth_screen.dart';
 import 'package:football_match_app/matches/football_match.dart';
 import 'package:football_match_app/matches/match_repository.dart';
@@ -34,6 +35,28 @@ void main() {
     expect(find.text('Create account'), findsOneWidget);
     expect(find.text('Have an account? Sign in'), findsOneWidget);
     expect(signedInUser, isNull);
+  });
+
+  testWidgets('Continue with Google only shows when Google is available', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthScreen(api: ApiClient(), onAuthenticated: (_) {}),
+      ),
+    );
+    expect(find.byKey(const ValueKey('auth_google')), findsNothing);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthScreen(
+          api: ApiClient(),
+          googleAuth: _FakeGoogle(),
+          onAuthenticated: (_) {},
+        ),
+      ),
+    );
+    expect(find.text('Continue with Google'), findsOneWidget);
   });
 
   testWidgets('shell switches between home, calendar, and profile', (
@@ -453,3 +476,11 @@ class _FakeApiClient extends Fake implements ApiClient {
 }
 
 class _GuestApiClient extends Fake implements ApiClient {}
+
+class _FakeGoogle implements GoogleAuth {
+  @override
+  Future<String?> idToken() async => null;
+
+  @override
+  Future<void> signOut() async {}
+}

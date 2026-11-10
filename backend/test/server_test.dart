@@ -185,6 +185,44 @@ void main() {
     expect(account['username'], 'fresh_name');
     expect(account['usernameChosen'], isTrue);
   });
+
+  test('google sign-in creates an account, then logs into it again', () async {
+    final google = createApp(
+      database: database,
+      jwtSecret: _secret,
+      googleVerifier: (token) async => token == 'good'
+          ? (email: 'Fan@Example.com', emailVerified: true)
+          : null,
+    );
+
+    final first = await sendRequest(
+      google,
+      'POST',
+      '/auth/google',
+      body: {'idToken': 'good'},
+    );
+    expect(first.statusCode, 201);
+    final created = await decode(first);
+    expect(created['user']['email'], 'fan@example.com');
+    expect(created['user']['usernameChosen'], false);
+
+    final second = await sendRequest(
+      google,
+      'POST',
+      '/auth/google',
+      body: {'idToken': 'good'},
+    );
+    expect(second.statusCode, 200);
+    expect((await decode(second))['user']['id'], created['user']['id']);
+
+    final bad = await sendRequest(
+      google,
+      'POST',
+      '/auth/google',
+      body: {'idToken': 'forged'},
+    );
+    expect(bad.statusCode, 401);
+  });
 }
 
 Future<Map<String, dynamic>> register(Handler app, String username) async {

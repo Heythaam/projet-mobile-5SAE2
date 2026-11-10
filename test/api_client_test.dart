@@ -30,6 +30,36 @@ void main() {
     );
   }
 
+  test('google sign-in posts the ID token and stores the session', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    String? sentBody;
+    final api = ApiClient(
+      baseUrl: 'http://api.test',
+      client: MockClient((request) async {
+        expect(request.url.path, '/auth/google');
+        sentBody = request.body;
+        return http.Response(
+          jsonEncode({
+            'token': 'jwt',
+            'user': {
+              'id': 7,
+              'username': 'player_abc123',
+              'email': 'fan@example.com',
+              'usernameChosen': false,
+            },
+          }),
+          201,
+        );
+      }),
+    );
+
+    final user = await api.loginWithGoogle('google-token');
+
+    expect(jsonDecode(sentBody!), {'idToken': 'google-token'});
+    expect(user.usernameChosen, isFalse);
+    expect(await const FlutterSecureStorage().read(key: 'auth_token'), 'jwt');
+  });
+
   test('other failures keep the token so the app can retry', () async {
     FlutterSecureStorage.setMockInitialValues({'auth_token': 'kept'});
     final api = client(500, {'error': 'Server error.'});

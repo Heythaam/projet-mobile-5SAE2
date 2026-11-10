@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api_client.dart';
+import 'auth/google_auth.dart';
 import 'firebase/cloud_sync.dart';
 import 'models.dart';
 import 'screens/kickoff_style.dart';
@@ -12,11 +13,15 @@ class AuthScreen extends StatefulWidget {
     required this.onAuthenticated,
     this.onCancel,
     this.cloud = const NoopCloudSync(),
+    this.googleAuth,
     super.key,
   });
 
   final ApiClient api;
   final CloudSync cloud;
+
+  /// Shows "Continue with Google" when set.
+  final GoogleAuth? googleAuth;
   final ValueChanged<UserAccount> onAuthenticated;
 
   /// Set when the player came here to add another account; shows a back arrow.
@@ -94,6 +99,26 @@ class _AuthScreenState extends State<AuthScreen> {
       _registering = false;
       _error = null;
     });
+  }
+
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final idToken = await widget.googleAuth!.idToken();
+      if (idToken == null) return; // cancelled
+      final user = await widget.api.loginWithGoogle(idToken);
+      await widget.cloud.signInWithGoogle(idToken);
+      if (mounted) widget.onAuthenticated(user);
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Google sign-in failed: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -313,6 +338,23 @@ class _AuthScreenState extends State<AuthScreen> {
                           busy: _busy,
                         ),
                       ),
+                      if (widget.googleAuth != null) ...[
+                        SizedBox(height: 10 * scale),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 14 * scale),
+                          child: OutlinedButton.icon(
+                            key: const ValueKey('auth_google'),
+                            onPressed: _busy ? null : _google,
+                            icon: const Icon(Icons.g_mobiledata_rounded),
+                            label: const Text('Continue with Google'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              minimumSize: Size.fromHeight(52 * scale),
+                              side: const BorderSide(color: Colors.white38),
+                            ),
+                          ),
+                        ),
+                      ],
                       if (_error != null) ...[
                         SizedBox(height: 8 * scale),
                         Padding(

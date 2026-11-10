@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api_client.dart';
+import 'auth/google_auth.dart';
 import 'auth_screen.dart';
 import 'local/session_store.dart';
 import 'security/app_lock.dart';
@@ -89,6 +90,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   Future<void> _logout() async {
     await _api.logout();
     await widget.cloud.signOut();
+    await PlatformGoogleAuth().signOut();
     await _remember(null);
     if (mounted) {
       setState(() {
@@ -176,6 +178,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         ? AuthScreen(
             api: _api,
             cloud: widget.cloud,
+            googleAuth: PlatformGoogleAuth(),
             onCancel: _user != null
                 ? () => setState(() => _adding = false)
                 : null,

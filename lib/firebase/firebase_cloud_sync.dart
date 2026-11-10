@@ -45,6 +45,15 @@ class FirebaseCloudSync implements CloudSync {
   }
 
   @override
+  Future<void> signInWithGoogle(String idToken) async {
+    try {
+      await _auth.signInWithCredential(
+        GoogleAuthProvider.credential(idToken: idToken),
+      );
+    } catch (_) {}
+  }
+
+  @override
   Future<void> signOut() async {
     try {
       await _auth.signOut();

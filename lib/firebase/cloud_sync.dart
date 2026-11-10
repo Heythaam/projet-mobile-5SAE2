@@ -9,6 +9,9 @@ abstract class CloudSync {
   /// creating the cloud account the first time.
   Future<void> signIn({required String email, required String password});
 
+  /// Signs in to the cloud with the Google ID token.
+  Future<void> signInWithGoogle(String idToken);
+
   Future<void> signOut();
 
   Future<void> pushProfile(LocalUser user);
@@ -24,6 +27,9 @@ class NoopCloudSync implements CloudSync {
 
   @override
   Future<void> signIn({required String email, required String password}) async {}
+
+  @override
+  Future<void> signInWithGoogle(String idToken) async {}
 
   @override
   Future<void> signOut() async {}

@@ -9,6 +9,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'database.dart';
 import 'gamification.dart';
+import 'google_verifier.dart';
 import 'stadium.dart';
 
 class ApiException implements Exception {
@@ -21,7 +22,11 @@ class ApiException implements Exception {
   final String? code;
 }
 
-Handler createApp({required AppDatabase database, required String jwtSecret}) {
+Handler createApp({
+  required AppDatabase database,
+  required String jwtSecret,
+  GoogleVerifier googleVerifier = verifyGoogleIdToken,
+}) {
   final router = Router()
     ..get('/', (_) => _json({'service': 'football-match-api'}))
     ..post(
@@ -29,6 +34,10 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
       (request) => _register(request, database, jwtSecret),
     )
     ..post('/auth/login', (request) => _login(request, database, jwtSecret))
+    ..post(
+      '/auth/google',
+      (request) => _google(request, database, jwtSecret, googleVerifier),
+    )
     ..get('/me', _authenticated(database, jwtSecret, _me))
     ..put('/me/username', _authenticated(database, jwtSecret, _setUsername))
     ..get(
@@ -252,6 +261,47 @@ Future<Response> _login(
   }
   recordActiveDay(database, users.first['id'] as int);
   return _sessionResponse(users.first, secret);
+}
+
+/// Signs in with a Google ID token. A known email logs into that account; a new
+/// one creates an account and the player picks a username afterwards.
+Future<Response> _google(
+  Request request,
+  AppDatabase database,
+  String secret,
+  GoogleVerifier verify,
+) async {
+  final body = await _body(request);
+  final identity = await verify(_requiredString(body, 'idToken'));
+  if (identity == null || !identity.emailVerified) {
+    throw ApiException(401, 'Google sign-in could not be verified.');
+  }
+  final email = identity.email.trim().toLowerCase();
+  const columns = 'id, username, email, username_chosen';
+  var users = database.db.select(
+    'SELECT $columns FROM users WHERE email = ?',
+    [email],
+  );
+  var created = false;
+  if (users.isEmpty) {
+    database.db.execute(
+      'INSERT INTO users (username, email, password_hash, username_chosen) '
+      'VALUES (?, ?, ?, 0)',
+      [
+        _temporaryUsername(database),
+        email,
+        BCrypt.hashpw(base64Url.encode(List.generate(32, (_) => Random.secure().nextInt(256))), BCrypt.gensalt()),
+      ],
+    );
+    users = database.db.select(
+      'SELECT $columns FROM users WHERE email = ?',
+      [email],
+    );
+    unlockAchievement(database, users.first['id'] as int, 'first_kickoff');
+    created = true;
+  }
+  recordActiveDay(database, users.first['id'] as int);
+  return _sessionResponse(users.first, secret, status: created ? 201 : 200);
 }
 
 Response _sessionResponse(Row user, String secret, {int status = 200}) {

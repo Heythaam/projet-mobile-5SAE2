@@ -188,6 +188,17 @@ class ApiClient {
     return UserAccount.fromJson(response['user'] as Map<String, dynamic>);
   }
 
+  /// Signs in with a Google ID token; creates the account the first time.
+  Future<UserAccount> loginWithGoogle(String idToken) async {
+    final response = await _send(
+      'POST',
+      '/auth/google',
+      body: {'idToken': idToken},
+    );
+    await _saveSession(response);
+    return UserAccount.fromJson(response['user'] as Map<String, dynamic>);
+  }
+
   Future<List<Friend>> getFriends() async {
     final response = await _authenticated('GET', '/friends');
     return (response['friends'] as List<dynamic>)
