@@ -1,0 +1,7 @@
+# Copy to android/key.properties (ignored by git) and fill in.
+# Create the keystore once:
+#   keytool -genkey -v -keystore android/app/kickoff-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias kickoff
+storeFile=app/kickoff-release.jks
+storePassword=CHANGE_ME
+keyAlias=kickoff
+keyPassword=CHANGE_ME
