@@ -302,7 +302,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    expect(fields, findsNWidgets(4));
+    expect(fields, findsNWidgets(3));
     await tester.ensureVisible(fields.last);
     await tester.tap(fields.last);
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
