@@ -11,6 +11,7 @@ import '../local/match_local_store.dart';
 import 'football_match.dart';
 import '../screens/match/match_mock_data.dart';
 import '../weather/weather_service.dart';
+import 'match_filter.dart';
 import 'stadium_directory.dart';
 
 typedef MatchStoreOpener = Future<MatchLocalStore> Function();
@@ -88,6 +89,8 @@ class MatchController extends ChangeNotifier {
               distance: stadium.address.split(',').first.trim(),
               coins: stadium.pricePerHour,
               players: stadium.maxCapacity,
+              rating: stadium.rating,
+              reviewCount: stadium.reviewCount,
             ),
         ];
         usingSampleStadiums = false;
@@ -104,6 +107,43 @@ class MatchController extends ChangeNotifier {
     }
     stadiumsLoading = false;
     notifyListeners();
+  }
+
+  /// Whether the stadium directory can show and take reviews.
+  bool get canReview => _directory is StadiumReviewSource;
+
+  /// Reviews of a real stadium. Throws [StadiumDirectoryException].
+  Future<StadiumReviewSet> reviewsOf(int stadiumId) {
+    final source = _directory;
+    if (source is! StadiumReviewSource) {
+      return Future.value(
+        const StadiumReviewSet(
+          rating: null,
+          count: 0,
+          canReview: false,
+          reviews: [],
+        ),
+      );
+    }
+    return (source as StadiumReviewSource).reviews(stadiumId);
+  }
+
+  /// Saves the player's review, then reloads the stadium list so the stars
+  /// are up to date.
+  Future<void> submitReview(
+    int stadiumId, {
+    required int stars,
+    required String comment,
+  }) async {
+    final source = _directory;
+    if (source is! StadiumReviewSource) return;
+    await (source as StadiumReviewSource).submitReview(
+      stadiumId,
+      stars: stars,
+      comment: comment,
+    );
+    stadiumsLoading = false;
+    await loadStadiums();
   }
 
   /// Free slots of a real stadium on [day]. Throws
@@ -248,12 +288,24 @@ class MatchController extends ChangeNotifier {
     notifyListeners();
   }
 
+  MatchFilter _filter = const MatchFilter();
+
+  /// What the public matches are narrowed down to.
+  MatchFilter get filter => _filter;
+
+  set filter(MatchFilter value) {
+    _filter = value;
+    notifyListeners();
+  }
+
   /// Public matches. With the player's location on, matches with free places
   /// come first, nearest first; otherwise soonest first.
   List<MatchPublicListing> get publicMatches {
     final here = _here;
     final listings = [
-      for (final match in _byCode.values.where((match) => match.isPublic))
+      for (final match in _byCode.values.where(
+        (match) => match.isPublic && _filter.allows(match.scheduledAt.toLocal()),
+      ))
         (
           match: match,
           distance: here != null && match.hasLocation

@@ -196,4 +196,39 @@ void main() {
     await owner.delete(stadium.id);
     expect((await owner.overview()).stadiums, isEmpty);
   });
+
+  test('only players who booked can review, once each', () async {
+    final stadium = await makeStadium();
+    await expectLater(
+      otherPlayer.submitReview(stadium.id, stars: 5, comment: 'Great'),
+      throwsA(isA<StadiumDirectoryException>()),
+    );
+    expect((await otherPlayer.reviews(stadium.id)).canReview, isFalse);
+
+    await player.hold(
+      stadiumId: stadium.id,
+      pitchId: stadium.pitches.single.id!,
+      day: _openDay(),
+      start: 17 * 60,
+      matchCode: 'ABC123',
+    );
+    expect((await player.reviews(stadium.id)).canReview, isTrue);
+    await expectLater(
+      player.submitReview(stadium.id, stars: 6, comment: ''),
+      throwsA(isA<StadiumDirectoryException>()),
+    );
+    await player.submitReview(stadium.id, stars: 4, comment: 'Nice pitch');
+    await player.submitReview(stadium.id, stars: 5, comment: 'Even better');
+
+    final set = await otherPlayer.reviews(stadium.id);
+    expect(set.count, 1);
+    expect(set.rating, 5.0);
+    expect(set.reviews.single.userName, 'ana');
+    expect(set.reviews.single.mine, isFalse);
+    expect((await player.reviews(stadium.id)).reviews.single.mine, isTrue);
+
+    final listed = await otherPlayer.stadiums();
+    expect(listed.single.rating, 5.0);
+    expect(listed.single.reviewCount, 1);
+  });
 }

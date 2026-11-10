@@ -291,7 +291,82 @@ abstract final class StadiumRules {
     'eveningFrom': stadiumEveningFrom,
     'paused': row['paused'] == true,
     'pitches': [for (final p in _sortedPitches(row)) pitchJson(p)],
+    'rating': rating(row),
+    'reviewCount': _list(row, 'reviews').length,
   };
+
+  // ---- Reviews -----------------------------------------------------------
+
+  /// Average stars rounded to one decimal, or null before the first review.
+  static double? rating(Doc stadium) {
+    final reviews = _list(stadium, 'reviews');
+    if (reviews.isEmpty) return null;
+    final total = reviews.fold<int>(0, (sum, r) => sum + (r['stars'] as int));
+    return double.parse((total / reviews.length).toStringAsFixed(1));
+  }
+
+  static Map<String, Object?> reviewsJson(Doc stadium, int me) {
+    final reviews = [..._list(stadium, 'reviews')]
+      ..sort(
+        (a, b) =>
+            (b['createdAtMs'] as int).compareTo(a['createdAtMs'] as int),
+      );
+    return {
+      'rating': rating(stadium),
+      'count': reviews.length,
+      'canReview': _list(stadium, 'bookings').any(
+        (b) => b['hostId'] == me && _active(b),
+      ),
+      'reviews': [
+        for (final r in reviews)
+          {
+            'userName': r['userName'],
+            'stars': r['stars'],
+            'comment': r['comment'] ?? '',
+            'createdAt': DateTime.fromMillisecondsSinceEpoch(
+              r['createdAtMs'] as int,
+              isUtc: true,
+            ).toIso8601String(),
+            'mine': r['userId'] == me,
+          },
+      ],
+    };
+  }
+
+  /// Adds or replaces the player's review. Only players who booked this
+  /// stadium can review it, and each player has one review.
+  static void addReview(
+    Doc stadium, {
+    required int userId,
+    required String userName,
+    required int stars,
+    required String comment,
+  }) {
+    if (stars < 1 || stars > 5) _fail(400, 'Pick 1 to 5 stars.');
+    final text = comment.trim();
+    if (text.length > 200) {
+      _fail(400, 'A review can have up to 200 characters.');
+    }
+    final booked = _list(stadium, 'bookings').any(
+      (b) => b['hostId'] == userId && _active(b),
+    );
+    if (!booked) _fail(403, 'Book this stadium before reviewing it.');
+    final reviews = [..._list(stadium, 'reviews')];
+    final entry = {
+      'userId': userId,
+      'userName': userName,
+      'stars': stars,
+      'comment': text,
+      'createdAtMs': DateTime.now().millisecondsSinceEpoch,
+    };
+    final index = reviews.indexWhere((r) => r['userId'] == userId);
+    if (index >= 0) {
+      reviews[index] = entry;
+    } else {
+      reviews.add(entry);
+    }
+    stadium['reviews'] = reviews;
+  }
 
   static Map<String, Object?> bookingJson(
     Doc booking, {

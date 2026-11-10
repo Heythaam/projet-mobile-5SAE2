@@ -9,6 +9,7 @@ import '../kickoff_style.dart';
 import 'match_create_screens.dart';
 import 'match_lobby_screen.dart';
 import '../../matches/match_controller.dart';
+import '../../matches/match_filter.dart';
 import 'match_mock_data.dart';
 import 'match_widgets.dart';
 
@@ -198,14 +199,17 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
       padding: _publicListPadding,
       children: [
         _nearbyBar(),
+        _filterBar(),
         if (widget.controller.publicMatches.isEmpty)
           SizedBox(
             height: 240,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'No public matches yet',
+                Text(
+                  widget.controller.filter.isEmpty
+                      ? 'No public matches yet'
+                      : 'No match fits these filters',
                   style: TextStyle(
                     color: KickoffColors.muted,
                     fontSize: 16,
@@ -234,6 +238,137 @@ class _MatchJoinScreenState extends State<MatchJoinScreen>
       ],
     ),
   );
+
+  Future<void> _pickDay() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: widget.controller.filter.day ?? now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null && mounted) {
+      widget.controller.filter = widget.controller.filter.copyWith(day: picked);
+    }
+  }
+
+  Future<void> _pickFromTime() async {
+    final current = widget.controller.filter.fromMinute;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: (current ?? 18 * 60) ~/ 60,
+        minute: (current ?? 18 * 60) % 60,
+      ),
+    );
+    if (picked != null && mounted) {
+      widget.controller.filter = widget.controller.filter.copyWith(
+        fromMinute: picked.hour * 60 + picked.minute,
+      );
+    }
+  }
+
+  /// Narrows the public matches by date, part of the day and start time.
+  Widget _filterBar() {
+    final controller = widget.controller;
+    final filter = controller.filter;
+    String dayLabel(DateTime day) =>
+        '${day.day.toString().padLeft(2, '0')}/'
+        '${day.month.toString().padLeft(2, '0')}';
+    String timeLabel(int minute) =>
+        '${(minute ~/ 60).toString().padLeft(2, '0')}:'
+        '${(minute % 60).toString().padLeft(2, '0')}';
+    return Container(
+      key: const ValueKey('filter_card'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: KickoffColors.panel,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.tune_rounded, color: KickoffColors.yellow),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Filter matches',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (!filter.isEmpty)
+                TextButton(
+                  key: const ValueKey('filter_clear'),
+                  onPressed: () => controller.filter = const MatchFilter(),
+                  child: const Text('Clear'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final part in DayPart.values)
+                ChoiceChip(
+                  key: ValueKey('filter_${part.name}'),
+                  label: Text(part.label),
+                  selected: filter.part == part,
+                  onSelected: (on) => controller.filter = on
+                      ? filter.copyWith(part: part)
+                      : filter.copyWith(clearPart: true),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              ActionChip(
+                key: const ValueKey('filter_day'),
+                avatar: const Icon(Icons.event_rounded, size: 18),
+                label: Text(
+                  filter.day == null ? 'Any date' : dayLabel(filter.day!),
+                ),
+                onPressed: _pickDay,
+              ),
+              if (filter.day != null)
+                ActionChip(
+                  label: const Text('Any date'),
+                  onPressed: () =>
+                      controller.filter = filter.copyWith(clearDay: true),
+                ),
+              ActionChip(
+                key: const ValueKey('filter_time'),
+                avatar: const Icon(Icons.schedule_rounded, size: 18),
+                label: Text(
+                  filter.fromMinute == null
+                      ? 'Any time'
+                      : 'From ${timeLabel(filter.fromMinute!)}',
+                ),
+                onPressed: _pickFromTime,
+              ),
+              if (filter.fromMinute != null)
+                ActionChip(
+                  label: const Text('Any time'),
+                  onPressed: () => controller.filter = filter.copyWith(
+                    clearFromMinute: true,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Offers to sort the public matches by distance. The location stays on the
   /// phone and is only asked for when the player taps the button.

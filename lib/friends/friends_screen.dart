@@ -235,13 +235,27 @@ class _FriendsScreenState extends State<FriendsScreen> {
               name: friend.username,
               subtitle: 'Tap to chat',
               onTap: () => _chat(friend),
-              trailing: IconButton(
-                tooltip: 'Remove friend',
-                onPressed: () => _remove(friend),
-                icon: const Icon(
-                  Icons.person_remove_rounded,
-                  color: KickoffColors.muted,
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: ValueKey('chat_${friend.id}'),
+                    tooltip: 'Chat',
+                    onPressed: () => _chat(friend),
+                    icon: const Icon(
+                      Icons.chat_bubble_rounded,
+                      color: KickoffColors.yellow,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remove friend',
+                    onPressed: () => _remove(friend),
+                    icon: const Icon(
+                      Icons.person_remove_rounded,
+                      color: KickoffColors.muted,
+                    ),
+                  ),
+                ],
               ),
             ),
           const SizedBox(height: 12),

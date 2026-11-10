@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../daylight/daylight_service.dart';
+import '../../travel/travel_service.dart';
 import '../../screens/kickoff_style.dart';
 import '../models/challenge_model.dart';
 import 'star_rating.dart';
 
 final _daylight = DaylightService();
+final _travel = TravelService();
 
 class ChallengeCard extends StatelessWidget {
   const ChallengeCard({
@@ -139,6 +141,8 @@ class ChallengeCard extends StatelessWidget {
                   start: date,
                   minutes: challenge.durationMinutes,
                 ),
+                SizedBox(height: 8 * scale),
+                TravelRow(service: _travel, place: challenge.locationName),
                 SizedBox(height: 8 * scale),
               ],
               Align(

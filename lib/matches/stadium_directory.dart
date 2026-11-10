@@ -23,6 +23,67 @@ abstract class StadiumDirectory {
   Future<void> release(int bookingId);
 }
 
+/// One player's review of a stadium.
+class StadiumReview {
+  const StadiumReview({
+    required this.userName,
+    required this.stars,
+    required this.comment,
+    required this.mine,
+  });
+
+  final String userName;
+  final int stars;
+  final String comment;
+
+  /// Written by the signed-in player.
+  final bool mine;
+}
+
+class StadiumReviewSet {
+  const StadiumReviewSet({
+    required this.rating,
+    required this.count,
+    required this.canReview,
+    required this.reviews,
+  });
+
+  factory StadiumReviewSet.fromJson(Map<String, dynamic> json) =>
+      StadiumReviewSet(
+        rating: (json['rating'] as num?)?.toDouble(),
+        count: json['count'] as int? ?? 0,
+        canReview: json['canReview'] as bool? ?? false,
+        reviews: [
+          for (final item in json['reviews'] as List<dynamic>? ?? const [])
+            StadiumReview(
+              userName: (item as Map<String, dynamic>)['userName'] as String,
+              stars: item['stars'] as int,
+              comment: item['comment'] as String? ?? '',
+              mine: item['mine'] as bool? ?? false,
+            ),
+        ],
+      );
+
+  /// Average stars, null before the first review.
+  final double? rating;
+  final int count;
+
+  /// The player booked this stadium, so they may write a review.
+  final bool canReview;
+  final List<StadiumReview> reviews;
+}
+
+/// Implemented by directories that can show and take stadium reviews.
+abstract class StadiumReviewSource {
+  Future<StadiumReviewSet> reviews(int stadiumId);
+
+  Future<void> submitReview(
+    int stadiumId, {
+    required int stars,
+    required String comment,
+  });
+}
+
 class StadiumDirectoryException implements Exception {
   const StadiumDirectoryException(this.message, {this.statusCode});
 
@@ -57,6 +118,8 @@ class RealStadium {
     required this.address,
     required this.pricePerHour,
     required this.pitches,
+    this.rating,
+    this.reviewCount = 0,
   });
 
   factory RealStadium.fromJson(Map<String, dynamic> json) => RealStadium(
@@ -64,6 +127,8 @@ class RealStadium {
     name: json['name'] as String,
     address: json['address'] as String? ?? '',
     pricePerHour: json['pricePerHour'] as int? ?? 0,
+    rating: (json['rating'] as num?)?.toDouble(),
+    reviewCount: json['reviewCount'] as int? ?? 0,
     pitches: [
       for (final pitch in json['pitches'] as List<dynamic>? ?? const [])
         RealPitch(
@@ -79,6 +144,10 @@ class RealStadium {
   final String address;
   final int pricePerHour;
   final List<RealPitch> pitches;
+
+  /// Average stars, null before the first review.
+  final double? rating;
+  final int reviewCount;
 
   int get maxCapacity => pitches.isEmpty
       ? 10

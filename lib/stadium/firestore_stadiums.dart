@@ -203,7 +203,8 @@ class FirestoreStadiumApi implements StadiumApi {
 }
 
 /// What the Match module uses to find stadiums and hold a slot, on Firestore.
-class FirestoreStadiumDirectory implements StadiumDirectory {
+class FirestoreStadiumDirectory
+    implements StadiumDirectory, StadiumReviewSource {
   FirestoreStadiumDirectory({
     required this.meId,
     required this.meName,
@@ -328,6 +329,33 @@ class FirestoreStadiumDirectory implements StadiumDirectory {
     await _store.mutate(
       stadiumOfId(bookingId),
       (doc) => StadiumRules.release(doc, meId, bookingId),
+    );
+  });
+
+  @override
+  Future<StadiumReviewSet> reviews(int stadiumId) => _run(() async {
+    final doc = await _store.get(stadiumId);
+    if (doc == null) throw const StadiumFailure(404, 'Stadium not found.');
+    return StadiumReviewSet.fromJson(
+      StadiumRules.reviewsJson(doc, meId).cast<String, dynamic>(),
+    );
+  });
+
+  @override
+  Future<void> submitReview(
+    int stadiumId, {
+    required int stars,
+    required String comment,
+  }) => _run(() async {
+    await _store.mutate(
+      stadiumId,
+      (doc) => StadiumRules.addReview(
+        doc,
+        userId: meId,
+        userName: meName,
+        stars: stars,
+        comment: comment,
+      ),
     );
   });
 }

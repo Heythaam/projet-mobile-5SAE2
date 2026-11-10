@@ -12,10 +12,16 @@ class MatchStadiumData {
     this.latitude,
     this.longitude,
     this.stadiumId,
+    this.rating,
+    this.reviewCount = 0,
   });
 
   /// The Stadium module's id, or null for a sample stadium.
   final int? stadiumId;
+
+  /// Average stars of a real stadium, null before its first review.
+  final double? rating;
+  final int reviewCount;
 
   final String name;
   final String distance;

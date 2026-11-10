@@ -6,6 +6,7 @@ import '../../matches/match_controller.dart';
 import '../../matches/stadium_directory.dart';
 import 'match_mock_data.dart';
 import 'match_widgets.dart';
+import 'stadium_reviews_sheet.dart';
 
 const _stadiumCardRadius = 22.0;
 const _stadiumBorderWidth = 4.0;
@@ -59,7 +60,7 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
               child: Text(
-                'Sample stadiums. Sign in and start the server to book real ones.',
+                'Sample stadiums. Sign in to book real ones.',
                 key: ValueKey('sample_stadiums_note'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: KickoffColors.muted, fontSize: 12),
@@ -116,7 +117,18 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
                                         horizontal: 8,
                                         vertical: 8,
                                       ),
-                                      child: _StadiumCard(stadium: stadium),
+                                      child: _StadiumCard(
+                                        stadium: stadium,
+                                        onReviews:
+                                            stadium.stadiumId != null &&
+                                                widget.controller.canReview
+                                            ? () => showStadiumReviews(
+                                                context,
+                                                widget.controller,
+                                                stadium,
+                                              )
+                                            : null,
+                                      ),
                                     ),
                                   );
                                 },
@@ -208,9 +220,12 @@ class _StadiumPickScreenState extends State<StadiumPickScreen> {
 }
 
 class _StadiumCard extends StatelessWidget {
-  const _StadiumCard({required this.stadium});
+  const _StadiumCard({required this.stadium, this.onReviews});
 
   final MatchStadiumData stadium;
+
+  /// Opens the stadium's reviews; null for sample stadiums.
+  final VoidCallback? onReviews;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -262,6 +277,18 @@ class _StadiumCard extends StatelessWidget {
                         icon: Icons.groups_rounded,
                         label: '${stadium.players}',
                       ),
+                      if (onReviews != null)
+                        GestureDetector(
+                          key: const ValueKey('stadium_reviews'),
+                          onTap: onReviews,
+                          child: StatChip(
+                            icon: Icons.star_rounded,
+                            iconColor: KickoffColors.yellow,
+                            label: stadium.rating == null
+                                ? 'Reviews'
+                                : '${stadium.rating} (${stadium.reviewCount})',
+                          ),
+                        ),
                     ],
                   ),
                 ],
