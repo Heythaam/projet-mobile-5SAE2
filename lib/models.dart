@@ -4,9 +4,16 @@ class UserAccount {
     required this.username,
     required this.email,
     this.usernameChosen = true,
+    this.uid,
   });
 
   final int id;
+
+  /// Firebase user id. Null for accounts that come from the old server.
+  final String? uid;
+
+  /// The id the phone's own data is saved under.
+  String get storageUid => uid ?? '$id';
   final String username;
   final String email;
 

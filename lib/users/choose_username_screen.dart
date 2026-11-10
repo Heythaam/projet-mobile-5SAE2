@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../api_client.dart';
+import '../auth/account_service.dart';
 import '../models.dart';
 import '../screens/kickoff_style.dart';
 
@@ -8,13 +8,13 @@ import '../screens/kickoff_style.dart';
 /// one else has.
 class ChooseUsernameScreen extends StatefulWidget {
   const ChooseUsernameScreen({
-    required this.api,
+    required this.account,
     required this.onDone,
     required this.onLogout,
     super.key,
   });
 
-  final ApiClient api;
+  final AccountService account;
   final ValueChanged<UserAccount> onDone;
   final VoidCallback onLogout;
 
@@ -41,12 +41,12 @@ class _ChooseUsernameScreenState extends State<ChooseUsernameScreen> {
       _error = null;
     });
     try {
-      final user = await widget.api.setUsername(_username.text.trim());
+      final user = await widget.account.setUsername(_username.text.trim());
       if (mounted) widget.onDone(user);
-    } on ApiException catch (error) {
+    } on AccountException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not reach the server.');
+      if (mounted) setState(() => _error = 'Could not reach the cloud.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

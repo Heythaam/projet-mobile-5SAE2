@@ -27,37 +27,14 @@ class FirebaseCloudSync implements CloudSync {
   final _db = FirebaseFirestore.instance;
 
   @override
-  Future<void> signIn({required String email, required String password}) async {
+  Future<Map<String, dynamic>?> pullProfile() async {
+    final cloudUid = _auth.currentUser?.uid;
+    if (cloudUid == null) return null;
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
-    } on FirebaseAuthException catch (error) {
-      const missing = {'user-not-found', 'invalid-credential'};
-      if (!missing.contains(error.code)) return;
-      try {
-        await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      } catch (_) {
-        // Wrong password for an existing cloud account, or offline.
-      }
-    } catch (_) {}
-  }
-
-  @override
-  Future<void> signInWithGoogle(String idToken) async {
-    try {
-      await _auth.signInWithCredential(
-        GoogleAuthProvider.credential(idToken: idToken),
-      );
-    } catch (_) {}
-  }
-
-  @override
-  Future<void> signOut() async {
-    try {
-      await _auth.signOut();
-    } catch (_) {}
+      return (await _db.collection('users').doc(cloudUid).get()).data();
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -67,14 +44,13 @@ class FirebaseCloudSync implements CloudSync {
     try {
       await _db.collection('users').doc(cloudUid).set({
         'uid': user.uid,
-        'username': user.username,
         'email': user.email,
         'bio': user.bio,
         'position': user.position,
         'avatarId': user.avatarId,
         'country': user.country,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
     } catch (_) {}
   }
 

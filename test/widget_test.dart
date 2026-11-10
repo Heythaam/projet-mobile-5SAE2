@@ -3,13 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
-import 'package:football_match_app/auth/google_auth.dart';
 import 'package:football_match_app/auth_screen.dart';
 import 'package:football_match_app/matches/football_match.dart';
 import 'package:football_match_app/matches/match_repository.dart';
 import 'package:football_match_app/models.dart';
 import 'package:football_match_app/screens/calendar_screen.dart';
 import 'package:football_match_app/screens/kickoff_shell.dart';
+
+import 'support/fake_account_service.dart';
 
 void main() {
   testWidgets('switches between sign in and account creation', (
@@ -19,7 +20,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: AuthScreen(
-          api: ApiClient(),
+          account: FakeAccountService(),
           onAuthenticated: (user) => signedInUser = user,
         ),
       ),
@@ -42,7 +43,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: AuthScreen(api: ApiClient(), onAuthenticated: (_) {}),
+        home: AuthScreen(account: FakeAccountService(), onAuthenticated: (_) {}),
       ),
     );
     expect(find.byKey(const ValueKey('auth_google')), findsNothing);
@@ -50,8 +51,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: AuthScreen(
-          api: ApiClient(),
-          googleAuth: _FakeGoogle(),
+          account: FakeAccountService(supportsGoogle: true),
           onAuthenticated: (_) {},
         ),
       ),
@@ -312,7 +312,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: AuthScreen(
-          api: ApiClient(),
+          account: FakeAccountService(),
           onAuthenticated: (_) {},
         ),
       ),
@@ -424,6 +424,7 @@ Widget _shell({
   ),
   home: KickoffShell(
     api: api ?? _FakeApiClient(pendingRequests: pendingRequests),
+    account: FakeAccountService(),
     user: const UserAccount(id: 1, username: 'player', email: 'p@example.com'),
     onLogout: () {},
     matchRepository: const EmptyMatchRepository(),
@@ -434,6 +435,7 @@ Widget _shell({
 Widget _guestShell() => MaterialApp(
   home: KickoffShell(
     api: _GuestApiClient(),
+    account: FakeAccountService(),
     user: const UserAccount(id: 0, username: 'guest', email: 'guest@local'),
     isGuest: true,
     onLogout: () {},
@@ -476,11 +478,3 @@ class _FakeApiClient extends Fake implements ApiClient {
 }
 
 class _GuestApiClient extends Fake implements ApiClient {}
-
-class _FakeGoogle implements GoogleAuth {
-  @override
-  Future<String?> idToken() async => null;
-
-  @override
-  Future<void> signOut() async {}
-}

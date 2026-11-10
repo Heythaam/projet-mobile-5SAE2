@@ -54,18 +54,39 @@ class UserProfileController extends ChangeNotifier {
   Future<void> _load() async {
     try {
       final store = await _ensureStore();
-      profile =
-          await store.getByUid(uid) ??
-          await store.create(
-            uid: uid,
-            username: accountUsername,
-            email: email,
-          );
+      profile = await store.getByUid(uid) ?? await _firstCopy(store);
     } on LocalUserException catch (error) {
       lastError = error.message;
     } catch (_) {
       lastError = 'Your profile could not be loaded from this phone.';
     }
+  }
+
+  /// First time this phone sees the account: start from the cloud profile (so
+  /// a second phone gets the same bio, position and avatar) or, without one,
+  /// from the account itself.
+  Future<LocalUser> _firstCopy(UserLocalStore store) async {
+    final remote = await cloud.pullProfile();
+    if (remote != null) {
+      try {
+        final created = await store.create(
+          uid: uid,
+          username: accountUsername,
+          email: email,
+          bio: '${remote['bio'] ?? ''}',
+          position: remote['position'] as String?,
+          avatarId: (remote['avatarId'] as num?)?.toInt() ?? 0,
+        );
+        final country = remote['country'];
+        if (country is String && country.isNotEmpty) {
+          return await store.updateProfile(uid, country: country);
+        }
+        return created;
+      } on LocalUserException {
+        // A value in the cloud copy is not valid here: start from the account.
+      }
+    }
+    return store.create(uid: uid, username: accountUsername, email: email);
   }
 
   /// Saves the changes. Returns false and sets [lastError] when a value is not

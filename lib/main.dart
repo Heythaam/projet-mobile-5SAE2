@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'api_client.dart';
+import 'auth/account_service.dart';
+import 'auth/firebase_account_service.dart';
 import 'auth/google_auth.dart';
 import 'auth_screen.dart';
 import 'local/session_store.dart';
@@ -15,12 +17,20 @@ import 'firebase/firebase_cloud_sync.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final cloud = await FirebaseCloudSync.start();
-  runApp(FootballMatchApp(cloud: cloud));
+  final AccountService account = cloud is FirebaseCloudSync
+      ? FirebaseAccountService(google: PlatformGoogleAuth())
+      : const UnavailableAccountService();
+  runApp(FootballMatchApp(account: account, cloud: cloud));
 }
 
 class FootballMatchApp extends StatefulWidget {
-  const FootballMatchApp({this.cloud = const NoopCloudSync(), super.key});
+  const FootballMatchApp({
+    required this.account,
+    this.cloud = const NoopCloudSync(),
+    super.key,
+  });
 
+  final AccountService account;
   final CloudSync cloud;
 
   @override
@@ -36,13 +46,15 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
 
   /// True while a signed-in player adds another account from Settings.
   bool _adding = false;
+
+  /// Email to fill in on the login screen after choosing a saved profile.
+  String? _prefillEmail;
   Object? _startupError;
   bool _starting = true;
 
   @override
   void initState() {
     super.initState();
-    _api.onSessionExpired = _expire;
     _restoreSession();
   }
 
@@ -55,7 +67,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         await store.clear();
       } else {
         await store.save(
-          uid: '${user.id}',
+          uid: user.storageUid,
           username: user.username,
           email: user.email,
         );
@@ -70,7 +82,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
       } catch (_) {
         // Without saved settings the app simply opens unlocked.
       }
-      final user = await _api.restoreSession();
+      final user = await widget.account.restoreSession();
       if (user != null) await _remember(user);
       if (!mounted) return;
       setState(() {
@@ -88,9 +100,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   }
 
   Future<void> _logout() async {
-    await _api.logout();
-    await widget.cloud.signOut();
-    await PlatformGoogleAuth().signOut();
+    await widget.account.logout();
     await _remember(null);
     if (mounted) {
       setState(() {
@@ -100,26 +110,16 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     }
   }
 
-  /// Makes another account signed in on this phone the active one. False when
-  /// its session no longer works.
-  Future<bool> _switchTo(int id) async {
-    final user = await _api.switchTo(id);
-    if (user == null) return false;
-    // The cloud account belongs to the previous player.
-    await widget.cloud.signOut();
-    await _remember(user);
-    if (mounted) {
-      setState(() {
-        _user = user;
-        _adding = false;
-      });
-    }
+  /// Signs out and opens the login screen with the chosen profile's email
+  /// filled in: Firebase keeps one signed-in account at a time.
+  Future<bool> _switchTo(String uid) async {
+    final saved = (await widget.account.rememberedAccounts())
+        .where((a) => a.uid == uid)
+        .firstOrNull;
+    if (saved == null) return false;
+    await _logout();
+    if (mounted) setState(() => _prefillEmail = saved.email);
     return true;
-  }
-
-  /// The server no longer accepts the saved session: back to the login.
-  void _expire() {
-    if (_user != null) _logout();
   }
 
   Widget _locked(Widget shell) {
@@ -176,9 +176,8 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
           )
         : _user == null || _adding
         ? AuthScreen(
-            api: _api,
-            cloud: widget.cloud,
-            googleAuth: PlatformGoogleAuth(),
+            account: widget.account,
+            prefillEmail: _prefillEmail,
             onCancel: _user != null
                 ? () => setState(() => _adding = false)
                 : null,
@@ -187,12 +186,13 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               setState(() {
                 _user = user;
                 _adding = false;
+                _prefillEmail = null;
               });
             },
           )
         : !_user!.usernameChosen
         ? ChooseUsernameScreen(
-            api: _api,
+            account: widget.account,
             onLogout: _logout,
             onDone: (user) {
               _remember(user);
@@ -203,11 +203,12 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
             KickoffShell(
               key: ValueKey(_user!.id),
               api: _api,
+              account: widget.account,
               cloud: widget.cloud,
               user: _user!,
               onLogout: _logout,
               onSwitchAccount: _switchTo,
-              onForgetAccount: _api.forgetAccount,
+              onForgetAccount: widget.account.forget,
               onAddAccount: () => setState(() => _adding = true),
               appLock: _appLock,
               authenticator: _authenticator,

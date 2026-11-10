@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../auth/account_service.dart';
 import '../firebase/cloud_sync.dart';
 import '../friends/friends_screen.dart';
 import '../settings/settings_screen.dart';
@@ -63,6 +64,7 @@ final _guestMatches = <FootballMatch>[
 class KickoffShell extends StatefulWidget {
   const KickoffShell({
     required this.api,
+    required this.account,
     required this.user,
     required this.onLogout,
     this.isGuest = false,
@@ -83,12 +85,13 @@ class KickoffShell extends StatefulWidget {
   final Authenticator? authenticator;
 
   final ApiClient api;
+  final AccountService account;
   final CloudSync cloud;
 
   /// Account switching from Settings → Profiles; null hides nothing, the
   /// screen simply cannot switch.
-  final Future<bool> Function(int id)? onSwitchAccount;
-  final Future<void> Function(int id)? onForgetAccount;
+  final Future<bool> Function(String uid)? onSwitchAccount;
+  final Future<void> Function(String uid)? onForgetAccount;
   final VoidCallback? onAddAccount;
   final UserAccount user;
   final VoidCallback onLogout;
@@ -111,7 +114,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   String? _matchesError;
   bool _showHistoryOnCalendar = false;
   late final _matchController = MatchController(
-    uid: widget.isGuest ? 'guest' : '${widget.user.id}',
+    uid: widget.isGuest ? 'guest' : widget.user.storageUid,
     username: widget.isGuest ? 'Guest' : widget.user.username,
     cloud: widget.isGuest ? const NoopCloudSync() : widget.cloud,
   );
@@ -122,7 +125,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   late final UserProfileController? _profileController = widget.isGuest
       ? null
       : UserProfileController(
-          uid: '${widget.user.id}',
+          uid: widget.user.storageUid,
           accountUsername: widget.user.username,
           email: widget.user.email,
           cloud: widget.cloud,
@@ -285,7 +288,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => SettingsScreen(
-          api: widget.api,
+          account: widget.account,
           user: widget.user,
           onLogout: widget.onLogout,
           onEditProfile: _profileController?.profile == null

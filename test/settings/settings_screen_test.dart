@@ -1,34 +1,27 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/api_client.dart';
+import 'package:football_match_app/auth/account_service.dart';
 import 'package:football_match_app/models.dart';
 import 'package:football_match_app/settings/settings_screen.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../support/fake_account_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const me = UserAccount(id: 1, username: 'ann', email: 'a@x.tn');
-
-  ApiClient api() => ApiClient(
-    baseUrl: 'http://api.test',
-    client: MockClient((_) async => http.Response('{}', 200)),
+  const me = UserAccount(
+    id: 1,
+    uid: 'uid_ann',
+    username: 'ann',
+    email: 'a@x.tn',
   );
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-    FlutterSecureStorage.setMockInitialValues({
-      'accounts': jsonEncode({
-        '1': {'token': 't1', 'username': 'ann', 'email': 'a@x.tn'},
-        '2': {'token': 't2', 'username': 'bob', 'email': 'b@x.tn'},
-      }),
-    });
-  });
+  FakeAccountService accounts() => FakeAccountService(
+    remembered: const [
+      RememberedAccount(uid: 'uid_ann', username: 'ann', email: 'a@x.tn'),
+      RememberedAccount(uid: 'uid_bob', username: 'bob', email: 'b@x.tn'),
+    ],
+  );
 
   testWidgets('settings has the five options, a theme switch and log out', (
     tester,
@@ -37,7 +30,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: SettingsScreen(
-          api: api(),
+          account: accounts(),
           user: me,
           onEditProfile: () {},
           onLogout: () => loggedOut = true,
@@ -62,14 +55,14 @@ void main() {
   testWidgets('profiles lists the other account and switches to it', (
     tester,
   ) async {
-    int? switched;
+    String? switched;
     await tester.pumpWidget(
       MaterialApp(
         home: ProfilesScreen(
-          api: api(),
+          account: accounts(),
           user: me,
-          onSwitchAccount: (id) async {
-            switched = id;
+          onSwitchAccount: (uid) async {
+            switched = uid;
             return true;
           },
           onForgetAccount: (_) async {},
@@ -81,10 +74,10 @@ void main() {
 
     expect(find.byKey(const ValueKey('profile_active')), findsOneWidget);
     expect(find.text('@bob'), findsOneWidget);
-    expect(find.byKey(const ValueKey('profile_2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('profile_uid_bob')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('profile_2')));
+    await tester.tap(find.byKey(const ValueKey('profile_uid_bob')));
     await tester.pumpAndSettle();
-    expect(switched, 2);
+    expect(switched, 'uid_bob');
   });
 }

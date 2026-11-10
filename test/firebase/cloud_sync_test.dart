@@ -12,6 +12,7 @@ class _FakeCloud extends NoopCloudSync {
   final pushed = <LocalMatch>[];
   final deleted = <String>[];
   final profiles = <LocalUser>[];
+  Map<String, dynamic>? remoteProfile;
 
   @override
   Future<void> pushMatch(LocalMatch match) async => pushed.add(match);
@@ -21,6 +22,9 @@ class _FakeCloud extends NoopCloudSync {
 
   @override
   Future<void> pushProfile(LocalUser user) async => profiles.add(user);
+
+  @override
+  Future<Map<String, dynamic>?> pullProfile() async => remoteProfile;
 }
 
 void main() {
@@ -84,5 +88,41 @@ void main() {
     await controller.load();
     expect(await controller.save(bio: 'Striker'), isTrue);
     expect(cloud.profiles.single.bio, 'Striker');
+  });
+
+  test('a new phone restores the profile from the cloud copy', () async {
+    cloud.remoteProfile = {
+      'bio': 'Left foot only',
+      'position': 'MID',
+      'avatarId': 3,
+      'country': 'TN',
+    };
+    final controller = UserProfileController(
+      uid: 'firebase-uid',
+      accountUsername: 'farouk',
+      email: 'f@example.com',
+      openStore: () async => UserLocalStore(db),
+      cloud: cloud,
+    );
+    await controller.load();
+
+    expect(controller.profile?.bio, 'Left foot only');
+    expect(controller.profile?.position, 'MID');
+    expect(controller.profile?.avatarId, 3);
+    expect(controller.profile?.country, 'TN');
+  });
+
+  test('without a cloud copy the profile starts from the account', () async {
+    final controller = UserProfileController(
+      uid: 'firebase-uid',
+      accountUsername: 'farouk',
+      email: 'f@example.com',
+      openStore: () async => UserLocalStore(db),
+      cloud: cloud,
+    );
+    await controller.load();
+
+    expect(controller.profile?.username, 'farouk');
+    expect(controller.profile?.bio, '');
   });
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../api_client.dart';
+import '../auth/account_service.dart';
 import '../models.dart';
 import '../screens/kickoff_style.dart';
 import '../security/app_lock.dart';
@@ -10,7 +10,7 @@ import 'theme_preference.dart';
 /// Settings: edit profile, theme, security, profiles and log out.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
-    required this.api,
+    required this.account,
     required this.user,
     required this.onLogout,
     this.onEditProfile,
@@ -24,7 +24,7 @@ class SettingsScreen extends StatefulWidget {
     super.key,
   });
 
-  final ApiClient api;
+  final AccountService account;
   final UserAccount user;
   final VoidCallback onLogout;
   final VoidCallback? onEditProfile;
@@ -34,8 +34,8 @@ class SettingsScreen extends StatefulWidget {
   final AppLockSettings? appLock;
   final Future<bool> Function(bool on)? onSetAppLock;
 
-  final Future<bool> Function(int id)? onSwitchAccount;
-  final Future<void> Function(int id)? onForgetAccount;
+  final Future<bool> Function(String uid)? onSwitchAccount;
+  final Future<void> Function(String uid)? onForgetAccount;
   final VoidCallback? onAddAccount;
   final VoidCallback? onOpenPeople;
   final VoidCallback? onResetProfile;
@@ -153,7 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle: 'Switch or disconnect',
         onTap: () => _open(
           ProfilesScreen(
-            api: widget.api,
+            account: widget.account,
             user: widget.user,
             onSwitchAccount: widget.onSwitchAccount,
             onForgetAccount: widget.onForgetAccount,
@@ -237,7 +237,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
 /// to switch to one, disconnect one or add another.
 class ProfilesScreen extends StatefulWidget {
   const ProfilesScreen({
-    required this.api,
+    required this.account,
     required this.user,
     this.onSwitchAccount,
     this.onForgetAccount,
@@ -247,10 +247,10 @@ class ProfilesScreen extends StatefulWidget {
     super.key,
   });
 
-  final ApiClient api;
+  final AccountService account;
   final UserAccount user;
-  final Future<bool> Function(int id)? onSwitchAccount;
-  final Future<void> Function(int id)? onForgetAccount;
+  final Future<bool> Function(String uid)? onSwitchAccount;
+  final Future<void> Function(String uid)? onForgetAccount;
   final VoidCallback? onAddAccount;
   final VoidCallback? onOpenPeople;
   final VoidCallback? onResetProfile;
@@ -260,7 +260,7 @@ class ProfilesScreen extends StatefulWidget {
 }
 
 class _ProfilesScreenState extends State<ProfilesScreen> {
-  List<SavedAccount> _others = const [];
+  List<RememberedAccount> _others = const [];
   bool _loading = true;
 
   @override
@@ -271,10 +271,10 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
 
   Future<void> _load() async {
     try {
-      final all = await widget.api.savedAccounts();
+      final all = await widget.account.rememberedAccounts();
       if (!mounted) return;
       setState(() {
-        _others = all.where((a) => a.id != widget.user.id).toList();
+        _others = all.where((a) => a.uid != widget.user.storageUid).toList();
         _loading = false;
       });
     } catch (_) {
@@ -286,20 +286,20 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     context,
   ).showSnackBar(SnackBar(content: Text(text)));
 
-  Future<void> _switch(SavedAccount account) async {
+  Future<void> _switch(RememberedAccount account) async {
     final change = widget.onSwitchAccount;
     if (change == null) return;
-    final ok = await change(account.id);
+    final ok = await change(account.uid);
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
-      _toast('That session expired. Sign in to @${account.username} again.');
+      _toast('Could not switch to @${account.username}.');
       await _load();
     }
   }
 
-  Future<void> _disconnect(SavedAccount account) async {
+  Future<void> _disconnect(RememberedAccount account) async {
     final forget = widget.onForgetAccount;
     if (forget == null) return;
     final ok = await showDialog<bool>(
@@ -322,7 +322,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       ),
     );
     if (ok != true) return;
-    await forget(account.id);
+    await forget(account.uid);
     await _load();
   }
 
@@ -355,7 +355,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       else
         for (final account in _others)
           _Row(
-            key: ValueKey('profile_${account.id}'),
+            key: ValueKey('profile_${account.uid}'),
             icon: Icons.person_rounded,
             title: '@${account.username}',
             subtitle: 'Tap to switch',

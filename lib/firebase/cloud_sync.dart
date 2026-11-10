@@ -1,18 +1,13 @@
 import '../local/match_local_store.dart';
 import '../local/user_local_store.dart';
 
-/// Copies the phone's data to the cloud. The phone (SQFlite) stays the main
+/// Copies the phone's data to the cloud and back. The phone (SQFlite) stays the main
 /// copy, so every call is best effort: it never throws and the app keeps
 /// working offline.
 abstract class CloudSync {
-  /// Signs in to the cloud with the same email and password as the account,
-  /// creating the cloud account the first time.
-  Future<void> signIn({required String email, required String password});
-
-  /// Signs in to the cloud with the Google ID token.
-  Future<void> signInWithGoogle(String idToken);
-
-  Future<void> signOut();
+  /// The signed-in player's profile as saved in the cloud, or null when there
+  /// is none or the phone is offline. Used to restore it on a new phone.
+  Future<Map<String, dynamic>?> pullProfile();
 
   Future<void> pushProfile(LocalUser user);
 
@@ -26,13 +21,7 @@ class NoopCloudSync implements CloudSync {
   const NoopCloudSync();
 
   @override
-  Future<void> signIn({required String email, required String password}) async {}
-
-  @override
-  Future<void> signInWithGoogle(String idToken) async {}
-
-  @override
-  Future<void> signOut() async {}
+  Future<Map<String, dynamic>?> pullProfile() async => null;
 
   @override
   Future<void> pushProfile(LocalUser user) async {}

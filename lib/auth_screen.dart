@@ -1,28 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'api_client.dart';
-import 'auth/google_auth.dart';
-import 'firebase/cloud_sync.dart';
+import 'auth/account_service.dart';
 import 'models.dart';
 import 'screens/kickoff_style.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
-    required this.api,
+    required this.account,
     required this.onAuthenticated,
     this.onCancel,
-    this.cloud = const NoopCloudSync(),
-    this.googleAuth,
+    this.prefillEmail,
     super.key,
   });
 
-  final ApiClient api;
-  final CloudSync cloud;
-
-  /// Shows "Continue with Google" when set.
-  final GoogleAuth? googleAuth;
+  final AccountService account;
   final ValueChanged<UserAccount> onAuthenticated;
+
+  /// Fills the email field, for example after choosing a saved profile.
+  final String? prefillEmail;
 
   /// Set when the player came here to add another account; shows a back arrow.
   final VoidCallback? onCancel;
@@ -41,42 +37,29 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
   String? _error;
-  List<SavedAccount> _saved = const [];
+  List<RememberedAccount> _saved = const [];
 
   @override
   void initState() {
     super.initState();
+    _email.text = widget.prefillEmail ?? '';
     _loadSaved();
   }
 
   Future<void> _loadSaved() async {
     try {
-      final saved = await widget.api.savedAccounts();
+      final saved = await widget.account.rememberedAccounts();
       if (mounted) setState(() => _saved = saved);
     } catch (_) {}
   }
 
-  Future<void> _continueAs(SavedAccount account) async {
+  /// Fills in the email; the player only types the password.
+  void _continueAs(RememberedAccount account) {
     setState(() {
-      _busy = true;
+      _registering = false;
       _error = null;
+      _email.text = account.email;
     });
-    try {
-      final user = await widget.api.switchTo(account.id);
-      if (user == null) {
-        await _loadSaved();
-        if (mounted) {
-          setState(() => _error = 'That session expired. Please sign in.');
-        }
-        return;
-      }
-      await widget.cloud.signOut();
-      if (mounted) widget.onAuthenticated(user);
-    } catch (error) {
-      if (mounted) setState(() => _error = 'Could not sign in: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
@@ -107,12 +90,9 @@ class _AuthScreenState extends State<AuthScreen> {
       _error = null;
     });
     try {
-      final idToken = await widget.googleAuth!.idToken();
-      if (idToken == null) return; // cancelled
-      final user = await widget.api.loginWithGoogle(idToken);
-      await widget.cloud.signInWithGoogle(idToken);
-      if (mounted) widget.onAuthenticated(user);
-    } on ApiException catch (error) {
+      final user = await widget.account.loginWithGoogle();
+      if (user != null && mounted) widget.onAuthenticated(user);
+    } on AccountException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (error) {
       if (mounted) setState(() => _error = 'Google sign-in failed: $error');
@@ -129,25 +109,19 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     try {
       final user = _registering
-          ? await widget.api.register(
+          ? await widget.account.register(
               email: _email.text.trim(),
               password: _password.text,
             )
-          : await widget.api.login(
+          : await widget.account.login(
               email: _email.text.trim(),
               password: _password.text,
             );
-      await widget.cloud.signIn(
-        email: _email.text.trim(),
-        password: _password.text,
-      );
       if (mounted) widget.onAuthenticated(user);
-    } on ApiException catch (error) {
+    } on AccountException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (error) {
-      if (mounted) {
-        setState(() => _error = 'Could not connect to the server: $error');
-      }
+      if (mounted) setState(() => _error = 'Could not sign in: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -338,7 +312,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           busy: _busy,
                         ),
                       ),
-                      if (widget.googleAuth != null) ...[
+                      if (widget.account.supportsGoogle) ...[
                         SizedBox(height: 10 * scale),
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 14 * scale),
@@ -374,10 +348,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       if (!isSignUp)
                         for (final account in _saved)
                           TextButton(
-                            key: ValueKey('continue_${account.id}'),
-                            onPressed: _busy
-                                ? null
-                                : () => _continueAs(account),
+                            key: ValueKey('continue_${account.uid}'),
+                            onPressed: _busy ? null : () => _continueAs(account),
                             child: Text(
                               'Continue as @${account.username}',
                               style: TextStyle(

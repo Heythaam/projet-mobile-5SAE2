@@ -1,13 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/api_client.dart';
 import 'package:football_match_app/models.dart';
 import 'package:football_match_app/users/choose_username_screen.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
+
+import '../support/fake_account_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -15,33 +11,11 @@ void main() {
   testWidgets('the username must be free before the player moves on', (
     tester,
   ) async {
-    FlutterSecureStorage.setMockInitialValues({'auth_token': 't'});
     UserAccount? done;
-    final api = ApiClient(
-      baseUrl: 'http://api.test',
-      client: MockClient((request) async {
-        final name = (jsonDecode(request.body) as Map)['username'] as String;
-        if (name == 'taken') {
-          return http.Response(
-            jsonEncode({'error': 'That username is already taken.'}),
-            409,
-          );
-        }
-        return http.Response(
-          jsonEncode({
-            'id': 1,
-            'username': name,
-            'email': 'a@x.tn',
-            'usernameChosen': true,
-          }),
-          200,
-        );
-      }),
-    );
     await tester.pumpWidget(
       MaterialApp(
         home: ChooseUsernameScreen(
-          api: api,
+          account: FakeAccountService(takenUsernames: {'taken'}),
           onDone: (user) => done = user,
           onLogout: () {},
         ),
