@@ -375,6 +375,91 @@ class ChallengeDatabase {
     return Challenge.fromMap(result.first, currentUserId: userId);
   }
 
+  // ---- Cloud copy -------------------------------------------------------
+
+  Future<Challenge?> getById(int id, {int? userId}) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT c.*, t.name as team_name
+      FROM challenges c
+      LEFT JOIN teams t ON c.team_id = t.id
+      WHERE c.id = ?
+    ''', [id]);
+    if (result.isEmpty) return null;
+    return Challenge.fromMap(result.first, currentUserId: userId);
+  }
+
+  Future<List<int>> participantsOf(int challengeId) async {
+    final db = await database;
+    final rows = await db.query(
+      'challenge_participants',
+      columns: ['user_id'],
+      where: 'challenge_id = ?',
+      whereArgs: [challengeId],
+      orderBy: 'joined_at ASC',
+    );
+    return [for (final row in rows) row['user_id']! as int];
+  }
+
+  /// Saves a challenge as the cloud has it, replacing the phone's copy (found
+  /// by its join code) and its players.
+  Future<void> upsertFromCloud(
+    Challenge challenge,
+    List<int> participants,
+  ) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final existing = await txn.query(
+        'challenges',
+        columns: ['id'],
+        where: 'join_code = ?',
+        whereArgs: [challenge.joinCode],
+      );
+      final map = challenge.toMap()..remove('id');
+      map['current_players'] = participants.isEmpty ? 1 : participants.length;
+      final int id;
+      if (existing.isEmpty) {
+        id = await txn.insert('challenges', map);
+      } else {
+        id = existing.first['id']! as int;
+        await txn.update('challenges', map, where: 'id = ?', whereArgs: [id]);
+      }
+      await txn.delete(
+        'challenge_participants',
+        where: 'challenge_id = ?',
+        whereArgs: [id],
+      );
+      final now = DateTime.now().toIso8601String();
+      for (final user in participants) {
+        await txn.insert('challenge_participants', {
+          'challenge_id': id,
+          'user_id': user,
+          'joined_at': now,
+        });
+      }
+    });
+  }
+
+  /// Forgets a challenge on this phone only, for example when its creator
+  /// cancelled it on another phone.
+  Future<void> deleteByJoinCode(String code) async {
+    final db = await database;
+    final rows = await db.query(
+      'challenges',
+      columns: ['id'],
+      where: 'join_code = ?',
+      whereArgs: [code.trim().toUpperCase()],
+    );
+    for (final row in rows) {
+      await db.delete(
+        'challenge_participants',
+        where: 'challenge_id = ?',
+        whereArgs: [row['id']],
+      );
+      await db.delete('challenges', where: 'id = ?', whereArgs: [row['id']]);
+    }
+  }
+
   Future<bool> isJoinCodeUnique(String code) async {
     final db = await database;
     final result = await db.query(

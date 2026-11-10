@@ -5,6 +5,8 @@ import 'auth/account_service.dart';
 import 'auth/firebase_account_service.dart';
 import 'auth/google_auth.dart';
 import 'auth_screen.dart';
+import 'challenges/repository/challenge_cloud.dart';
+import 'challenges/repository/firestore_challenge_cloud.dart';
 import 'friends/firestore_friends_service.dart';
 import 'friends/friends_service.dart';
 import 'local/session_store.dart';
@@ -219,6 +221,9 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               api: _api,
               account: widget.account,
               friends: widget.friendsFor(_user!),
+              challengeCloud: widget.cloud is FirebaseCloudSync
+                  ? FirestoreChallengeCloud()
+                  : const NoopChallengeCloud(),
               cloud: widget.cloud,
               user: _user!,
               onLogout: _logout,

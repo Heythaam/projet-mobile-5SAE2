@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
+import '../challenges/repository/challenge_cloud.dart';
 import '../auth/account_service.dart';
 import '../firebase/cloud_sync.dart';
 import '../friends/friends_screen.dart';
@@ -68,6 +69,7 @@ class KickoffShell extends StatefulWidget {
     required this.account,
     required this.friends,
     required this.user,
+    this.challengeCloud = const NoopChallengeCloud(),
     required this.onLogout,
     this.isGuest = false,
     this.cloud = const NoopCloudSync(),
@@ -89,6 +91,7 @@ class KickoffShell extends StatefulWidget {
   final ApiClient api;
   final AccountService account;
   final FriendsService friends;
+  final ChallengeCloud challengeCloud;
   final CloudSync cloud;
 
   /// Account switching from Settings → Profiles; null hides nothing, the
@@ -252,7 +255,10 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ChallengesDashboardScreen(
-            repository: SqliteChallengeRepository(),
+            repository: SqliteChallengeRepository(
+              null,
+              widget.challengeCloud,
+            ),
             user: widget.user,
             isGuest: widget.isGuest,
           ),
