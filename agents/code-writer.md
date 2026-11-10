@@ -34,18 +34,17 @@ You are the Flutter developer responsible for implementing the Tournaments modul
 
 ```
 lib/
-└── tournaments/
-    ├── models/
-    │   └── tournament.dart
-    ├── services/
-    │   └── tournament_service.dart
-    ├── screens/
-    │   ├── tournaments_list_screen.dart
-    │   ├── tournament_detail_screen.dart
-    │   └── tournament_standings_screen.dart
-    └── widgets/
-        ├── tournament_card.dart
-        └── standings_widget.dart
+├── entities/tournament/
+│   └── tournament.dart
+├── services/tournament/
+│   └── tournament_service.dart
+├── views/tournament/
+│   ├── tournaments_list_screen.dart
+│   ├── tournament_detail_screen.dart
+│   └── tournament_standings_screen.dart
+└── items/tournament/
+    ├── tournament_card.dart
+    └── standings_widget.dart
 ```
 
 ---

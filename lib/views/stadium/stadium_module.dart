@@ -17,6 +17,7 @@ import '../../entities/stadium/stadium.dart';
 import '../../entities/user/dial_codes.dart';
 import '../../items/kickoff_style.dart';
 import '../../items/maps/pick_on_map_button.dart';
+import '../../items/stadium/stadium_icons.dart';
 import '../../services/stadium/stadium_api.dart';
 
 const _slotLengths = [60, 90, 120];
@@ -738,7 +739,7 @@ class _StadiumEditorScreenState extends State<StadiumEditorScreen> {
                         SizedBox(width: 10 * scale),
                         Flexible(
                           child: _IconText(
-                            icon: stadiumSurfaces[pitch.surface]!.$2,
+                            icon: stadiumSurfaceIcons[pitch.surface]!,
                             text: pitch.surfaceLabel,
                             color: KickoffColors.yellow,
                           ),
@@ -769,8 +770,8 @@ class _StadiumEditorScreenState extends State<StadiumEditorScreen> {
             if (index > 0) SizedBox(width: 8 * scale),
             Expanded(
               child: _FeatureTile(
-                label: entry.value.$1,
-                icon: entry.value.$2,
+                label: entry.value,
+                icon: stadiumFeatureIcons[entry.key]!,
                 selected: _draft.features.contains(entry.key),
                 onTap: () => setState(() {
                   if (!_draft.features.remove(entry.key)) {
@@ -1050,8 +1051,8 @@ class _PitchSheetState extends State<_PitchSheet> {
           children: [
             for (final entry in stadiumSurfaces.entries)
               _Pill(
-                label: entry.value.$1,
-                icon: entry.value.$2,
+                label: entry.value,
+                icon: stadiumSurfaceIcons[entry.key]!,
                 selected: _surface == entry.key,
                 onTap: () => setState(() => _surface = entry.key),
               ),

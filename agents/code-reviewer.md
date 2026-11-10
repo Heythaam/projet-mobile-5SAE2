@@ -22,8 +22,9 @@ You are a senior code reviewer for the Tournaments module. Your job is to ensure
 ## Review Checklist
 
 ### ✅ 1. Structure & Organization
-- [ ] Files are in the correct folder (`models/`, `services/`, `screens/`, `widgets/`)
-- [ ] No tournament logic lives outside the `tournaments/` folder
+- [ ] Files are in the correct folder (`entities/`, `services/`, `views/`, `items/`)
+- [ ] No tournament logic lives outside the `tournament/` subfolders
+- [ ] `package:http` and Firestore are imported only under `services/`
 - [ ] No code duplication — shared widgets are extracted
 - [ ] No business logic inside widget `build()` methods
 - [ ] Services are separated from UI completely

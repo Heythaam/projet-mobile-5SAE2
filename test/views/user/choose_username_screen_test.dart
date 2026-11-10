@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:football_match_app/entities/user/models.dart';
 import 'package:football_match_app/views/user/choose_username_screen.dart';
 
-import '../support/fake_account_service.dart';
+import '../../support/fake_account_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

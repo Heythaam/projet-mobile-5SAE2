@@ -39,7 +39,7 @@ More in [`docs/screenshots/`](docs/screenshots) and the design prototypes in
 
 ```
             ┌──────────────────────────── phone ───────────────────────────┐
- Flutter UI │  screens ─► controllers / services ─► repositories           │
+ Flutter UI │  views / items ─► services ─► bd (SQFlite)                 │
             │                                         │                    │
             │                       SQFlite  kickoff_local.db (offline)    │
             └─────────────────────────────────────────┼────────────────────┘
@@ -83,7 +83,7 @@ More in [`docs/screenshots/`](docs/screenshots) and the design prototypes in
 | Place search | Nominatim (OpenStreetMap) |
 | Car travel time | OSRM `router.project-osrm.org` |
 | Walking travel time | `routing.openstreetmap.de/routed-foot` |
-| Sunrise / sunset, weather | public HTTP APIs, parsed in `lib/daylight` and `lib/weather` |
+| Sunrise / sunset, weather | public HTTP APIs, parsed in `lib/services/challenge` and `lib/services/match` |
 | Map tiles | `flutter_map` with OpenStreetMap |
 
 ## Tech stack
@@ -97,17 +97,20 @@ Flutter 3.x / Dart 3.13 · `sqflite` · `firebase_core`, `firebase_auth`,
 
 ```
 lib/
-  main.dart                 app entry, wires Firebase services
-  auth/ users/ friends/     accounts, profile, friends and chat
-  matches/ screens/match/   match model, controller, filters, creation flow
-  stadium/                  stadium owner module and booking rules (Firestore)
-  challenges/               challenges (SQLite + Firestore sync)
-  tournaments/              models, rules, fixtures, screens (cloud/ = Firestore)
-  travel/ daylight/ weather/ location/ maps/   map and place helpers
-  local/ core/              SQFlite database, DocStore, session store
-  firebase/                 CloudSync interface and Firebase implementation
-  awards/ security/ settings/ sample_data/
-test/                       unit and widget tests, mirrors lib/
+  main.dart                 app entry, `routes:` map wiring, Firebase services
+  app_routes.dart           route names, route arguments and the routes map
+  entities/                 plain classes (toJson / fromJson), no Flutter, no I/O
+    user/ match/ stadium/ challenge/ tournament/
+  bd/                       SQFlite only: database, tables, CRUD, DocStore, stores
+  services/                 everything outside a screen: http, Firestore,
+    auth/ friends/ match/   SharedPreferences, rules and controllers
+    stadium/ challenge/ tournament/ user/ firebase/ location/ maps/
+    security/ settings/ awards/   api_client.dart, http_constants.dart
+  views/                    one full page per file
+    auth/ home/ user/ friends/ match/ stadium/ challenge/ tournament/ settings/ maps/
+  items/                    small reusable widgets used by the views
+    match/ stadium/ challenge/ tournament/ user/ awards/ maps/
+test/                       mirrors lib/ (test/services, test/views, test/bd, ...)
 docs/                       design prototypes, screenshots, tournaments spec
 tools/phone.ps1             run on a USB phone (see below)
 assets/sample_data.json     optional demo matches and challenges
@@ -160,7 +163,7 @@ uses Google sign-in needs its signing key's SHA-1 registered in Firebase.
 ```bash
 flutter analyze
 flutter test
-flutter test test/stadium/stadium_firestore_test.dart   # one file
+flutter test test/services/stadium/stadium_firestore_test.dart   # one file
 ```
 
 Cloud logic is tested without a network: `InMemoryTournamentStore` and
@@ -168,7 +171,7 @@ Cloud logic is tested without a network: `InMemoryTournamentStore` and
 runs through `sqflite_common_ffi` on the desktop.
 
 Known red test: `TournamentService reports malformed responses`
-(`test/tournaments_test.dart`) belongs to the legacy HTTP client and fails on
+(`test/services/tournament/tournaments_test.dart`) belongs to the legacy HTTP client and fails on
 `main` too.
 
 ## Known limits
@@ -182,7 +185,7 @@ Known red test: `TournamentService reports malformed responses`
   (bookings, joins and reviews are transactional).
 - Knockout rounds after round one are placeholders (same as the original
   server); tournament player XP and level are placeholders.
-- `lib/api_client.dart`, `TournamentService` and the old HTTP stadium client
+- `lib/services/api_client.dart`, `TournamentService` and the old HTTP stadium client
   remain as the base classes and fallback that the Firestore versions
   implement. The Dart server that used to back them has been removed.
 

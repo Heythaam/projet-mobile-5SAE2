@@ -4,7 +4,7 @@ import 'package:football_match_app/services/auth/account_service.dart';
 import 'package:football_match_app/entities/user/models.dart';
 import 'package:football_match_app/views/settings/settings_screen.dart';
 
-import '../support/fake_account_service.dart';
+import '../../support/fake_account_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

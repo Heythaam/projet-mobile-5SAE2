@@ -1,18 +1,16 @@
-import 'package:flutter/material.dart';
-
 const stadiumPitchSizes = ['5v5', '7v7', '11v11'];
 
-const stadiumSurfaces = <String, (String, IconData)>{
-  'turf': ('Turf', Icons.grass_rounded),
-  'grass': ('Grass', Icons.park_rounded),
-  'indoor': ('Indoor', Icons.roofing_rounded),
+const stadiumSurfaces = <String, String>{
+  'turf': 'Turf',
+  'grass': 'Grass',
+  'indoor': 'Indoor',
 };
 
-const stadiumFeatures = <String, (String, IconData)>{
-  'lights': ('Lights', Icons.lightbulb_rounded),
-  'showers': ('Showers', Icons.shower_rounded),
-  'parking': ('Parking', Icons.local_parking_rounded),
-  'cafe': ('Café', Icons.local_cafe_rounded),
+const stadiumFeatures = <String, String>{
+  'lights': 'Lights',
+  'showers': 'Showers',
+  'parking': 'Parking',
+  'cafe': 'Café',
 };
 
 class Pitch {
@@ -35,7 +33,7 @@ class Pitch {
   final String size;
   final String surface;
 
-  String get surfaceLabel => stadiumSurfaces[surface]?.$1 ?? surface;
+  String get surfaceLabel => stadiumSurfaces[surface] ?? surface;
 
   Map<String, Object?> toJson() => {
     if (id != null) 'id': id,

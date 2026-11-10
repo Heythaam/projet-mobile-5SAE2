@@ -5,7 +5,7 @@ import 'package:football_match_app/services/auth/firebase_account_service.dart';
 import 'package:football_match_app/views/auth/auth_screen.dart';
 import 'package:football_match_app/entities/user/models.dart';
 
-import '../support/fake_account_service.dart';
+import '../../support/fake_account_service.dart';
 
 void main() {
   test('a uid always maps to the same player number', () {

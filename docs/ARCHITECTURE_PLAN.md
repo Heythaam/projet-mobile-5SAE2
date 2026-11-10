@@ -4,6 +4,14 @@ Goal: make Kickoff follow the architecture taught in class and used in the
 professor's reference repository (`FlutterSAE_2627`), without changing what the
 app does.
 
+## Status
+
+Phases 1 to 4 are done: files moved, mixed files split, behavior aligned
+(routes map, validated form, HTTP constants, timeout, `FutureBuilder` on the
+daylight row), tests moved to mirror `lib/`, docs updated. Not done: splitting
+`views/stadium/stadium_module.dart` (still one large file) and `FutureBuilder`
+on the big list screens.
+
 ## 1. The reference architecture
 
 The professor's `lib/` has five layer folders and a `main.dart` with a named

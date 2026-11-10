@@ -32,7 +32,7 @@ not reintroduce it or add a second source of truth.
   versions (guest mode). Tests plug in in-memory fakes
   (`InMemoryTournamentStore`, `InMemoryStadiumStore`). Prefer adding a separate
   interface over adding methods to one that test fakes `implement`.
-- `lib/api_client.dart`, `TournamentService` and the old HTTP stadium client
+- `lib/services/api_client.dart`, `TournamentService` and the old HTTP stadium client
   remain only as base classes the Firestore versions implement, and for legacy
   tests. Do not add new HTTP calls to a Kickoff server.
 - Numeric user id = `stableUserId(firebaseUid)` (FNV-1a), `UserAccount.id`.
@@ -52,7 +52,7 @@ about 30 days after creation); writing real rules is pending.
 
 `users`, `session`, `matches`, `match_players`, `challenges`,
 `challenge_participants`, `docs` (JSON mirror of Firestore documents through
-`DocStore`). Schema version lives in `lib/local/local_database.dart`; add a
+`DocStore`). Schema version lives in `lib/bd/local_database.dart`; add a
 migration for any change.
 
 ## Implemented behavior
@@ -63,14 +63,14 @@ migration for any change.
 - **Friends and chat:** requests, accept, remove, private chat. Entry point:
   Profile, Friends, chat button on each friend row.
 - **Matches:** create public or private, join by code or from the public list,
-  calendar, weather. Search filters in `lib/matches/match_filter.dart`: part of
+  calendar, weather. Search filters in `lib/entities/match/match_filter.dart`: part of
   day (morning, afternoon, evening, night), date, earliest start time.
 - **Stadiums:** owner screens (pitches, hours, prices, block slots, pause,
   delete, booking inbox, auto-confirm) and player booking. Reviews: 1-5 stars
   and a comment, only from players who booked, one per player
   (`StadiumRules.addReview`, `stadium_reviews_sheet.dart`).
 - **Challenges:** SQLite plus Firestore sync, sunrise/sunset row and travel
-  time (`lib/travel/travel_service.dart`: Nominatim, OSRM car, OSM foot router;
+  time (`lib/services/challenge/travel_service.dart`: Nominatim, OSRM car, OSM foot router;
   no API key; Nominatim needs a User-Agent header).
 - **Tournaments:** create (league or knockout), join as captain, request to
   join, captain transfer, disband, fixtures, results, standings, bracket,
@@ -98,19 +98,26 @@ migration for any change.
 ## Key files
 
 - `lib/main.dart`: app setup, session restore, wiring of Firebase services.
-- `lib/screens/kickoff_shell.dart`: three-item shell and module entry points.
-- `lib/firebase/`: `CloudSync` and the Firebase implementation.
-- `lib/local/`: SQFlite database, `DocStore`, session and local stores.
-- `lib/auth/`, `lib/users/`, `lib/friends/`: accounts, profile, friends, chat.
-- `lib/matches/`, `lib/screens/match/`: match model, controller, filters, flow.
-- `lib/stadium/`: `stadium_module.dart` (models, owner screens),
-  `stadium_rules.dart`, `stadium_store.dart`, `firestore_stadiums.dart`.
-- `lib/challenges/`: database, repository, Firestore cloud, widgets.
-- `lib/tournaments/`: models, screens, widgets; `cloud/` holds the rules,
-  fixtures, store and Firestore service. Paths, sizes and copy live in
-  `tournament_constants.dart`. Update `docs/tournaments.md` with any change.
-- `lib/travel/`, `lib/daylight/`, `lib/weather/`, `lib/location/`, `lib/maps/`.
-- `test/`: mirrors `lib/`. Cloud tests use in-memory stores and `MockClient`.
+- `lib/views/home/kickoff_shell.dart`: three-item shell and module entry points
+  (opens the module screens with `pushNamed`, routes in `lib/app_routes.dart`).
+- `lib/entities/`: plain data classes with `toJson` / `fromJson`, no Flutter.
+- `lib/bd/`: SQFlite only (database, `DocStore`, session, user, match and
+  challenge stores).
+- `lib/services/`: the only place that uses `package:http`, Firestore or
+  SharedPreferences. `http_constants.dart` holds the base URLs; `firebase/` holds
+  `CloudSync` and its Firebase implementation. Subfolders per module: `auth`,
+  `friends`, `match`, `stadium`, `challenge`, `tournament`, `user`, `location`,
+  `maps`, `security`, `settings`, `awards`.
+- `lib/views/`: one page per file, per module. `stadium_module.dart` holds the
+  stadium owner screens; tournaments rules live in `services/tournament/`.
+- `lib/items/`: reusable widgets (cards, rows, pickers) and `kickoff_style.dart`.
+  Paths, sizes and copy of tournaments live in
+  `items/tournament/tournament_constants.dart`. Update `docs/tournaments.md`
+  with any change.
+- Layer rules: views and items call services, never the network or the
+  database; entities import neither Flutter nor I/O; only `bd/` imports sqflite.
+  Forms use `Form` + `GlobalKey<FormState>` + `TextFormField` + `validator`.
+- `test/`: mirrors `lib/` (`test/services`, `test/views`, `test/bd`, ...). Cloud tests use in-memory stores and `MockClient`.
 - `agents/`: role guides (brainstorm, code-writer, ux-designer, code-reviewer).
 - `tools/phone.ps1`: runs the app on the USB test phone.
 
@@ -131,7 +138,7 @@ flutter build apk --debug
   `libflutter.so`; `tools/phone.ps1` switches it off while running and restores
   `pubspec.*`. Do not commit those leftovers.
 - Known red test: `TournamentService reports malformed responses` in
-  `test/tournaments_test.dart` (legacy HTTP client; also red on main).
+  `test/services/tournament/tournaments_test.dart` (legacy HTTP client; also red on main).
 - When behavior or setup changes, update the related tests and docs, and run the
   narrowest relevant tests plus `flutter analyze`.
 

@@ -12,7 +12,7 @@ picture.
 flutter pub get
 flutter analyze
 flutter test                                   # all tests
-flutter test test/stadium/stadium_firestore_test.dart   # single file
+flutter test test/services/stadium/stadium_firestore_test.dart   # single file
 flutter test --plain-name "some test name"     # single test
 flutter build apk --debug
 .\tools\phone.ps1                              # run on the USB phone
@@ -36,13 +36,16 @@ Firestore as the shared source, so several phones show the same data.
   Tournaments and stadiums are one Firestore document each, changed only through
   `store.mutate` (a transaction).
 - State management is plain `setState` / `ChangeNotifier`.
-- `lib/api_client.dart` and the old HTTP services are legacy base classes only.
+- `lib/services/api_client.dart` and the old HTTP services are legacy base classes only.
   Never add calls to a Kickoff server.
 
-Modules: account and friends (`lib/auth`, `lib/users`, `lib/friends`), matches
-(`lib/matches`, `lib/screens/match`), stadiums (`lib/stadium`), challenges
-(`lib/challenges`, `lib/travel`, `lib/daylight`), tournaments
-(`lib/tournaments`, reference `docs/tournaments.md`), awards, settings.
+Layout (same as the course): `lib/entities` (data classes), `lib/bd` (SQFlite),
+`lib/services` (http, Firestore, SharedPreferences, rules), `lib/views` (pages),
+`lib/items` (reusable widgets); named routes in `lib/app_routes.dart`. Only
+`services/` imports `package:http` or Firestore; views and items call services.
+Each layer has one subfolder per module: account and friends (`auth`, `user`,
+`friends`), matches (`match`), stadiums (`stadium`), challenges (`challenge`),
+tournaments (`tournament`, reference `docs/tournaments.md`), awards, settings.
 
 ## Rules to remember
 
