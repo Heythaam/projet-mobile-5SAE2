@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'daylight_row.dart';
 import '../../services/challenge/daylight_service.dart';
+import 'travel_row.dart';
 import '../../services/challenge/travel_service.dart';
 import '../kickoff_style.dart';
 import '../../entities/challenge/challenge_model.dart';

@@ -1,38 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../entities/challenge/travel.dart';
 import '../location/player_location.dart';
-import '../../items/kickoff_style.dart';
-
-/// How long it takes to reach a place from where the player is.
-class TravelEstimate {
-  const TravelEstimate({
-    required this.driveMinutes,
-    required this.walkMinutes,
-    required this.kilometres,
-  });
-
-  final int driveMinutes;
-  final int walkMinutes;
-
-  /// Road distance by car.
-  final double kilometres;
-
-  static String format(int minutes) => minutes < 60
-      ? '$minutes min'
-      : '${minutes ~/ 60} h ${(minutes % 60).toString().padLeft(2, '0')}';
-}
-
-/// Either an estimate or a message ready to show the player.
-class TravelResult {
-  const TravelResult.ok(TravelEstimate this.estimate) : message = null;
-  const TravelResult.failed(String this.message) : estimate = null;
-
-  final TravelEstimate? estimate;
-  final String? message;
-}
 
 /// Finds a place on OpenStreetMap (Nominatim) and times the trip to it with
 /// the public OSRM routers; none of them needs a key. The player's position
@@ -158,82 +129,5 @@ class TravelService {
     final metres = route['distance'];
     if (seconds is! num || metres is! num) return null;
     return (seconds: seconds.toDouble(), metres: metres.toDouble());
-  }
-}
-
-/// "How long to get there?" The trip is timed only when the player taps, so
-/// no location permission is asked just by looking at a challenge.
-class TravelRow extends StatefulWidget {
-  const TravelRow({required this.service, required this.place, super.key});
-
-  final TravelService service;
-  final String place;
-
-  @override
-  State<TravelRow> createState() => _TravelRowState();
-}
-
-class _TravelRowState extends State<TravelRow> {
-  bool _loading = false;
-  TravelResult? _result;
-
-  Future<void> _go() async {
-    setState(() => _loading = true);
-    final result = await widget.service.estimate(widget.place);
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _result = result;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final estimate = _result?.estimate;
-    final text = _loading
-        ? 'Timing the trip…'
-        : estimate != null
-        ? 'Car ${TravelEstimate.format(estimate.driveMinutes)}'
-              ' · Walk ${TravelEstimate.format(estimate.walkMinutes)}'
-              ' · ${estimate.kilometres.toStringAsFixed(1)} km'
-        : _result?.message ?? 'How long to get there?';
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: InkWell(
-        key: const ValueKey('travel_row'),
-        onTap: _loading ? null : _go,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                estimate == null
-                    ? Icons.directions_rounded
-                    : Icons.directions_car_rounded,
-                color: KickoffColors.yellow,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  text,
-                  style: TextStyle(
-                    color: estimate == null
-                        ? KickoffColors.muted
-                        : Colors.white,
-                    fontSize: 13,
-                    decoration: estimate == null
-                        ? TextDecoration.underline
-                        : null,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

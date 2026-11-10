@@ -4,9 +4,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../bd/doc_store.dart';
+import '../../entities/stadium/real_stadium.dart';
 import 'stadium_directory.dart';
 import '../tournament/tournament_store.dart';
-import '../../views/stadium/stadium_module.dart';
+import '../../entities/stadium/stadium.dart';
+import 'stadium_api.dart';
 import 'stadium_rules.dart';
 import 'stadium_store.dart';
 

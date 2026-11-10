@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../maps/map_picker_screen.dart';
+import '../../items/maps/pick_on_map_button.dart';
 import '../../entities/user/models.dart';
 import '../../items/kickoff_style.dart';
 import '../../entities/challenge/challenge_model.dart';

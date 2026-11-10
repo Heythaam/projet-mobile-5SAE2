@@ -16,6 +16,7 @@ import '../../entities/user/models.dart';
 import '../../services/challenge/challenge_repository.dart';
 import '../challenge/challenges_dashboard_screen.dart';
 import '../../services/stadium/stadium_directory.dart';
+import '../../services/stadium/stadium_api.dart';
 import '../stadium/stadium_module.dart';
 import '../../services/user/country_service.dart';
 import '../../services/user/user_profile_controller.dart';

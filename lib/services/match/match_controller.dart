@@ -12,6 +12,7 @@ import '../../entities/match/football_match.dart';
 import '../../entities/match/match_mock_data.dart';
 import 'weather_service.dart';
 import '../../entities/match/match_filter.dart';
+import '../../entities/stadium/real_stadium.dart';
 import '../stadium/stadium_directory.dart';
 
 typedef MatchStoreOpener = Future<MatchLocalStore> Function();

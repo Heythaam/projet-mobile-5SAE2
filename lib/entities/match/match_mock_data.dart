@@ -1,4 +1,4 @@
-import '../../services/stadium/stadium_directory.dart';
+import '../stadium/real_stadium.dart';
 
 // Match models for the screens. The stadium list at the bottom is sample data,
 // used only when the Stadium module's server is not reachable (or for guests).

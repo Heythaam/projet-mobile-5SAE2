@@ -1,63 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-import '../../services/location/player_location.dart';
+import '../../entities/maps/picked_place.dart';
 import '../../items/kickoff_style.dart';
-
-/// A place chosen on the map.
-class PickedPlace {
-  const PickedPlace({
-    required this.latitude,
-    required this.longitude,
-    required this.label,
-  });
-
-  final double latitude;
-  final double longitude;
-
-  /// A short address, or the coordinates when none could be found.
-  final String label;
-}
-
-/// Names a point on the map, in French, using OpenStreetMap's free Nominatim
-/// service.
-/// Never throws: a missing connection gives the coordinates instead.
-class PlaceNamer {
-  PlaceNamer({http.Client? client}) : _client = client ?? http.Client();
-
-  final http.Client _client;
-
-  Future<String> nameOf(double latitude, double longitude) async {
-    final fallback =
-        '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
-    try {
-      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
-        'format': 'jsonv2',
-        'lat': '$latitude',
-        'lon': '$longitude',
-        'zoom': '18',
-        'accept-language': 'fr',
-      });
-      final response = await _client
-          .get(uri, headers: {
-            'User-Agent': 'kickoff-football-app',
-            'Accept-Language': 'fr',
-          })
-          .timeout(const Duration(seconds: 6));
-      if (response.statusCode != 200) return fallback;
-      final json = jsonDecode(response.body);
-      final name = json is Map<String, dynamic> ? json['display_name'] : null;
-      if (name is! String || name.trim().isEmpty) return fallback;
-      return name.split(',').take(3).map((part) => part.trim()).join(', ');
-    } catch (_) {
-      return fallback;
-    }
-  }
-}
+import '../../services/location/player_location.dart';
+import '../../services/maps/place_namer.dart';
 
 /// Full-screen map: tap to drop a pin, then confirm. Pops a [PickedPlace].
 class MapPickerScreen extends StatefulWidget {
@@ -207,38 +155,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
           ),
         ),
       ],
-    ),
-  );
-}
-
-/// A small "Pick on map" button that opens [MapPickerScreen] and reports the
-/// chosen place.
-class PickOnMapButton extends StatelessWidget {
-  const PickOnMapButton({
-    required this.onPicked,
-    this.title = 'Pick a place',
-    super.key,
-  });
-
-  final ValueChanged<PickedPlace> onPicked;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: TextButton.icon(
-      key: const ValueKey('pick_on_map'),
-      onPressed: () async {
-        final place = await Navigator.of(context).push<PickedPlace>(
-          MaterialPageRoute(builder: (_) => MapPickerScreen(title: title)),
-        );
-        if (place != null) onPicked(place);
-      },
-      icon: const Icon(Icons.map_rounded, color: KickoffColors.yellow),
-      label: const Text(
-        'Pick on map',
-        style: TextStyle(color: KickoffColors.yellow),
-      ),
     ),
   );
 }
