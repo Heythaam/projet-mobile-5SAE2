@@ -248,8 +248,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
