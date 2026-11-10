@@ -12,6 +12,8 @@ import 'local/doc_store.dart';
 import 'local/local_database.dart';
 import 'tournaments/cloud/firestore_tournament_service.dart';
 import 'tournaments/cloud/tournament_store.dart';
+import 'stadium/firestore_stadiums.dart';
+import 'stadium/stadium_store.dart';
 import 'friends/friends_service.dart';
 import 'local/session_store.dart';
 import 'security/app_lock.dart';
@@ -63,6 +65,10 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   final Authenticator _authenticator = LocalAuthAuthenticator();
   AppLockSettings? _appLock;
   UserAccount? _user;
+  late final StadiumRepo _stadiumRepo = StadiumRepo(
+    store: FirestoreStadiumStore(),
+    cache: () async => DocStore(await LocalDatabase.open()),
+  );
 
   /// True while a signed-in player adds another account from Settings.
   bool _adding = false;
@@ -234,6 +240,20 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
                       meName: _user!.username,
                       store: FirestoreTournamentStore(),
                       cache: () async => DocStore(await LocalDatabase.open()),
+                    )
+                  : null,
+              stadiumApi: widget.cloud is FirebaseCloudSync
+                  ? FirestoreStadiumApi(
+                      meId: _user!.id,
+                      meName: _user!.username,
+                      repo: _stadiumRepo,
+                    )
+                  : null,
+              stadiumDirectory: widget.cloud is FirebaseCloudSync
+                  ? FirestoreStadiumDirectory(
+                      meId: _user!.id,
+                      meName: _user!.username,
+                      repo: _stadiumRepo,
                     )
                   : null,
               cloud: widget.cloud,

@@ -15,6 +15,7 @@ import '../matches/match_repository.dart';
 import '../models.dart';
 import '../challenges/repository/challenge_repository.dart';
 import '../challenges/screens/challenges_dashboard_screen.dart';
+import '../matches/stadium_directory.dart';
 import '../stadium/stadium_module.dart';
 import '../users/country_service.dart';
 import '../users/user_profile_controller.dart';
@@ -71,6 +72,8 @@ class KickoffShell extends StatefulWidget {
     required this.user,
     this.challengeCloud = const NoopChallengeCloud(),
     this.tournaments,
+    this.stadiumApi,
+    this.stadiumDirectory,
     required this.onLogout,
     this.isGuest = false,
     this.cloud = const NoopCloudSync(),
@@ -96,6 +99,10 @@ class KickoffShell extends StatefulWidget {
 
   /// Tournaments on Firestore; the old server service when null.
   final TournamentService? tournaments;
+
+  /// Stadiums on Firestore; the old server when null.
+  final StadiumApi? stadiumApi;
+  final StadiumDirectory? stadiumDirectory;
   final CloudSync cloud;
 
   /// Account switching from Settings → Profiles; null hides nothing, the
@@ -127,6 +134,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     uid: widget.isGuest ? 'guest' : widget.user.storageUid,
     username: widget.isGuest ? 'Guest' : widget.user.username,
     cloud: widget.isGuest ? const NoopCloudSync() : widget.cloud,
+    stadiumDirectory: widget.stadiumDirectory,
   );
   static final _noChanges = ChangeNotifier();
   final _countries = CountryService();
@@ -493,6 +501,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => StadiumModule(
+          api: widget.stadiumApi,
           isGuest: widget.isGuest,
           onSignIn: widget.onOpenAuth,
         ),
