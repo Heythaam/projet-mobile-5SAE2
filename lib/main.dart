@@ -31,13 +31,13 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   final Authenticator _authenticator = LocalAuthAuthenticator();
   AppLockSettings? _appLock;
   UserAccount? _user;
-  bool _guest = false;
   Object? _startupError;
   bool _starting = true;
 
   @override
   void initState() {
     super.initState();
+    _api.onSessionExpired = _expire;
     _restoreSession();
   }
 
@@ -70,7 +70,6 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
       if (!mounted) return;
       setState(() {
         _user = user;
-        _guest = user == null;
         _startupError = null;
         _starting = false;
       });
@@ -87,18 +86,17 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     await _api.logout();
     await widget.cloud.signOut();
     await _remember(null);
-    if (mounted) {
-      setState(() {
-        _user = null;
-        _guest = false;
-      });
-    }
+    if (mounted) setState(() => _user = null);
   }
 
-  /// Signed-in players get the app lock; guests have nothing to protect.
+  /// The server no longer accepts the saved session: back to the login.
+  void _expire() {
+    if (_user != null) _logout();
+  }
+
   Widget _locked(Widget shell) {
     final settings = _appLock;
-    if (_guest || settings == null) return shell;
+    if (settings == null) return shell;
     return AppLockGate(
       settings: settings,
       authenticator: _authenticator,
@@ -148,46 +146,27 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               _restoreSession();
             },
           )
-        : _user == null && !_guest
+        : _user == null
         ? AuthScreen(
             api: _api,
             cloud: widget.cloud,
             onAuthenticated: (user) {
               _remember(user);
-              setState(() {
-                _user = user;
-                _guest = false;
-              });
+              setState(() => _user = user);
             },
-            onGuest: () => setState(() {
-              _user = null;
-              _guest = true;
-              _startupError = null;
-            }),
           )
         : _locked(
             KickoffShell(
               api: _api,
               cloud: widget.cloud,
-              user: _user ?? _guestUser,
-              isGuest: _guest,
+              user: _user!,
               onLogout: _logout,
-              appLock: _guest ? null : _appLock,
+              appLock: _appLock,
               authenticator: _authenticator,
-              onOpenAuth: () => setState(() {
-                _guest = false;
-                _user = null;
-              }),
             ),
           ),
   );
 }
-
-const _guestUser = UserAccount(
-  id: 0,
-  username: 'guest',
-  email: 'guest@local',
-);
 
 class _StartupError extends StatelessWidget {
   const _StartupError({required this.error, required this.onRetry});

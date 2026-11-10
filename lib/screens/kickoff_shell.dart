@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../api_client.dart';
 import '../firebase/cloud_sync.dart';
+import '../friends/friends_screen.dart';
 import '../matches/match_controller.dart';
 import '../app_route_observer.dart';
-import '../home_screen.dart';
 import '../matches/football_match.dart';
 import '../matches/match_repository.dart';
 import '../models.dart';
@@ -266,13 +266,7 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   void _openFriends() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => HomeScreen(
-          api: widget.api,
-          user: widget.user,
-          onLogout: widget.onLogout,
-          isGuest: widget.isGuest,
-          showNavigation: false,
-        ),
+        builder: (_) => FriendsScreen(api: widget.api, user: widget.user),
       ),
     );
   }

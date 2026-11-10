@@ -207,14 +207,6 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                     SizedBox(height: 16 * scale),
-                    if (onEditProfile != null) ...[
-                      _ProfileRow(
-                        icon: Icons.edit_rounded,
-                        title: 'Edit profile',
-                        onTap: onEditProfile!,
-                      ),
-                      SizedBox(height: 8 * scale),
-                    ],
                     _ProfileRow(
                       icon: Icons.history_rounded,
                       title: 'History',
@@ -240,12 +232,6 @@ class ProfileScreen extends StatelessWidget {
                         onTap: onStadiums!,
                       ),
                     ],
-                    SizedBox(height: 8 * scale),
-                    _ProfileRow(
-                      icon: Icons.settings_rounded,
-                      title: 'Settings',
-                      onTap: onSettings,
-                    ),
                   ],
                 ),
               ),

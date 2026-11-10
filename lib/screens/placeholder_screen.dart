@@ -11,7 +11,12 @@ class PlaceholderScreen extends StatelessWidget {
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) => ArcadeBackdrop(
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: _content(context),
+  );
+
+  Widget _content(BuildContext context) => ArcadeBackdrop(
     child: SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -68,8 +73,12 @@ class AwardsScreen extends StatelessWidget {
   /// Awards worked out from the matches on this phone; they work offline.
   final List<LocalAward> localAwards;
 
+  // Without a Material ancestor the text gets the yellow underline.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      Material(type: MaterialType.transparency, child: _content(context));
+
+  Widget _content(BuildContext context) {
     final achievements = profile?.achievements ?? const <Achievement>[];
     final unlocked = localAwards.where((a) => a.unlocked).length;
     return ArcadeBackdrop(
@@ -136,6 +145,18 @@ class AwardsScreen extends StatelessWidget {
                             trailing: award.unlocked
                                 ? 'Done'
                                 : '${award.progress}/${award.target}',
+                          ),
+                        if (achievements.isNotEmpty && localAwards.isNotEmpty)
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(4, 12, 4, 8),
+                            child: Text(
+                              'Career',
+                              style: TextStyle(
+                                color: KickoffColors.yellow,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         for (final achievement in achievements)
                           _AwardTile(

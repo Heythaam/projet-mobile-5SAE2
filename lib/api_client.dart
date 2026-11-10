@@ -154,6 +154,10 @@ class ApiClient {
     await _storage.write(key: _tokenKey, value: token);
   }
 
+  /// Called once when the server refuses the saved session (or there is none),
+  /// so the app can send the player back to the login.
+  void Function()? onSessionExpired;
+
   Future<Map<String, dynamic>> _authenticated(
     String method,
     String path, {
@@ -161,9 +165,18 @@ class ApiClient {
   }) async {
     final token = await _storage.read(key: _tokenKey);
     if (token == null) {
+      onSessionExpired?.call();
       throw const ApiException('Your session has expired. Please sign in.');
     }
-    return _send(method, path, body: body, token: token);
+    try {
+      return await _send(method, path, body: body, token: token);
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        await _storage.delete(key: _tokenKey);
+        onSessionExpired?.call();
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> _send(

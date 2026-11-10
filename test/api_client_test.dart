@@ -37,4 +37,25 @@ void main() {
     await expectLater(api.restoreSession(), throwsA(isA<ApiException>()));
     expect(await const FlutterSecureStorage().readAll(), isNotEmpty);
   });
+
+  test('a 401 on a request clears the token and tells the app', () async {
+    FlutterSecureStorage.setMockInitialValues({'auth_token': 'old'});
+    final api = client(401, {'error': 'Invalid session.'});
+    var expired = 0;
+    api.onSessionExpired = () => expired++;
+
+    await expectLater(api.getFriends(), throwsA(isA<ApiException>()));
+    expect(expired, 1);
+    expect(await const FlutterSecureStorage().readAll(), isEmpty);
+  });
+
+  test('a request without a saved session tells the app', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final api = client(200, {});
+    var expired = 0;
+    api.onSessionExpired = () => expired++;
+
+    await expectLater(api.getFriends(), throwsA(isA<ApiException>()));
+    expect(expired, 1);
+  });
 }

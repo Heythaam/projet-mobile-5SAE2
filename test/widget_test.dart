@@ -20,7 +20,6 @@ void main() {
         home: AuthScreen(
           api: ApiClient(),
           onAuthenticated: (user) => signedInUser = user,
-          onGuest: () {},
         ),
       ),
     );
@@ -292,7 +291,6 @@ void main() {
         home: AuthScreen(
           api: ApiClient(),
           onAuthenticated: (_) {},
-          onGuest: () {},
         ),
       ),
     );

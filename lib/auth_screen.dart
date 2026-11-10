@@ -10,7 +10,6 @@ class AuthScreen extends StatefulWidget {
   const AuthScreen({
     required this.api,
     required this.onAuthenticated,
-    required this.onGuest,
     this.cloud = const NoopCloudSync(),
     super.key,
   });
@@ -18,7 +17,6 @@ class AuthScreen extends StatefulWidget {
   final ApiClient api;
   final CloudSync cloud;
   final ValueChanged<UserAccount> onAuthenticated;
-  final VoidCallback onGuest;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -326,27 +324,6 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                       ),
-                      if (!isSignUp)
-                        Padding(
-                          padding: EdgeInsets.only(bottom: 12 * scale),
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              minimumSize: Size(56 * scale, 56 * scale),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12 * scale,
-                              ),
-                            ),
-                            onPressed: _busy ? null : widget.onGuest,
-                            child: Text(
-                              'Continue as guest',
-                              style: TextStyle(
-                                color: KickoffColors.muted,
-                                fontSize: 14 * scale,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
