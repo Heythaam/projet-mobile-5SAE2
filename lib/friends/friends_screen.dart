@@ -85,9 +85,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   Future<void> _add() async {
-    final username = await showDialog<String>(
+    final username = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => _AddFriendDialog(onShare: _share),
+      isScrollControlled: true,
+      backgroundColor: KickoffColors.panelDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) => _AddFriendSheet(onShare: _share),
     );
     if (username == null || username.isEmpty) return;
     await _run(
@@ -337,16 +342,18 @@ class _Tile extends StatelessWidget {
   );
 }
 
-class _AddFriendDialog extends StatefulWidget {
-  const _AddFriendDialog({required this.onShare});
+/// Bottom sheet to add a friend: a username, or an invite for someone who is
+/// not on Kickoff yet.
+class _AddFriendSheet extends StatefulWidget {
+  const _AddFriendSheet({required this.onShare});
 
   final Future<void> Function() onShare;
 
   @override
-  State<_AddFriendDialog> createState() => _AddFriendDialogState();
+  State<_AddFriendSheet> createState() => _AddFriendSheetState();
 }
 
-class _AddFriendDialogState extends State<_AddFriendDialog> {
+class _AddFriendSheetState extends State<_AddFriendSheet> {
   final _controller = TextEditingController();
 
   @override
@@ -355,41 +362,86 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
     super.dispose();
   }
 
+  void _send() {
+    final name = _controller.text.trim();
+    if (name.isNotEmpty) Navigator.pop(context, name);
+  }
+
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Add a friend'),
-    content: Column(
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      20,
+      20,
+      20,
+      20 + MediaQuery.of(context).viewInsets.bottom,
+    ),
+    child: Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
+        const Text(
+          'Add a friend',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Type their username to send a request.',
+          style: TextStyle(color: KickoffColors.muted),
+        ),
+        const SizedBox(height: 16),
+        PillField(
           key: const ValueKey('friend_username'),
           controller: _controller,
+          hint: 'Username',
+          icon: Icons.alternate_email_rounded,
           autofocus: true,
-          textCapitalization: TextCapitalization.none,
-          decoration: const InputDecoration(
-            labelText: 'Their username',
-            prefixText: '@',
-          ),
-          onSubmitted: (_) => Navigator.pop(context, _controller.text.trim()),
+          textInputAction: TextInputAction.send,
+          onSubmitted: (_) => _send(),
         ),
-        const SizedBox(height: 8),
-        TextButton.icon(
+        const SizedBox(height: 14),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, value, _) => ChunkyButton(
+            key: const ValueKey('friend_send'),
+            label: 'Send request',
+            icon: Icons.send_rounded,
+            onPressed: value.text.trim().isEmpty ? null : _send,
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Row(
+          children: [
+            Expanded(child: Divider(color: KickoffColors.dim)),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Text('or', style: TextStyle(color: KickoffColors.dim)),
+            ),
+            Expanded(child: Divider(color: KickoffColors.dim)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          key: const ValueKey('friend_invite'),
           onPressed: widget.onShare,
-          icon: const Icon(Icons.ios_share_rounded, size: 18),
-          label: const Text('Not on Kickoff yet? Invite by message'),
+          icon: const Icon(Icons.ios_share_rounded),
+          label: const Text('Invite by message'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: KickoffColors.dim),
+            minimumSize: const Size.fromHeight(48),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'For friends who do not have Kickoff yet.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: KickoffColors.dim, fontSize: 12),
         ),
       ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Not now'),
-      ),
-      FilledButton(
-        onPressed: () => Navigator.pop(context, _controller.text.trim()),
-        child: const Text('Send request'),
-      ),
-    ],
   );
 }

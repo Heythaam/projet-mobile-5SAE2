@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../api_client.dart';
 import '../firebase/cloud_sync.dart';
 import '../friends/friends_screen.dart';
+import '../settings/settings_screen.dart';
 import '../matches/match_controller.dart';
 import '../app_route_observer.dart';
 import '../matches/football_match.dart';
@@ -66,6 +67,9 @@ class KickoffShell extends StatefulWidget {
     required this.onLogout,
     this.isGuest = false,
     this.cloud = const NoopCloudSync(),
+    this.onSwitchAccount,
+    this.onForgetAccount,
+    this.onAddAccount,
     this.onOpenAuth,
     this.matchRepository = const EmptyMatchRepository(),
     this.appLock,
@@ -80,6 +84,12 @@ class KickoffShell extends StatefulWidget {
 
   final ApiClient api;
   final CloudSync cloud;
+
+  /// Account switching from Settings → Profiles; null hides nothing, the
+  /// screen simply cannot switch.
+  final Future<bool> Function(int id)? onSwitchAccount;
+  final Future<void> Function(int id)? onForgetAccount;
+  final VoidCallback? onAddAccount;
   final UserAccount user;
   final VoidCallback onLogout;
   final bool isGuest;
@@ -271,125 +281,29 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
     );
   }
 
-  Future<void> _showSettings() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: KickoffColors.panelDark,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(22 * kickoffScale(context)),
+  void _showSettings() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(
+          api: widget.api,
+          user: widget.user,
+          onLogout: widget.onLogout,
+          onEditProfile: _profileController?.profile == null
+              ? null
+              : _editProfile,
+          appLock: widget.appLock,
+          onSetAppLock: widget.appLock != null && widget.authenticator != null
+              ? _setAppLock
+              : null,
+          onSwitchAccount: widget.onSwitchAccount,
+          onForgetAccount: widget.onForgetAccount,
+          onAddAccount: widget.onAddAccount,
+          onOpenPeople: _profileController == null ? null : _openPeople,
+          onResetProfile: _profileController == null
+              ? null
+              : _confirmResetProfile,
         ),
       ),
-      builder: (context) {
-        final scale = kickoffScale(context);
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              16 * scale,
-              18 * scale,
-              16 * scale,
-              12 * scale,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Settings',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18 * scale,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 12 * scale),
-                if (_profileController?.profile != null) ...[
-                  Text(
-                    '@${_profileController?.profile?.username} · '
-                    '${_profileController?.profile?.email}',
-                    key: const ValueKey('settings_account'),
-                    style: const TextStyle(color: KickoffColors.muted),
-                  ),
-                  SizedBox(height: 12 * scale),
-                  ChunkyButton(
-                    label: 'Edit profile',
-                    icon: Icons.edit_rounded,
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _editProfile();
-                    },
-                  ),
-                  if (widget.appLock != null && widget.authenticator != null)
-                    StatefulBuilder(
-                      builder: (context, setSheetState) => SwitchListTile(
-                        key: const ValueKey('settings_app_lock'),
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Lock the app',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        subtitle: const Text(
-                          'Ask for fingerprint, face or screen lock when you open Kickoff.',
-                          style: TextStyle(color: KickoffColors.muted),
-                        ),
-                        value: widget.appLock!.enabled,
-                        onChanged: (on) async {
-                          final ok = await _setAppLock(on);
-                          if (!ok) return;
-                          setSheetState(() {});
-                        },
-                      ),
-                    ),
-                  SizedBox(height: 8 * scale),
-                  TextButton(
-                    key: const ValueKey('settings_people'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _openPeople();
-                    },
-                    child: const Text('Profiles on this phone'),
-                  ),
-                  TextButton(
-                    key: const ValueKey('settings_reset_profile'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _confirmResetProfile();
-                    },
-                    child: const Text(
-                      'Reset profile on this phone',
-                      style: TextStyle(color: KickoffColors.orange),
-                    ),
-                  ),
-                  SizedBox(height: 8 * scale),
-                ],
-                ChunkyButton(
-                  label: widget.isGuest ? 'Sign in' : 'Sign out',
-                  icon: widget.isGuest
-                      ? Icons.login_rounded
-                      : Icons.logout_rounded,
-                  backgroundColor: widget.isGuest
-                      ? KickoffColors.yellow
-                      : KickoffColors.red,
-                  bottomColor: widget.isGuest
-                      ? KickoffColors.yellowDark
-                      : KickoffColors.redDark,
-                  foregroundColor: widget.isGuest
-                      ? KickoffColors.ink
-                      : Colors.white,
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    if (widget.isGuest) {
-                      widget.onOpenAuth?.call();
-                    } else {
-                      widget.onLogout();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 

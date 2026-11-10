@@ -30,7 +30,7 @@ void main() {
     await tester.tap(createAccountLink);
     await tester.pumpAndSettle();
 
-    expect(find.text('Player name'), findsOneWidget);
+    expect(find.text('Player name'), findsNothing);
     expect(find.text('Create account'), findsOneWidget);
     expect(find.text('Have an account? Sign in'), findsOneWidget);
     expect(signedInUser, isNull);

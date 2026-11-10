@@ -58,4 +58,50 @@ void main() {
     await expectLater(api.getFriends(), throwsA(isA<ApiException>()));
     expect(expired, 1);
   });
+
+  test('signed-in accounts are kept so the player can switch', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    String name(int id) => id == 1 ? 'ann' : 'bob';
+    final api = ApiClient(
+      baseUrl: 'http://api.test',
+      client: MockClient((request) async {
+        if (request.url.path == '/auth/login') {
+          final email = (jsonDecode(request.body) as Map)['email'] as String;
+          final id = email == 'a@x.tn' ? 1 : 2;
+          return http.Response(
+            jsonEncode({
+              'token': 'tok$id',
+              'user': {'id': id, 'username': name(id), 'email': email},
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/me') {
+          final id = request.headers['authorization'] == 'Bearer tok1' ? 1 : 2;
+          return http.Response(
+            jsonEncode({
+              'id': id,
+              'username': name(id),
+              'email': id == 1 ? 'a@x.tn' : 'b@x.tn',
+            }),
+            200,
+          );
+        }
+        return http.Response('{}', 200);
+      }),
+    );
+
+    await api.login(email: 'a@x.tn', password: 'x');
+    await api.login(email: 'b@x.tn', password: 'x');
+    expect((await api.savedAccounts()).map((a) => a.username), ['ann', 'bob']);
+
+    final back = await api.switchTo(1);
+    expect(back?.username, 'ann');
+
+    await api.forgetAccount(2);
+    expect((await api.savedAccounts()).map((a) => a.id), [1]);
+
+    await api.logout();
+    expect(await api.savedAccounts(), isEmpty);
+  });
 }

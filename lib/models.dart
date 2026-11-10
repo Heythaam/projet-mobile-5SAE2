@@ -3,16 +3,21 @@ class UserAccount {
     required this.id,
     required this.username,
     required this.email,
+    this.usernameChosen = true,
   });
 
   final int id;
   final String username;
   final String email;
 
+  /// False right after sign up, until the player picks a username.
+  final bool usernameChosen;
+
   factory UserAccount.fromJson(Map<String, dynamic> json) => UserAccount(
     id: json['id'] as int,
     username: json['username'] as String,
     email: json['email'] as String,
+    usernameChosen: json['usernameChosen'] as bool? ?? true,
   );
 }
 

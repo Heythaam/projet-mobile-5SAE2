@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
@@ -29,6 +30,7 @@ Handler createApp({required AppDatabase database, required String jwtSecret}) {
     )
     ..post('/auth/login', (request) => _login(request, database, jwtSecret))
     ..get('/me', _authenticated(database, jwtSecret, _me))
+    ..put('/me/username', _authenticated(database, jwtSecret, _setUsername))
     ..get(
       '/me/tournament-requests',
       _authenticated(database, jwtSecret, _myTournamentRequests),
@@ -175,16 +177,17 @@ Future<Response> _register(
   String secret,
 ) async {
   final body = await _body(request);
-  final username = _requiredString(body, 'username').trim().toLowerCase();
+  // The app signs up with email and password only; the player picks the
+  // username afterwards. Clients that send one still get it.
+  final givenUsername = body['username'];
+  final chooseLater = givenUsername is! String || givenUsername.trim().isEmpty;
   final email = _requiredString(body, 'email').trim().toLowerCase();
   final password = _requiredString(body, 'password');
+  final username = chooseLater
+      ? _temporaryUsername(database)
+      : (givenUsername as String).trim().toLowerCase();
 
-  if (!RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username)) {
-    throw ApiException(
-      400,
-      'Username must be 3-20 characters (letters, numbers, or underscores).',
-    );
-  }
+  _checkUsername(username);
   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email) ||
       email.length > 254) {
     throw ApiException(400, 'Enter a valid email address.');
@@ -203,8 +206,14 @@ Future<Response> _register(
 
   try {
     database.db.execute(
-      'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
-      [username, email, BCrypt.hashpw(password, BCrypt.gensalt())],
+      'INSERT INTO users (username, email, password_hash, username_chosen) '
+      'VALUES (?, ?, ?, ?)',
+      [
+        username,
+        email,
+        BCrypt.hashpw(password, BCrypt.gensalt()),
+        chooseLater ? 0 : 1,
+      ],
     );
   } on SqliteException catch (error) {
     if (error.message.contains('UNIQUE constraint failed')) {
@@ -214,7 +223,8 @@ Future<Response> _register(
   }
 
   final user = database.db.select(
-    'SELECT id, username, email FROM users WHERE username = ?',
+    'SELECT id, username, email, username_chosen FROM users '
+    'WHERE username = ?',
     [username],
   ).first;
   recordActiveDay(database, user['id'] as int);
@@ -231,7 +241,8 @@ Future<Response> _login(
   final email = _requiredString(body, 'email').trim().toLowerCase();
   final password = _requiredString(body, 'password');
   final users = database.db.select(
-    'SELECT id, username, email, password_hash FROM users WHERE email = ?',
+    'SELECT id, username, email, username_chosen, password_hash '
+    'FROM users WHERE email = ?',
     [email],
   );
 
@@ -254,8 +265,71 @@ Response _sessionResponse(Row user, String secret, {int status = 200}) {
       'id': user['id'],
       'username': user['username'],
       'email': user['email'],
+      'usernameChosen': user['username_chosen'] != 0,
     },
   }, status: status);
+}
+
+void _checkUsername(String username) {
+  if (!RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username)) {
+    throw ApiException(
+      400,
+      'Username must be 3-20 characters (letters, numbers, or underscores).',
+    );
+  }
+}
+
+/// A free `player_xxxxxx` name for an account that has not picked one yet.
+String _temporaryUsername(AppDatabase database) {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  final random = Random.secure();
+  while (true) {
+    final name =
+        'player_${List.generate(6, (_) => alphabet[random.nextInt(36)]).join()}';
+    final taken = database.db.select(
+      'SELECT 1 FROM users WHERE username = ?',
+      [name],
+    );
+    if (taken.isEmpty) return name;
+  }
+}
+
+Future<Response> _setUsername(Request request) async {
+  final userId = _userId(request);
+  final database = _database(request);
+  final body = await _body(request);
+  final username = _requiredString(body, 'username').trim().toLowerCase();
+  _checkUsername(username);
+  final taken = database.db.select(
+    'SELECT id FROM users WHERE username = ? AND id != ?',
+    [username, userId],
+  );
+  if (taken.isNotEmpty) {
+    throw ApiException(409, 'That username is already taken.');
+  }
+  try {
+    database.db.execute(
+      'UPDATE users SET username = ?, username_chosen = 1 WHERE id = ?',
+      [username, userId],
+    );
+  } on SqliteException catch (error) {
+    if (error.message.contains('UNIQUE constraint failed')) {
+      throw ApiException(409, 'That username is already taken.');
+    }
+    rethrow;
+  }
+  final rows = database.db.select(
+    'SELECT id, username, email, username_chosen FROM users WHERE id = ?',
+    [userId],
+  );
+  if (rows.isEmpty) throw ApiException(404, 'Account not found.');
+  final user = rows.first;
+  return _json({
+    'id': user['id'],
+    'username': user['username'],
+    'email': user['email'],
+    'usernameChosen': true,
+  });
 }
 
 Response _me(Request request) {
@@ -263,7 +337,7 @@ Response _me(Request request) {
   final database = _database(request);
   recordActiveDay(database, userId);
   final rows = database.db.select(
-    'SELECT id, username, email FROM users WHERE id = ?',
+    'SELECT id, username, email, username_chosen FROM users WHERE id = ?',
     [userId],
   );
   if (rows.isEmpty) {
@@ -274,6 +348,7 @@ Response _me(Request request) {
     'id': user['id'],
     'username': user['username'],
     'email': user['email'],
+    'usernameChosen': user['username_chosen'] != 0,
   });
 }
 

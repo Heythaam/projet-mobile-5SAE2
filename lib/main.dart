@@ -6,6 +6,7 @@ import 'local/session_store.dart';
 import 'security/app_lock.dart';
 import 'models.dart';
 import 'screens/kickoff_shell.dart';
+import 'users/choose_username_screen.dart';
 import 'app_route_observer.dart';
 import 'firebase/cloud_sync.dart';
 import 'firebase/firebase_cloud_sync.dart';
@@ -31,6 +32,9 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   final Authenticator _authenticator = LocalAuthAuthenticator();
   AppLockSettings? _appLock;
   UserAccount? _user;
+
+  /// True while a signed-in player adds another account from Settings.
+  bool _adding = false;
   Object? _startupError;
   bool _starting = true;
 
@@ -86,7 +90,29 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     await _api.logout();
     await widget.cloud.signOut();
     await _remember(null);
-    if (mounted) setState(() => _user = null);
+    if (mounted) {
+      setState(() {
+        _user = null;
+        _adding = false;
+      });
+    }
+  }
+
+  /// Makes another account signed in on this phone the active one. False when
+  /// its session no longer works.
+  Future<bool> _switchTo(int id) async {
+    final user = await _api.switchTo(id);
+    if (user == null) return false;
+    // The cloud account belongs to the previous player.
+    await widget.cloud.signOut();
+    await _remember(user);
+    if (mounted) {
+      setState(() {
+        _user = user;
+        _adding = false;
+      });
+    }
+    return true;
   }
 
   /// The server no longer accepts the saved session: back to the login.
@@ -146,21 +172,40 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               _restoreSession();
             },
           )
-        : _user == null
+        : _user == null || _adding
         ? AuthScreen(
             api: _api,
             cloud: widget.cloud,
+            onCancel: _user != null
+                ? () => setState(() => _adding = false)
+                : null,
             onAuthenticated: (user) {
+              _remember(user);
+              setState(() {
+                _user = user;
+                _adding = false;
+              });
+            },
+          )
+        : !_user!.usernameChosen
+        ? ChooseUsernameScreen(
+            api: _api,
+            onLogout: _logout,
+            onDone: (user) {
               _remember(user);
               setState(() => _user = user);
             },
           )
         : _locked(
             KickoffShell(
+              key: ValueKey(_user!.id),
               api: _api,
               cloud: widget.cloud,
               user: _user!,
               onLogout: _logout,
+              onSwitchAccount: _switchTo,
+              onForgetAccount: _api.forgetAccount,
+              onAddAccount: () => setState(() => _adding = true),
               appLock: _appLock,
               authenticator: _authenticator,
             ),

@@ -151,6 +151,40 @@ void main() {
     final response = await sendRequest(app, 'GET', '/friends');
     expect(response.statusCode, 401);
   });
+
+  test('sign up without a username, then pick one', () async {
+    final signUp = await sendRequest(
+      app,
+      'POST',
+      '/auth/register',
+      body: {'email': 'new@example.com', 'password': 'secure-pass-123'},
+    );
+    expect(signUp.statusCode, 201);
+    final data = await decode(signUp);
+    expect(data['user']['usernameChosen'], isFalse);
+    expect(data['user']['username'], startsWith('player_'));
+    final token = data['token'] as String;
+
+    await register(app, 'taken_name');
+    Future<Response> pick(String name) => sendRequest(
+      app,
+      'PUT',
+      '/me/username',
+      token: token,
+      body: {'username': name},
+    );
+
+    expect((await pick('taken_name')).statusCode, 409);
+    expect((await pick('ab')).statusCode, 400);
+    final ok = await pick('Fresh_Name');
+    expect(ok.statusCode, 200);
+    expect((await decode(ok))['username'], 'fresh_name');
+
+    final me = await sendRequest(app, 'GET', '/me', token: token);
+    final account = await decode(me);
+    expect(account['username'], 'fresh_name');
+    expect(account['usernameChosen'], isTrue);
+  });
 }
 
 Future<Map<String, dynamic>> register(Handler app, String username) async {

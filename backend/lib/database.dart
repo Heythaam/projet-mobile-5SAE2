@@ -40,6 +40,13 @@ class AppDatabase {
     if (!columnNames.contains('last_active_on')) {
       db.execute('ALTER TABLE users ADD COLUMN last_active_on TEXT');
     }
+    // 0 while a new account still has the username the server made up; the
+    // player picks the real one right after signing up.
+    if (!columnNames.contains('username_chosen')) {
+      db.execute(
+        'ALTER TABLE users ADD COLUMN username_chosen INTEGER NOT NULL DEFAULT 1',
+      );
+    }
     db.execute('''
       CREATE TABLE IF NOT EXISTS friendships (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -18,6 +18,20 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// An account that is signed in on this phone, so the player can switch to it
+/// without typing the password again.
+class SavedAccount {
+  const SavedAccount({
+    required this.id,
+    required this.username,
+    required this.email,
+  });
+
+  final int id;
+  final String username;
+  final String email;
+}
+
 class ApiClient {
   ApiClient({
     http.Client? client,
@@ -49,21 +63,113 @@ class ApiClient {
       // again instead.
       if (error.statusCode == 401 || error.statusCode == 404) {
         await _storage.delete(key: _tokenKey);
+        await _forgetToken(token);
         return null;
       }
       rethrow;
     }
   }
 
+  // ---- Accounts signed in on this phone ---------------------------------
+
+  static const _accountsKey = 'accounts';
+
+  Future<Map<String, Map<String, dynamic>>> _vault() async {
+    try {
+      final raw = await _storage.read(key: _accountsKey);
+      if (raw == null) return {};
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return {
+        for (final entry in decoded.entries)
+          entry.key: Map<String, dynamic>.from(entry.value as Map),
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _saveVault(Map<String, Map<String, dynamic>> vault) =>
+      _storage.write(key: _accountsKey, value: jsonEncode(vault));
+
+  Future<void> _remember(UserAccount user, String token) async {
+    try {
+      final vault = await _vault();
+      vault['${user.id}'] = {
+        'token': token,
+        'username': user.username,
+        'email': user.email,
+      };
+      await _saveVault(vault);
+    } catch (_) {}
+  }
+
+  Future<void> _forgetToken(String token) async {
+    try {
+      final vault = await _vault();
+      final before = vault.length;
+      vault.removeWhere((_, entry) => entry['token'] == token);
+      if (vault.length != before) await _saveVault(vault);
+    } catch (_) {}
+  }
+
+  /// Accounts signed in on this phone, A to Z.
+  Future<List<SavedAccount>> savedAccounts() async {
+    final vault = await _vault();
+    final accounts = [
+      for (final entry in vault.entries)
+        if (int.tryParse(entry.key) != null)
+          SavedAccount(
+            id: int.parse(entry.key),
+            username: '${entry.value['username']}',
+            email: '${entry.value['email']}',
+          ),
+    ]..sort((a, b) => a.username.compareTo(b.username));
+    return accounts;
+  }
+
+  /// Makes a saved account the active one. Returns null when its session is
+  /// no longer valid (it is then forgotten).
+  Future<UserAccount?> switchTo(int id) async {
+    final entry = (await _vault())['$id'];
+    final token = entry?['token'];
+    if (token is! String) return null;
+    await _storage.write(key: _tokenKey, value: token);
+    return restoreSession();
+  }
+
+  /// Signs a saved account out of this phone without touching the active one.
+  Future<void> forgetAccount(int id) async {
+    final vault = await _vault();
+    if (vault.remove('$id') != null) await _saveVault(vault);
+  }
+
+  /// Saves the username the player picked after signing up.
+  Future<UserAccount> setUsername(String username) async {
+    final response = await _authenticated(
+      'PUT',
+      '/me/username',
+      body: {'username': username},
+    );
+    final user = UserAccount.fromJson(response);
+    final token = await _storage.read(key: _tokenKey);
+    if (token != null) await _remember(user, token);
+    return user;
+  }
+
+  /// Without a [username] the player picks one right after signing up.
   Future<UserAccount> register({
-    required String username,
+    String? username,
     required String email,
     required String password,
   }) async {
     final response = await _send(
       'POST',
       '/auth/register',
-      body: {'username': username, 'email': email, 'password': password},
+      body: {
+        'username': ?username,
+        'email': email,
+        'password': password,
+      },
     );
     await _saveSession(response);
     return UserAccount.fromJson(response['user'] as Map<String, dynamic>);
@@ -136,7 +242,12 @@ class ApiClient {
     return ChatMessage.fromJson(response['message'] as Map<String, dynamic>);
   }
 
-  Future<void> logout() => _storage.delete(key: _tokenKey);
+  /// Signs the active account out of this phone.
+  Future<void> logout() async {
+    final token = await _storage.read(key: _tokenKey);
+    await _storage.delete(key: _tokenKey);
+    if (token != null) await _forgetToken(token);
+  }
 
   /// Sends a bearer-authenticated request for feature services (for example
   /// `TournamentService`) that keep their own endpoint paths and parsing.
@@ -152,6 +263,10 @@ class ApiClient {
       throw const ApiException('The server returned an invalid session.');
     }
     await _storage.write(key: _tokenKey, value: token);
+    final user = response['user'];
+    if (user is Map<String, dynamic>) {
+      await _remember(UserAccount.fromJson(user), token);
+    }
   }
 
   /// Called once when the server refuses the saved session (or there is none),
@@ -173,6 +288,7 @@ class ApiClient {
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
         await _storage.delete(key: _tokenKey);
+        await _forgetToken(token);
         onSessionExpired?.call();
       }
       rethrow;

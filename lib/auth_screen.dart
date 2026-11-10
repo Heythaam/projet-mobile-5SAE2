@@ -10,6 +10,7 @@ class AuthScreen extends StatefulWidget {
   const AuthScreen({
     required this.api,
     required this.onAuthenticated,
+    this.onCancel,
     this.cloud = const NoopCloudSync(),
     super.key,
   });
@@ -18,13 +19,15 @@ class AuthScreen extends StatefulWidget {
   final CloudSync cloud;
   final ValueChanged<UserAccount> onAuthenticated;
 
+  /// Set when the player came here to add another account; shows a back arrow.
+  final VoidCallback? onCancel;
+
   @override
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
@@ -33,10 +36,46 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
   String? _error;
+  List<SavedAccount> _saved = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    try {
+      final saved = await widget.api.savedAccounts();
+      if (mounted) setState(() => _saved = saved);
+    } catch (_) {}
+  }
+
+  Future<void> _continueAs(SavedAccount account) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final user = await widget.api.switchTo(account.id);
+      if (user == null) {
+        await _loadSaved();
+        if (mounted) {
+          setState(() => _error = 'That session expired. Please sign in.');
+        }
+        return;
+      }
+      await widget.cloud.signOut();
+      if (mounted) widget.onAuthenticated(user);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Could not sign in: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   void dispose() {
-    _username.dispose();
     _email.dispose();
     _password.dispose();
     _confirmation.dispose();
@@ -66,7 +105,6 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       final user = _registering
           ? await widget.api.register(
-              username: _username.text.trim(),
               email: _email.text.trim(),
               password: _password.text,
             )
@@ -129,6 +167,19 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ),
                         ),
+                      if (!isSignUp && widget.onCancel != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            tooltip: 'Back',
+                            onPressed: _busy ? null : widget.onCancel,
+                            icon: Icon(
+                              Icons.arrow_back_rounded,
+                              color: KickoffColors.muted,
+                              size: 22 * scale,
+                            ),
+                          ),
+                        ),
                       SizedBox(height: constraints.maxHeight * 0.04),
                       Column(
                         children: [
@@ -154,22 +205,6 @@ class _AuthScreenState extends State<AuthScreen> {
                           key: _formKey,
                           child: Column(
                             children: [
-                              if (isSignUp) ...[
-                                PillField(
-                                  controller: _username,
-                                  hint: 'Player name',
-                                  icon: Icons.alternate_email_rounded,
-                                  validator: (value) {
-                                    final username = value?.trim() ?? '';
-                                    if (!RegExp(r'^[a-zA-Z0-9_]{3,20}$')
-                                        .hasMatch(username)) {
-                                      return 'Use 3-20 letters, numbers, or underscores.';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                SizedBox(height: 12 * scale),
-                              ],
                               PillField(
                                 controller: _email,
                                 hint: 'Email',
@@ -294,6 +329,21 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ],
                       const Spacer(),
+                      if (!isSignUp)
+                        for (final account in _saved)
+                          TextButton(
+                            key: ValueKey('continue_${account.id}'),
+                            onPressed: _busy
+                                ? null
+                                : () => _continueAs(account),
+                            child: Text(
+                              'Continue as @${account.username}',
+                              style: TextStyle(
+                                color: KickoffColors.muted,
+                                fontSize: 14 * scale,
+                              ),
+                            ),
+                          ),
                       Padding(
                         padding: EdgeInsets.only(
                           left: 12 * scale,
