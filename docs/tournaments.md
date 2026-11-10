@@ -2,12 +2,12 @@
 
 Players discover tournaments, register a team (or ask to join someone
 else's), follow standings and knockout brackets, and captains manage their
-roster. Everything shown comes from the API; the app holds no sample
+roster. Everything shown comes from Firestore; the app holds no sample
 tournaments, matches or results.
 
 - Flutter code: `lib/tournaments/`
-- API routes and rules: `backend/lib/app.dart`
-- Schema and migrations: `backend/lib/database.dart`
+- Rules (create, join, leave, requests): `lib/tournaments/cloud/tournament_rules.dart`
+- Fixtures, results, standings, bracket: `lib/tournaments/cloud/tournament_fixtures.dart`
 - Team agents' guidelines: `agents/` (brainstorm, code-writer, ux-designer,
   code-reviewer)
 
