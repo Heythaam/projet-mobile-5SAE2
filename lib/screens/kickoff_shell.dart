@@ -70,6 +70,7 @@ class KickoffShell extends StatefulWidget {
     required this.friends,
     required this.user,
     this.challengeCloud = const NoopChallengeCloud(),
+    this.tournaments,
     required this.onLogout,
     this.isGuest = false,
     this.cloud = const NoopCloudSync(),
@@ -92,6 +93,9 @@ class KickoffShell extends StatefulWidget {
   final AccountService account;
   final FriendsService friends;
   final ChallengeCloud challengeCloud;
+
+  /// Tournaments on Firestore; the old server service when null.
+  final TournamentService? tournaments;
   final CloudSync cloud;
 
   /// Account switching from Settings → Profiles; null hides nothing, the
@@ -140,7 +144,8 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   /// Join requests waiting for this captain; the home banner hides at zero.
   int _pendingJoinRequests = 0;
   int _latestPendingLoad = 0;
-  late final _tournamentService = TournamentService(widget.api);
+  late final TournamentService _tournamentService =
+      widget.tournaments ?? TournamentService(widget.api);
   ModalRoute<void>? _route;
   late final AppLifecycleListener _lifecycle;
 

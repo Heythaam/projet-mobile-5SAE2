@@ -8,6 +8,10 @@ import 'auth_screen.dart';
 import 'challenges/repository/challenge_cloud.dart';
 import 'challenges/repository/firestore_challenge_cloud.dart';
 import 'friends/firestore_friends_service.dart';
+import 'local/doc_store.dart';
+import 'local/local_database.dart';
+import 'tournaments/cloud/firestore_tournament_service.dart';
+import 'tournaments/cloud/tournament_store.dart';
 import 'friends/friends_service.dart';
 import 'local/session_store.dart';
 import 'security/app_lock.dart';
@@ -224,6 +228,14 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               challengeCloud: widget.cloud is FirebaseCloudSync
                   ? FirestoreChallengeCloud()
                   : const NoopChallengeCloud(),
+              tournaments: widget.cloud is FirebaseCloudSync
+                  ? FirestoreTournamentService(
+                      meId: _user!.id,
+                      meName: _user!.username,
+                      store: FirestoreTournamentStore(),
+                      cache: () async => DocStore(await LocalDatabase.open()),
+                    )
+                  : null,
               cloud: widget.cloud,
               user: _user!,
               onLogout: _logout,
