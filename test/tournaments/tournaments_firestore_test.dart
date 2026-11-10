@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/tournaments/cloud/firestore_tournament_service.dart';
-import 'package:football_match_app/tournaments/cloud/tournament_store.dart';
-import 'package:football_match_app/tournaments/models/tournament.dart';
-import 'package:football_match_app/tournaments/services/tournament_service.dart';
+import 'package:football_match_app/services/tournament/firestore_tournament_service.dart';
+import 'package:football_match_app/services/tournament/tournament_store.dart';
+import 'package:football_match_app/entities/tournament/tournament.dart';
+import 'package:football_match_app/services/tournament/tournament_service.dart';
 
 FirestoreTournamentService _as(
   InMemoryTournamentStore store,

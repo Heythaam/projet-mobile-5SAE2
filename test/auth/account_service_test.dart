@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/auth/account_service.dart';
-import 'package:football_match_app/auth/firebase_account_service.dart';
-import 'package:football_match_app/auth_screen.dart';
-import 'package:football_match_app/models.dart';
+import 'package:football_match_app/services/auth/account_service.dart';
+import 'package:football_match_app/services/auth/firebase_account_service.dart';
+import 'package:football_match_app/views/auth/auth_screen.dart';
+import 'package:football_match_app/entities/user/models.dart';
 
 import '../support/fake_account_service.dart';
 

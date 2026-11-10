@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/local/local_database.dart';
-import 'package:football_match_app/local/user_local_store.dart';
-import 'package:football_match_app/users/avatar_palette.dart';
-import 'package:football_match_app/users/user_profile_controller.dart';
+import 'package:football_match_app/bd/local_database.dart';
+import 'package:football_match_app/bd/user_local_store.dart';
+import 'package:football_match_app/items/user/avatar_palette.dart';
+import 'package:football_match_app/services/user/user_profile_controller.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {

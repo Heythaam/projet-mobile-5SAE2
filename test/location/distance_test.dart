@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/location/player_location.dart';
+import 'package:football_match_app/services/location/player_location.dart';
 
 void main() {
   test('distance between the same point is zero', () {

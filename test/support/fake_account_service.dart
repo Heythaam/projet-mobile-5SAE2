@@ -1,5 +1,5 @@
-import 'package:football_match_app/auth/account_service.dart';
-import 'package:football_match_app/models.dart';
+import 'package:football_match_app/services/auth/account_service.dart';
+import 'package:football_match_app/entities/user/models.dart';
 
 /// An in-memory [AccountService] for widget tests.
 class FakeAccountService implements AccountService {

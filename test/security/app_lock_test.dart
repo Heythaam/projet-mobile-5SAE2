@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/security/app_lock.dart';
+import 'package:football_match_app/services/security/app_lock.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeAuth implements Authenticator {

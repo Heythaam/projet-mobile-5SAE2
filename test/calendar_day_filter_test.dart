@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/matches/football_match.dart';
-import 'package:football_match_app/screens/calendar_screen.dart';
+import 'package:football_match_app/entities/match/football_match.dart';
+import 'package:football_match_app/views/home/calendar_screen.dart';
 
 void main() {
   testWidgets('tapping a day lists only that day, again shows all', (

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/friends/friends_screen.dart';
-import 'package:football_match_app/friends/friends_service.dart';
-import 'package:football_match_app/models.dart';
+import 'package:football_match_app/views/friends/friends_screen.dart';
+import 'package:football_match_app/services/friends/friends_service.dart';
+import 'package:football_match_app/entities/user/models.dart';
 
 class _FakeFriends implements FriendsService {
   final calls = <String>[];

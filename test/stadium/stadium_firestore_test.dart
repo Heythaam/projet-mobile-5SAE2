@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/matches/stadium_directory.dart';
-import 'package:football_match_app/stadium/firestore_stadiums.dart';
-import 'package:football_match_app/stadium/stadium_module.dart';
-import 'package:football_match_app/stadium/stadium_store.dart';
+import 'package:football_match_app/services/stadium/stadium_directory.dart';
+import 'package:football_match_app/services/stadium/firestore_stadiums.dart';
+import 'package:football_match_app/views/stadium/stadium_module.dart';
+import 'package:football_match_app/services/stadium/stadium_store.dart';
 
 /// A day at least two days ahead that is not a Sunday (the default draft is
 /// open Monday to Saturday).

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/location/player_location.dart';
-import 'package:football_match_app/travel/travel_service.dart';
+import 'package:football_match_app/services/location/player_location.dart';
+import 'package:football_match_app/services/challenge/travel_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

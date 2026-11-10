@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/matches/match_filter.dart';
+import 'package:football_match_app/entities/match/match_filter.dart';
 
 void main() {
   test('an empty filter keeps every match', () {

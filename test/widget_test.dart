@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:football_match_app/api_client.dart';
+import 'package:football_match_app/services/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
-import 'package:football_match_app/auth_screen.dart';
-import 'package:football_match_app/friends/friends_service.dart';
-import 'package:football_match_app/matches/football_match.dart';
-import 'package:football_match_app/matches/match_repository.dart';
-import 'package:football_match_app/models.dart';
-import 'package:football_match_app/screens/calendar_screen.dart';
-import 'package:football_match_app/screens/kickoff_shell.dart';
+import 'package:football_match_app/views/auth/auth_screen.dart';
+import 'package:football_match_app/services/friends/friends_service.dart';
+import 'package:football_match_app/entities/match/football_match.dart';
+import 'package:football_match_app/services/match/match_repository.dart';
+import 'package:football_match_app/entities/user/models.dart';
+import 'package:football_match_app/views/home/calendar_screen.dart';
+import 'package:football_match_app/views/home/kickoff_shell.dart';
 
 import 'support/fake_account_service.dart';
 

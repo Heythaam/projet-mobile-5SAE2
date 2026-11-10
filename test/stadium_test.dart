@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/stadium/stadium_module.dart';
+import 'package:football_match_app/views/stadium/stadium_module.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

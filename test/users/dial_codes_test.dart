@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/users/dial_codes.dart';
+import 'package:football_match_app/entities/user/dial_codes.dart';
 
 void main() {
   test('splits a saved number into its code and digits', () {

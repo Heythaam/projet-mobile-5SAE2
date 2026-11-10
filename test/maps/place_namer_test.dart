@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/maps/map_picker_screen.dart';
+import 'package:football_match_app/views/maps/map_picker_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/screens/match/match_mock_data.dart';
-import 'package:football_match_app/screens/match/match_widgets.dart';
+import 'package:football_match_app/entities/match/match_mock_data.dart';
+import 'package:football_match_app/items/match/match_widgets.dart';
 
 void main() {
   final match = MatchHomeMatch(

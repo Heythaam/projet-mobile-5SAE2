@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/challenges/database/challenge_database.dart';
-import 'package:football_match_app/challenges/models/challenge_model.dart';
-import 'package:football_match_app/challenges/repository/challenge_cloud.dart';
-import 'package:football_match_app/challenges/repository/challenge_repository.dart';
+import 'package:football_match_app/bd/challenge_database.dart';
+import 'package:football_match_app/entities/challenge/challenge_model.dart';
+import 'package:football_match_app/services/challenge/challenge_cloud.dart';
+import 'package:football_match_app/services/challenge/challenge_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class _FakeCloud implements ChallengeCloud {

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/challenges/database/challenge_database.dart';
-import 'package:football_match_app/challenges/models/challenge_model.dart';
-import 'package:football_match_app/challenges/repository/challenge_repository.dart';
-import 'package:football_match_app/challenges/screens/challenges_dashboard_screen.dart';
-import 'package:football_match_app/challenges/widgets/challenge_card.dart';
-import 'package:football_match_app/challenges/widgets/star_rating.dart';
-import 'package:football_match_app/models.dart';
+import 'package:football_match_app/bd/challenge_database.dart';
+import 'package:football_match_app/entities/challenge/challenge_model.dart';
+import 'package:football_match_app/services/challenge/challenge_repository.dart';
+import 'package:football_match_app/views/challenge/challenges_dashboard_screen.dart';
+import 'package:football_match_app/items/challenge/challenge_card.dart';
+import 'package:football_match_app/items/challenge/star_rating.dart';
+import 'package:football_match_app/entities/user/models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _testUser = UserAccount(

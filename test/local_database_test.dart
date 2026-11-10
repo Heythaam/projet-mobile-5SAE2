@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/api_client.dart';
-import 'package:football_match_app/core/local_database.dart';
-import 'package:football_match_app/tournaments/services/tournament_service.dart';
+import 'package:football_match_app/services/api_client.dart';
+import 'package:football_match_app/bd/core_database.dart';
+import 'package:football_match_app/services/tournament/tournament_service.dart';
 
 class _FakeApi extends ApiClient {
   _FakeApi(this.responses)

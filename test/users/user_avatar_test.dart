@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/users/avatar_palette.dart';
-import 'package:football_match_app/users/user_avatar.dart';
+import 'package:football_match_app/items/user/avatar_palette.dart';
+import 'package:football_match_app/items/user/user_avatar.dart';
 
 void main() {
   test('diceBearUrl carries the seed, size and colour', () {

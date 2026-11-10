@@ -3,19 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/api_client.dart';
-import 'package:football_match_app/tournaments/models/player_profile.dart';
-import 'package:football_match_app/tournaments/models/tournament.dart';
-import 'package:football_match_app/tournaments/screens/tournament_detail_screen.dart';
-import 'package:football_match_app/tournaments/screens/tournament_standings_screen.dart';
-import 'package:football_match_app/tournaments/screens/tournaments_list_screen.dart';
-import 'package:football_match_app/tournaments/services/tournament_service.dart';
-import 'package:football_match_app/core/local_database.dart';
-import 'package:football_match_app/tournaments/tournament_constants.dart';
+import 'package:football_match_app/services/api_client.dart';
+import 'package:football_match_app/entities/tournament/player_profile.dart';
+import 'package:football_match_app/entities/tournament/tournament.dart';
+import 'package:football_match_app/views/tournament/tournament_detail_screen.dart';
+import 'package:football_match_app/views/tournament/tournament_standings_screen.dart';
+import 'package:football_match_app/views/tournament/tournaments_list_screen.dart';
+import 'package:football_match_app/services/tournament/tournament_service.dart';
+import 'package:football_match_app/bd/core_database.dart';
+import 'package:football_match_app/items/tournament/tournament_constants.dart';
 import 'package:football_match_app/app_route_observer.dart';
-import 'package:football_match_app/tournaments/widgets/bracket_widget.dart';
-import 'package:football_match_app/tournaments/widgets/sheet_frame.dart';
-import 'package:football_match_app/tournaments/widgets/tournament_states.dart';
+import 'package:football_match_app/items/tournament/bracket_widget.dart';
+import 'package:football_match_app/items/tournament/sheet_frame.dart';
+import 'package:football_match_app/items/tournament/tournament_states.dart';
 
 void main() {
   setUp(() async {

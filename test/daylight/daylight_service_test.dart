@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/daylight/daylight_service.dart';
+import 'package:football_match_app/services/challenge/daylight_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/weather/match_weather_row.dart';
-import 'package:football_match_app/weather/weather_service.dart';
+import 'package:football_match_app/items/match/match_weather_row.dart';
+import 'package:football_match_app/services/match/weather_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 

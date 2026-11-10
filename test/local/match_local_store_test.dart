@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/local/local_database.dart';
-import 'package:football_match_app/local/match_local_store.dart';
+import 'package:football_match_app/bd/local_database.dart';
+import 'package:football_match_app/bd/match_local_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Matcher throwsMatch(LocalMatchError error) => throwsA(

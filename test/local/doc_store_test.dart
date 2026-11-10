@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/local/doc_store.dart';
-import 'package:football_match_app/local/local_database.dart';
+import 'package:football_match_app/bd/doc_store.dart';
+import 'package:football_match_app/bd/local_database.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
