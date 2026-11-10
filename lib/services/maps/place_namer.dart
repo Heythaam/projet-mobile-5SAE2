@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import '../http_constants.dart';
 
 /// Names a point on the map, in French, using OpenStreetMap's free Nominatim
 /// service.
@@ -14,7 +15,7 @@ class PlaceNamer {
     final fallback =
         '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
     try {
-      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+      final uri = Uri.https(HttpEndpoints.nominatimHost, '/reverse', {
         'format': 'jsonv2',
         'lat': '$latitude',
         'lon': '$longitude',

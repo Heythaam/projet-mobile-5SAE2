@@ -5,31 +5,25 @@ import '../../services/api_client.dart';
 import '../../services/challenge/challenge_cloud.dart';
 import '../../services/auth/account_service.dart';
 import '../../services/firebase/cloud_sync.dart';
-import '../friends/friends_screen.dart';
 import '../../services/friends/friends_service.dart';
 import '../settings/settings_screen.dart';
 import '../../services/match/match_controller.dart';
 import '../../app_route_observer.dart';
+import '../../app_routes.dart';
 import '../../entities/match/football_match.dart';
 import '../../services/match/match_repository.dart';
 import '../../entities/user/models.dart';
-import '../../services/challenge/challenge_repository.dart';
-import '../challenge/challenges_dashboard_screen.dart';
 import '../../services/stadium/stadium_directory.dart';
 import '../../services/stadium/stadium_api.dart';
-import '../stadium/stadium_module.dart';
 import '../../services/user/country_service.dart';
 import '../../services/user/user_profile_controller.dart';
 import '../user/edit_profile_screen.dart';
-import '../user/people_screen.dart';
 import '../../services/security/app_lock.dart';
-import '../tournament/tournaments_list_screen.dart';
 import '../../services/tournament/tournament_service.dart';
 import '../../items/tournament/requests_badge.dart';
 import 'calendar_screen.dart';
 import 'home_dashboard_screen.dart';
 import '../../items/kickoff_style.dart';
-import '../match/match_home_screen.dart';
 import 'placeholder_screen.dart';
 import '../user/profile_screen.dart';
 
@@ -266,24 +260,23 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   void _handleBallMenuSelect(String title, IconData icon) {
     setState(() => _menuOpen = false);
     if (title == 'Challenge') {
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => ChallengesDashboardScreen(
-            repository: SqliteChallengeRepository(
-              null,
-              widget.challengeCloud,
-            ),
-            user: widget.user,
-            isGuest: widget.isGuest,
-          ),
+      Navigator.of(context).pushNamed<void>(
+        AppRoutes.challenges,
+        arguments: ChallengesArgs(
+          cloud: widget.challengeCloud,
+          user: widget.user,
+          isGuest: widget.isGuest,
         ),
+      );
+    } else if (title == 'Match') {
+      Navigator.of(context).pushNamed<void>(
+        AppRoutes.match,
+        arguments: _matchController,
       );
     } else {
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => title == 'Match'
-              ? MatchHomeScreen(controller: _matchController)
-              : PlaceholderScreen(title: title, icon: icon),
+          builder: (_) => PlaceholderScreen(title: title, icon: icon),
         ),
       );
     }
@@ -292,18 +285,16 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   /// The banner refreshes in [didPopNext] once the tournaments close.
   void _openTournaments() {
     setState(() => _menuOpen = false);
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => TournamentsListScreen(service: _tournamentService),
-      ),
+    Navigator.of(context).pushNamed<void>(
+      AppRoutes.tournaments,
+      arguments: _tournamentService,
     );
   }
 
   void _openFriends() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => FriendsScreen(friends: widget.friends, user: widget.user),
-      ),
+    Navigator.of(context).pushNamed<void>(
+      AppRoutes.friends,
+      arguments: FriendsArgs(friends: widget.friends, user: widget.user),
     );
   }
 
@@ -334,12 +325,11 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   }
 
   void _openAwards() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => AwardsScreen(
-          profile: _profile,
-          localAwards: widget.isGuest ? const [] : _matchController.awards,
-        ),
+    Navigator.of(context).pushNamed<void>(
+      AppRoutes.awards,
+      arguments: AwardsArgs(
+        profile: _profile,
+        localAwards: widget.isGuest ? const [] : _matchController.awards,
       ),
     );
   }
@@ -480,10 +470,9 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   void _openPeople() {
     final controller = _profileController;
     if (controller == null) return;
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => PeopleScreen(controller: controller),
-      ),
+    Navigator.of(context).pushNamed<void>(
+      AppRoutes.people,
+      arguments: controller,
     );
   }
 
@@ -499,13 +488,12 @@ class _KickoffShellState extends State<KickoffShell> with RouteAware {
   }
 
   void _openStadiums() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => StadiumModule(
-          api: widget.stadiumApi,
-          isGuest: widget.isGuest,
-          onSignIn: widget.onOpenAuth,
-        ),
+    Navigator.of(context).pushNamed<void>(
+      AppRoutes.stadiums,
+      arguments: StadiumsArgs(
+        api: widget.stadiumApi,
+        isGuest: widget.isGuest,
+        onSignIn: widget.onOpenAuth,
       ),
     );
   }

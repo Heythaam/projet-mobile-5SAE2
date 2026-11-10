@@ -3,13 +3,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../entities/challenge/daylight.dart';
+import '../http_constants.dart';
 
 /// Reads sunrise and sunset from sunrise-sunset.org (free, no key). Returns
 /// null instead of throwing, so a missing connection never blocks a screen.
 class DaylightService {
   DaylightService({http.Client? client, Uri? baseUri})
     : _client = client ?? http.Client(),
-      _baseUri = baseUri ?? Uri.parse('https://api.sunrise-sunset.org/json');
+      _baseUri = baseUri ?? Uri.parse(HttpEndpoints.sunriseSunset);
 
   final http.Client _client;
   final Uri _baseUri;

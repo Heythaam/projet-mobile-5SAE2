@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../entities/challenge/travel.dart';
 import '../location/player_location.dart';
+import '../http_constants.dart';
 
 /// Finds a place on OpenStreetMap (Nominatim) and times the trip to it with
 /// the public OSRM routers; none of them needs a key. The player's position
@@ -19,13 +20,13 @@ class TravelService {
   }) : _client = client ?? http.Client(),
        _location = location ?? const GeolocatorLocationSource(),
        _geocoder =
-           geocoder ?? Uri.parse('https://nominatim.openstreetmap.org/search'),
+           geocoder ?? Uri.parse(HttpEndpoints.nominatimSearch),
        _carRouter =
            carRouter ??
-           Uri.parse('https://router.project-osrm.org/route/v1/driving'),
+           Uri.parse(HttpEndpoints.osrmDriving),
        _footRouter =
            footRouter ??
-           Uri.parse('https://routing.openstreetmap.de/routed-foot/route/v1/foot');
+           Uri.parse(HttpEndpoints.osrmFoot);
 
   final http.Client _client;
   final LocationSource _location;

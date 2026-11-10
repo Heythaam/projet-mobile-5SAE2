@@ -1,3 +1,4 @@
+import 'package:football_match_app/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -418,6 +419,7 @@ Widget _shell({
 }) => MaterialApp(
   key: key,
   navigatorObservers: [appRouteObserver],
+  routes: appRoutes,
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context)
         .copyWith(textScaler: TextScaler.linear(textScale)),
@@ -435,6 +437,7 @@ Widget _shell({
 
 // ignore: unused_element
 Widget _guestShell() => MaterialApp(
+  routes: appRoutes,
   home: KickoffShell(
     api: _GuestApiClient(),
     account: FakeAccountService(),

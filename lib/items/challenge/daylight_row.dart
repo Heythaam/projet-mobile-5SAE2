@@ -28,33 +28,41 @@ class DaylightRow extends StatefulWidget {
 }
 
 class _DaylightRowState extends State<DaylightRow> {
-  Daylight? _daylight;
+  late Future<Daylight?> _future;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _load();
   }
 
-  Future<void> _load() async {
-    final start = widget.start;
-    final daylight = await widget.service.forDay(
-      latitude: widget.latitude,
-      longitude: widget.longitude,
-      day: start,
-    );
-    if (!mounted || start != widget.start) return;
-    setState(() => _daylight = daylight);
+  @override
+  void didUpdateWidget(DaylightRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.start != widget.start) _future = _load();
   }
+
+  Future<Daylight?> _load() => widget.service.forDay(
+    latitude: widget.latitude,
+    longitude: widget.longitude,
+    day: widget.start,
+  );
 
   static String _hm(DateTime time) =>
       '${time.hour.toString().padLeft(2, '0')}:'
       '${time.minute.toString().padLeft(2, '0')}';
 
   @override
-  Widget build(BuildContext context) {
-    final daylight = _daylight;
-    if (daylight == null) return const SizedBox.shrink();
+  Widget build(BuildContext context) => FutureBuilder<Daylight?>(
+    future: _future,
+    builder: (context, snapshot) {
+      final daylight = snapshot.data;
+      if (daylight == null) return const SizedBox.shrink();
+      return _content(daylight);
+    },
+  );
+
+  Widget _content(Daylight daylight) {
     final verdict = daylight.verdict(widget.start, widget.minutes);
     final good = verdict == DaylightVerdict.daylight;
     final color = good ? KickoffColors.yellow : KickoffColors.orange;

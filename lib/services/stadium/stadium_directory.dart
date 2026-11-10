@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../../entities/stadium/real_stadium.dart';
+import '../http_constants.dart';
 
 /// What the Match module needs from the Stadium module. It only uses the
 /// stadium module's public API: list stadiums, read free slots, hold a slot and
@@ -62,7 +63,7 @@ class HttpStadiumDirectory implements StadiumDirectory {
            baseUrl ??
            const String.fromEnvironment(
              'API_BASE_URL',
-             defaultValue: 'http://10.0.2.2:8080',
+             defaultValue: HttpEndpoints.kickoffApi,
            );
 
   final http.Client _client;

@@ -49,6 +49,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       widget.countries ?? CountryService();
   bool _saving = false;
   String? _error;
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -100,6 +101,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (!(_formKey.currentState?.validate() ?? true)) return;
     final oldPhoto = widget.controller.profile?.photoPath;
     setState(() {
       _saving = true;
@@ -189,7 +191,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               Expanded(
-                child: ListView(
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   children: [
                     Center(
@@ -270,11 +274,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     const SizedBox(height: 20),
                     const _Label('Username'),
-                    TextField(
+                    TextFormField(
                       key: const ValueKey('edit_profile_username'),
                       controller: _username,
                       maxLength: 20,
                       autocorrect: false,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (value) =>
+                          RegExp(r'^[a-zA-Z0-9_]{3,20}$')
+                              .hasMatch(value?.trim() ?? '')
+                          ? null
+                          : 'Use 3-20 letters, numbers, or underscores.',
                       textInputAction: TextInputAction.next,
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
@@ -386,6 +396,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       style: TextStyle(color: KickoffColors.dim, fontSize: 12),
                     ),
                   ],
+                ),
                 ),
               ),
               Padding(

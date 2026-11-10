@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../../entities/stadium/stadium.dart';
+import '../http_constants.dart';
 
 class StadiumApiException implements Exception {
   const StadiumApiException(this.message);
@@ -28,7 +29,7 @@ class StadiumApi {
            baseUrl ??
            const String.fromEnvironment(
              'API_BASE_URL',
-             defaultValue: 'http://10.0.2.2:8080',
+             defaultValue: HttpEndpoints.kickoffApi,
            );
 
   final http.Client _client;

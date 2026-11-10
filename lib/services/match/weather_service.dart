@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../http_constants.dart';
 
 /// Forecast for one hour at one place, from Open-Meteo (free, no key).
 class MatchWeather {
@@ -74,7 +75,7 @@ class MatchWeather {
 class WeatherService {
   WeatherService({http.Client? client, Uri? baseUri, DateTime Function()? clock})
     : _client = client ?? http.Client(),
-      _baseUri = baseUri ?? Uri.parse('https://api.open-meteo.com/v1/forecast'),
+      _baseUri = baseUri ?? Uri.parse(HttpEndpoints.openMeteo),
       _clock = clock ?? DateTime.now;
 
   final http.Client _client;

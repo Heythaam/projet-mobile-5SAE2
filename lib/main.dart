@@ -21,6 +21,7 @@ import 'entities/user/models.dart';
 import 'views/home/kickoff_shell.dart';
 import 'views/user/choose_username_screen.dart';
 import 'app_route_observer.dart';
+import 'app_routes.dart';
 import 'services/firebase/cloud_sync.dart';
 import 'services/firebase/firebase_cloud_sync.dart';
 
@@ -163,6 +164,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     title: 'Kickoff',
     debugShowCheckedModeBanner: false,
     navigatorObservers: [appRouteObserver],
+    routes: appRoutes,
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF0B5FE8),

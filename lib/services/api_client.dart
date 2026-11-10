@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../entities/user/models.dart';
+import 'http_constants.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, {this.statusCode, this.code});
@@ -43,7 +44,7 @@ class ApiClient {
            baseUrl ??
            const String.fromEnvironment(
              'API_BASE_URL',
-             defaultValue: 'http://10.0.2.2:8080',
+             defaultValue: HttpEndpoints.kickoffApi,
            );
 
   static const _tokenKey = 'auth_token';
@@ -323,7 +324,9 @@ class ApiClient {
 
     final request = http.Request(method, uri)..headers.addAll(headers);
     if (body != null) request.body = jsonEncode(body);
-    final streamed = await _client.send(request);
+    final streamed = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 20));
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode == 204) return {};
 

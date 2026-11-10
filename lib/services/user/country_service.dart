@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../entities/user/builtin_countries.dart';
+import '../http_constants.dart';
 
 class Country {
   const Country({required this.code, required this.name, required this.flagUrl});
@@ -36,7 +37,7 @@ String flagEmoji(String code) {
 class CountryService {
   CountryService({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
-      _baseUrl = baseUrl ?? 'https://restcountries.com/v3.1';
+      _baseUrl = baseUrl ?? HttpEndpoints.restCountries;
 
   final http.Client _client;
   final String _baseUrl;
