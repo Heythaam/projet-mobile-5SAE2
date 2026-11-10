@@ -8,9 +8,10 @@ app does.
 
 Phases 1 to 4 are done: files moved, mixed files split, behavior aligned
 (routes map, validated form, HTTP constants, timeout, `FutureBuilder` on the
-daylight row), tests moved to mirror `lib/`, docs updated. Not done: splitting
-`views/stadium/stadium_module.dart` (still one large file) and `FutureBuilder`
-on the big list screens.
+daylight row), tests moved to mirror `lib/`, docs updated, and the stadium owner
+screens split into one file per screen (shared widgets in
+`items/stadium/stadium_widgets.dart`). Not done: `FutureBuilder` on the big list
+screens.
 
 ## 1. The reference architecture
 

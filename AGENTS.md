@@ -108,8 +108,9 @@ migration for any change.
   `CloudSync` and its Firebase implementation. Subfolders per module: `auth`,
   `friends`, `match`, `stadium`, `challenge`, `tournament`, `user`, `location`,
   `maps`, `security`, `settings`, `awards`.
-- `lib/views/`: one page per file, per module. `stadium_module.dart` holds the
-  stadium owner screens; tournaments rules live in `services/tournament/`.
+- `lib/views/`: one page per file, per module. `stadium/` has one file per owner screen
+  (home, editor, detail, bookings inbox) plus `stadium_module.dart` (entry point);
+  tournament rules live in `services/tournament/`.
 - `lib/items/`: reusable widgets (cards, rows, pickers) and `kickoff_style.dart`.
   Paths, sizes and copy of tournaments live in
   `items/tournament/tournament_constants.dart`. Update `docs/tournaments.md`
