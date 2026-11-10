@@ -113,6 +113,13 @@ class AppDatabase {
           'id, tournament_id, home_team_id, away_team_id, round, '
           'home_score, away_score, scheduled_at, status',
     );
+    final matchColumns = db
+        .select('PRAGMA table_info(tournament_matches)')
+        .map((row) => row['name'])
+        .toSet();
+    if (!matchColumns.contains('location')) {
+      db.execute('ALTER TABLE tournament_matches ADD COLUMN location TEXT');
+    }
     db.execute('''
       CREATE INDEX IF NOT EXISTS tournament_matches_tournament_idx
       ON tournament_matches(tournament_id, status)
@@ -186,7 +193,23 @@ class AppDatabase {
       CREATE INDEX IF NOT EXISTS join_requests_team_idx
       ON join_requests(team_id, status)
     ''');
-    createStadiumTables(db);
+
+    // Notifications table for tournament and match events.
+    db.execute('''
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+    db.execute('''
+      CREATE INDEX IF NOT EXISTS notifications_user_idx
+      ON notifications(user_id, is_read, created_at)
+    ''');
   }
 
   late final Database db;
@@ -268,6 +291,7 @@ class AppDatabase {
       winner_team_id INTEGER
         REFERENCES tournament_teams(id) ON DELETE SET NULL,
       scheduled_at TEXT,
+      location TEXT,
       status TEXT NOT NULL DEFAULT 'scheduled' CHECK (
         status IN ('scheduled', 'played', 'cancelled', 'bye')
       ),

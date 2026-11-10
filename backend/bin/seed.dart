@@ -47,7 +47,7 @@ const _tournaments = [
     name: 'City League',
     description: 'City-wide league tournament',
     format: 'league',
-    status: 'upcoming',
+    status: 'active',
     startDate: '2026-11-01',
     endDate: '2026-12-31',
     maxTeams: 6,
@@ -275,6 +275,94 @@ void main() {
         'Sample file: ${sampleUsers.length} more users, '
         '${_sampleTournaments().length} more tournaments.',
       );
+      // Seed City League (league tournament with standings and stats)
+      final cityLeagueId = tournamentIds['City League'];
+      if (cityLeagueId != null) {
+        final cityTeamNames = [
+          ('Real Madrid CF', 'alice'),
+          ('FC Barcelona', 'bob'),
+          ('Manchester City', 'carlos'),
+          ('Bayern Munich', 'diana'),
+          ('Paris Saint-Germain', 'cl_psg'),
+          ('Liverpool FC', 'cl_liv'),
+        ];
+        final cityTeamIds = <String, int>{};
+        for (final (tName, capt) in cityTeamNames) {
+          db.execute(
+            '''
+              INSERT INTO tournament_teams (tournament_id, captain_id, name)
+              VALUES (?, ?, ?)
+            ''',
+            [cityLeagueId, userIds[capt], tName],
+          );
+          cityTeamIds[tName] = db.lastInsertRowId;
+        }
+
+        final cityMatches = <(String, String, int?, int?, String, String)>[
+          ('Real Madrid CF', 'FC Barcelona', 3, 1, '2026-11-02 18:00:00', 'Tunis Arena - Pitch A'),
+          ('Manchester City', 'Bayern Munich', 2, 2, '2026-11-02 20:00:00', 'Tunis Arena - Pitch B'),
+          ('Paris Saint-Germain', 'Liverpool FC', 3, 0, '2026-11-03 19:00:00', 'Olympic Stadium'),
+          ('Real Madrid CF', 'Manchester City', 2, 1, '2026-11-05 18:00:00', 'Tunis Arena - Pitch A'),
+          ('FC Barcelona', 'Liverpool FC', 2, 0, '2026-11-05 20:00:00', 'Olympic Stadium'),
+          ('Bayern Munich', 'Paris Saint-Germain', 1, 2, '2026-11-06 19:00:00', 'Tunis Arena - Pitch B'),
+          ('Real Madrid CF', 'Paris Saint-Germain', 2, 2, '2026-11-08 18:00:00', 'Tunis Arena - Pitch A'),
+          ('FC Barcelona', 'Manchester City', 3, 2, '2026-11-08 20:00:00', 'Olympic Stadium'),
+          ('Liverpool FC', 'Bayern Munich', 2, 1, '2026-11-09 19:00:00', 'Tunis Arena - Pitch B'),
+          ('Real Madrid CF', 'Bayern Munich', null, null, '2026-11-15 19:30:00', 'Santiago Bernabéu Field'),
+          ('FC Barcelona', 'Paris Saint-Germain', null, null, '2026-11-16 20:45:00', 'Camp Nou Arena'),
+          ('Manchester City', 'Liverpool FC', null, null, '2026-11-17 18:00:00', 'Etihad Ground'),
+        ];
+
+        var cRound = 1;
+        for (final (hName, aName, hScore, aScore, sched, loc) in cityMatches) {
+          final hId = cityTeamIds[hName]!;
+          final aId = cityTeamIds[aName]!;
+          final played = hScore != null;
+          int? winner;
+          if (hScore != null && aScore != null) {
+            if (hScore > aScore) winner = hId;
+            if (aScore > hScore) winner = aId;
+          }
+          db.execute(
+            '''
+              INSERT INTO tournament_matches (tournament_id, stage, round,
+                home_team_id, away_team_id, home_score, away_score,
+                winner_team_id, status, scheduled_at, location)
+              VALUES (?, 'group', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            [
+              cityLeagueId,
+              cRound++,
+              hId,
+              aId,
+              hScore,
+              aScore,
+              winner,
+              played ? 'played' : 'scheduled',
+              sched,
+              loc,
+            ],
+          );
+        }
+      }
+
+      // Seed notifications for Alice
+      final aliceId = userIds['alice']!;
+      final notifications = [
+        ('New Join Request', 'Bob sent a request to join Real Madrid in Champions League.', 0, tournamentId),
+        ('Match Result Recorded', 'Real Madrid CF defeated FC Barcelona 3-1 in City League!', 0, cityLeagueId),
+        ('Semifinal Scheduled', 'Real Madrid vs Manchester City scheduled for Nov 18.', 0, tournamentId),
+        ('Tournament Started', 'City League is underway! Check out the standings and match fixtures.', 1, cityLeagueId),
+      ];
+      for (final (title, body, isRead, tId) in notifications) {
+        db.execute(
+          '''
+            INSERT INTO notifications (user_id, title, body, is_read, tournament_id)
+            VALUES (?, ?, ?, ?, ?)
+          ''',
+          [aliceId, title, body, isRead, tId],
+        );
+      }
 
       _verify(db, tournamentId);
       db.execute('COMMIT');

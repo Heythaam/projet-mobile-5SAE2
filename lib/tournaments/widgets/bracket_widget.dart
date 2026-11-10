@@ -11,9 +11,16 @@ const _lineHeight = 1.25;
 /// matches that feed it, joined by connector lines. Scrolls horizontally;
 /// the caller provides vertical scrolling.
 class BracketWidget extends StatelessWidget {
-  const BracketWidget({required this.rounds, super.key});
+  const BracketWidget({
+    required this.rounds,
+    this.onMatchTap,
+    super.key,
+  });
 
   final List<BracketRound> rounds;
+
+  /// Called with the match when an organizer taps a match card.
+  final void Function(BracketMatch)? onMatchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +102,9 @@ class BracketWidget extends StatelessWidget {
                             rounds[r].roundsFromEnd,
                             rounds[r].round,
                           ),
+                          onTap: onMatchTap == null
+                              ? null
+                              : () => onMatchTap!(rounds[r].matches[m]),
                         ),
                       ),
                 ],
@@ -161,11 +171,13 @@ class BracketMatchCard extends StatelessWidget {
   const BracketMatchCard({
     required this.match,
     required this.roundName,
+    this.onTap,
     super.key,
   });
 
   final BracketMatch match;
   final String roundName;
+  final VoidCallback? onTap;
 
   static const _verticalPadding = 8.0;
   static const _rowSpacing = 4.0;
@@ -206,7 +218,9 @@ class BracketMatchCard extends StatelessWidget {
         winner: winner?.name,
       ),
       excludeSemantics: true,
-      child: Container(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: 12 * scale,
           vertical: _verticalPadding * scale,
@@ -216,6 +230,9 @@ class BracketMatchCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(
             TournamentSizes.CARD_RADIUS * scale,
           ),
+          border: onTap != null
+              ? Border.all(color: KickoffColors.dim, width: 1)
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -249,6 +266,7 @@ class BracketMatchCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

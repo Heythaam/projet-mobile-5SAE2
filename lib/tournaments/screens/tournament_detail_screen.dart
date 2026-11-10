@@ -9,12 +9,15 @@ import '../widgets/join_team_sheet.dart';
 import '../widgets/confirm_action_sheet.dart';
 import '../widgets/team_details_sheet.dart';
 import '../widgets/team_disbanded_banner.dart';
+import '../widgets/team_removed_banner.dart';
 import '../widgets/team_tile.dart';
 import '../widgets/transfer_captaincy_sheet.dart';
 import '../widgets/tournament_card.dart';
 import '../widgets/tournament_states.dart';
+import 'create_tournament_screen.dart';
 import 'tournament_bracket_view.dart';
 import 'tournament_standings_screen.dart';
+import '../widgets/tournament_stats_widget.dart';
 
 class TournamentDetailScreen extends StatefulWidget {
   const TournamentDetailScreen({
@@ -44,6 +47,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   /// Hides the "team disbanded" notice while its dismissal is being saved.
   bool _disbandNoticeHidden = false;
+
+  /// Hides the "removed from team" notice while its dismissal is being saved.
+  bool _removedNoticeHidden = false;
 
   @override
   void initState() {
@@ -258,6 +264,17 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     };
   }
 
+  Future<void> _dismissRemovedNotice(Tournament tournament) async {
+    setState(() => _removedNoticeHidden = true);
+    try {
+      await widget.service.dismissRemovedNotice(tournament.id);
+    } on TournamentException catch (error) {
+      if (!mounted) return;
+      setState(() => _removedNoticeHidden = false);
+      _showMessage(error.message);
+    }
+  }
+
   /// Hides the notice at once; the API remembers it so it is not shown
   /// again. If that fails the notice comes back with the reason.
   Future<void> _dismissDisbandNotice(Tournament tournament) async {
@@ -296,6 +313,79 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     if (disbanded) {
       _showMessage(TournamentStrings.DISBAND_SUCCESS);
     } else if (disbandFailed) {
+      await _loadTournament(showLoading: false);
+    }
+  }
+
+  Future<void> _editTournament(Tournament tournament) async {
+    final result = await Navigator.of(context).push<Tournament>(
+      MaterialPageRoute<Tournament>(
+        builder: (_) => CreateTournamentScreen(
+          service: widget.service,
+          tournament: tournament,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _tournament = result);
+    }
+  }
+
+  Future<void> _changeTournamentStatus(
+    Tournament tournament,
+    String newStatus,
+    String confirmLabel,
+    IconData icon,
+  ) async {
+    final confirmed = await showConfirmActionSheet(
+      context,
+      title: confirmLabel,
+      message: TournamentStrings.statusChangeMessage(
+        tournament.name,
+        newStatus,
+      ),
+      confirmLabel: confirmLabel,
+      confirmIcon: icon,
+      cancelLabel: TournamentStrings.STAY,
+      confirmKey: ValueKey('tournament_status_$newStatus'),
+      onConfirm: () async {
+        try {
+          final updated = await widget.service.updateTournamentStatus(
+            tournament.id,
+            newStatus,
+          );
+          if (mounted) setState(() => _tournament = updated);
+          return null;
+        } on TournamentException catch (e) {
+          return e.message;
+        }
+      },
+    );
+    if (confirmed && mounted) {
+      _showMessage(TournamentStrings.statusChangeSuccess(newStatus));
+    }
+  }
+
+  Future<void> _generateFixtures(Tournament tournament) async {
+    final confirmed = await showConfirmActionSheet(
+      context,
+      title: TournamentStrings.GENERATE_FIXTURES,
+      message: TournamentStrings.GENERATE_FIXTURES_CONFIRM,
+      confirmLabel: TournamentStrings.GENERATE,
+      confirmIcon: Icons.auto_fix_high_rounded,
+      cancelLabel: TournamentStrings.STAY,
+      confirmKey: const ValueKey('tournament_generate_fixtures'),
+      onConfirm: () async {
+        try {
+          await widget.service.generateFixtures(tournament.id);
+          return null;
+        } on TournamentException catch (e) {
+          return e.message;
+        }
+      },
+    );
+    if (confirmed && mounted) {
+      _showMessage(TournamentStrings.GENERATE_FIXTURES_SUCCESS);
       await _loadTournament(showLoading: false);
     }
   }
@@ -353,6 +443,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             service: widget.service,
             tournamentId: tournament.id,
             grouped: format.hasBracket,
+            autoRefresh: tournament.status == TournamentStatus.active,
           ),
         ),
       if (format.hasBracket)
@@ -360,6 +451,17 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           TournamentStrings.BRACKET,
           TournamentBracketView(
             key: ValueKey(('bracket', tournament.currentTeams)),
+            service: widget.service,
+            tournamentId: tournament.id,
+            autoRefresh: tournament.status == TournamentStatus.active,
+            isOrganizer: tournament.isOrganizer,
+          ),
+        ),
+      if (tournament.status != TournamentStatus.upcoming)
+        (
+          TournamentStrings.STATS,
+          TournamentStatsWidget(
+            key: ValueKey(('stats', tournament.currentTeams)),
             service: widget.service,
             tournamentId: tournament.id,
           ),
@@ -381,6 +483,18 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
               ),
               child: TeamDisbandedBanner(
                 onDismiss: () => _dismissDisbandNotice(tournament),
+              ),
+            ),
+          if (tournament.removedFromTeam && !_removedNoticeHidden)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12 * scale,
+                0,
+                12 * scale,
+                8 * scale,
+              ),
+              child: TeamRemovedBanner(
+                onDismiss: () => _dismissRemovedNotice(tournament),
               ),
             ),
           Padding(
@@ -422,6 +536,32 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (tournament.isOrganizer) ...[
+                  _OrganizerActions(
+                    tournament: tournament,
+                    onEdit: () => _editTournament(tournament),
+                    onStart: () => _changeTournamentStatus(
+                      tournament,
+                      'active',
+                      TournamentStrings.START_TOURNAMENT,
+                      Icons.play_arrow_rounded,
+                    ),
+                    onFinish: () => _changeTournamentStatus(
+                      tournament,
+                      'finished',
+                      TournamentStrings.FINISH_TOURNAMENT,
+                      Icons.flag_rounded,
+                    ),
+                    onCancel: () => _changeTournamentStatus(
+                      tournament,
+                      'cancelled',
+                      TournamentStrings.CANCEL_TOURNAMENT,
+                      Icons.cancel_rounded,
+                    ),
+                    onGenerateFixtures: () => _generateFixtures(tournament),
+                  ),
+                  SizedBox(height: 8 * scale),
+                ],
                 if (tournament.canManageRequests) ...[
                   _JoinRequestsButton(
                     count: tournament.pendingRequests,
@@ -848,6 +988,93 @@ class _RegistrationButton extends StatelessWidget {
       label: TournamentStrings.JOIN,
       icon: Icons.add_rounded,
       onPressed: onJoin,
+    );
+  }
+}
+
+/// Organizer-only actions: edit, status transitions, generate fixtures.
+class _OrganizerActions extends StatelessWidget {
+  const _OrganizerActions({
+    required this.tournament,
+    required this.onEdit,
+    required this.onStart,
+    required this.onFinish,
+    required this.onCancel,
+    required this.onGenerateFixtures,
+  });
+
+  final Tournament tournament;
+  final VoidCallback onEdit;
+  final VoidCallback onStart;
+  final VoidCallback onFinish;
+  final VoidCallback onCancel;
+  final VoidCallback onGenerateFixtures;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = kickoffScale(context);
+    final status = tournament.status;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (status == TournamentStatus.upcoming) ...[
+          ChunkyButton(
+            label: TournamentStrings.EDIT_TOURNAMENT,
+            icon: Icons.edit_rounded,
+            onPressed: onEdit,
+            backgroundColor: KickoffColors.panel,
+            bottomColor: KickoffColors.panelDark,
+            foregroundColor: Colors.white,
+          ),
+          SizedBox(height: 6 * scale),
+          ChunkyButton(
+            label: TournamentStrings.GENERATE_FIXTURES,
+            icon: Icons.auto_fix_high_rounded,
+            onPressed: onGenerateFixtures,
+            backgroundColor: KickoffColors.panel,
+            bottomColor: KickoffColors.panelDark,
+            foregroundColor: Colors.white,
+          ),
+          SizedBox(height: 6 * scale),
+          ChunkyButton(
+            label: TournamentStrings.START_TOURNAMENT,
+            icon: Icons.play_arrow_rounded,
+            onPressed: onStart,
+            backgroundColor: KickoffColors.blue,
+            bottomColor: KickoffColors.blueDark,
+            foregroundColor: Colors.white,
+          ),
+        ],
+        if (status == TournamentStatus.active) ...[
+          ChunkyButton(
+            label: TournamentStrings.FINISH_TOURNAMENT,
+            icon: Icons.flag_rounded,
+            onPressed: onFinish,
+            backgroundColor: KickoffColors.blue,
+            bottomColor: KickoffColors.blueDark,
+            foregroundColor: Colors.white,
+          ),
+        ],
+        if (status == TournamentStatus.upcoming ||
+            status == TournamentStatus.active) ...[
+          SizedBox(height: 6 * scale),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: TournamentColors.ERROR_TEXT,
+              minimumSize: Size.fromHeight(TournamentSizes.MIN_TAP * scale),
+            ),
+            onPressed: onCancel,
+            icon: Icon(Icons.cancel_rounded, size: 20 * scale),
+            label: Text(
+              TournamentStrings.CANCEL_TOURNAMENT,
+              style: TextStyle(
+                fontSize: TournamentSizes.BODY * scale,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

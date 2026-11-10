@@ -7,9 +7,13 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'package:shelf_web_socket/shelf_web_socket.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
 import 'database.dart';
 import 'gamification.dart';
 import 'google_verifier.dart';
+import 'live_hub.dart';
 import 'stadium.dart';
 
 class ApiException implements Exception {
@@ -26,7 +30,12 @@ Handler createApp({
   required AppDatabase database,
   required String jwtSecret,
   GoogleVerifier googleVerifier = verifyGoogleIdToken,
+  LiveTournamentHub? liveHub,
 }) {
+  final hub = liveHub ?? LiveTournamentHub();
+  Handler auth(Handler handler) =>
+      _authenticated(database, jwtSecret, handler, hub: hub);
+
   final router = Router()
     ..get('/', (_) => _json({'service': 'football-match-api'}))
     ..post(
@@ -38,90 +47,155 @@ Handler createApp({
       '/auth/google',
       (request) => _google(request, database, jwtSecret, googleVerifier),
     )
-    ..get('/me', _authenticated(database, jwtSecret, _me))
-    ..put('/me/username', _authenticated(database, jwtSecret, _setUsername))
+    ..get('/me', auth(_me))
+    ..put('/me/username', auth(_setUsername))
     ..get(
       '/me/tournament-requests',
-      _authenticated(database, jwtSecret, _myTournamentRequests),
+      auth(_myTournamentRequests),
     )
     ..get(
       '/users/<userId>/profile',
-      _authenticated(database, jwtSecret, _userProfile),
+      auth(_userProfile),
     )
-    ..get('/gamification', _authenticated(database, jwtSecret, _gamification))
-    ..get('/friends', _authenticated(database, jwtSecret, _friends))
+    ..get('/gamification', auth(_gamification))
+    ..get('/friends', auth(_friends))
     ..get(
       '/friend-requests',
-      _authenticated(database, jwtSecret, _incomingRequests),
+      auth(_incomingRequests),
     )
     ..post(
       '/friend-requests',
-      _authenticated(database, jwtSecret, _sendFriendRequest),
+      auth(_sendFriendRequest),
     )
     ..post(
       '/friend-requests/<requestId>/accept',
-      _authenticated(database, jwtSecret, _acceptFriendRequest),
+      auth(_acceptFriendRequest),
     )
     ..delete(
       '/friends/<friendId>',
-      _authenticated(database, jwtSecret, _removeFriend),
+      auth(_removeFriend),
     )
     ..get(
       '/friends/<friendId>/messages',
-      _authenticated(database, jwtSecret, _messages),
+      auth(_messages),
     )
     ..post(
       '/friends/<friendId>/messages',
-      _authenticated(database, jwtSecret, _sendMessage),
+      auth(_sendMessage),
     )
-    ..get('/tournaments', _authenticated(database, jwtSecret, _tournaments))
+    ..get('/tournaments', auth(_tournaments))
+    ..post(
+      '/tournaments',
+      auth(_createTournament),
+    )
     ..get(
       '/tournaments/<tournamentId>',
-      _authenticated(database, jwtSecret, _tournament),
+      auth(_tournament),
+    )
+    ..patch(
+      '/tournaments/<tournamentId>',
+      auth(_editTournament),
     )
     ..post(
       '/tournaments/<tournamentId>/join',
-      _authenticated(database, jwtSecret, _joinTournament),
+      auth(_joinTournament),
     )
     ..delete(
       '/tournaments/<tournamentId>/join',
-      _authenticated(database, jwtSecret, _leaveTournament),
+      auth(_leaveTournament),
     )
     ..post(
       '/tournaments/<tournamentId>/transfer-captaincy',
-      _authenticated(database, jwtSecret, _transferCaptaincy),
+      auth(_transferCaptaincy),
     )
     ..post(
       '/tournaments/<tournamentId>/teams/<teamId>/request',
-      _authenticated(database, jwtSecret, _requestToJoinTeam),
+      auth(_requestToJoinTeam),
     )
     ..get(
       '/tournaments/<tournamentId>/teams/<teamId>',
-      _authenticated(database, jwtSecret, _tournamentTeam),
+      auth(_tournamentTeam),
     )
     ..delete(
       '/tournaments/<tournamentId>/teams/<teamId>/members/<memberId>',
-      _authenticated(database, jwtSecret, _removeTeamMember),
+      auth(_removeTeamMember),
     )
     ..get(
       '/tournaments/<tournamentId>/requests',
-      _authenticated(database, jwtSecret, _teamJoinRequests),
+      auth(_teamJoinRequests),
     )
     ..put(
       '/tournaments/<tournamentId>/requests/<requestId>',
-      _authenticated(database, jwtSecret, _answerJoinRequest),
+      auth(_answerJoinRequest),
     )
     ..delete(
       '/tournaments/<tournamentId>/disband-notice',
-      _authenticated(database, jwtSecret, _dismissDisbandNotice),
+      auth(_dismissDisbandNotice),
+    )
+    ..delete(
+      '/tournaments/<tournamentId>/removed-notice',
+      auth(_dismissRemovedNotice),
+    )
+    ..patch(
+      '/tournaments/<tournamentId>/matches/<matchId>',
+      auth(_scheduleMatch),
+    )
+    ..post(
+      '/tournaments/<tournamentId>/matches/<matchId>/result',
+      auth(_recordMatchResult),
+    )
+    ..post(
+      '/tournaments/<tournamentId>/generate-fixtures',
+      auth(_generateFixtures),
     )
     ..get(
       '/tournaments/<tournamentId>/standings',
-      _authenticated(database, jwtSecret, _tournamentStandings),
+      auth(_tournamentStandings),
     )
     ..get(
       '/tournaments/<tournamentId>/bracket',
-      _authenticated(database, jwtSecret, _tournamentBracket),
+      auth(_tournamentBracket),
+    )
+    ..get(
+      '/tournaments/<tournamentId>/stats',
+      auth(_tournamentStats),
+    )
+    ..get('/tournaments/<tournamentId>/live', (request, String tournamentId) {
+      // 1. tournamentId is already passed as a String from the route pattern
+      final id = int.tryParse(tournamentId);
+      
+      if (id == null) {
+        return Response(400, body: 'Invalid tournament ID');
+      }
+      
+      final tournament = database.db.select(
+        'SELECT id FROM tournaments WHERE id = ?',
+        [id],
+      );
+      
+      if (tournament.isEmpty) {
+        return Response(404, body: 'Tournament not found');
+      }
+      
+      // 2. Pass the parsed 'id' to the hub
+      return webSocketHandler((WebSocketChannel channel, String? _) {
+        hub.addConnection(id, channel); 
+      })(request);
+    })
+    ..get('/notifications', auth(_notifications))
+    ..put('/notifications/<notificationId>/read', auth(_markNotificationRead))
+    ..patch('/notifications/<notificationId>/read', auth(_markNotificationRead))
+    ..put(
+      '/tournaments/<tournamentId>/matches/<matchId>/schedule',
+      auth(_scheduleMatch),
+    )
+    ..patch(
+      '/tournaments/<tournamentId>/matches/<matchId>/schedule',
+      auth(_scheduleMatch),
+    )
+    ..put(
+      '/tournaments/<tournamentId>/matches/<matchId>/result',
+      auth(_recordMatchResult),
     );
   mountStadiumRoutes(
     router,
@@ -150,7 +224,12 @@ Middleware get _errors =>
       }
     };
 
-Handler _authenticated(AppDatabase database, String secret, Handler handler) {
+Handler _authenticated(
+  AppDatabase database,
+  String secret,
+  Handler handler, {
+  LiveTournamentHub? hub,
+}) {
   return (request) async {
     final authorization = request.headers['authorization'];
     if (authorization == null || !authorization.startsWith('Bearer ')) {
@@ -169,7 +248,13 @@ Handler _authenticated(AppDatabase database, String secret, Handler handler) {
         throw ApiException(401, 'Invalid session.');
       }
       return await handler(
-        request.change(context: {'userId': userId, 'database': database}),
+        request.change(
+          context: {
+            'userId': userId,
+            'database': database,
+            'hub': ?hub,
+          },
+        ),
       );
     } on JWTException {
       throw ApiException(
@@ -645,7 +730,6 @@ const _teamSizeMax = 11;
 /// Control characters, tab and the newline pair excepted.
 final _controlCharacters = RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]');
 final _whitespaceRun = RegExp(r'\s+');
-final _fractionalSeconds = RegExp(r'\.\d+Z$');
 
 /// The team the signed-in user (`?1`) plays for in tournament `t`, as the
 /// captain of an active team or as an accepted player.
@@ -693,6 +777,9 @@ Response _tournaments(Request request) {
   if (status != null && !_tournamentStatuses.contains(status)) {
     throw ApiException(400, 'Invalid tournament status.');
   }
+  final offsetParam = request.url.queryParameters['offset'];
+  final offset = offsetParam != null ? (int.tryParse(offsetParam) ?? 0) : 0;
+  final userId = _userId(request);
   final rows = _database(request).db.select(
     '''
       $_tournamentSelect
@@ -704,11 +791,16 @@ Response _tournaments(Request request) {
           ELSE 3
         END,
         t.start_date, t.id
-      LIMIT $_tournamentListLimit
+      LIMIT ? OFFSET ?
     ''',
-    [_userId(request), status, status],
+    [userId, status, status, _tournamentListLimit + 1, offset],
   );
-  return _json({'tournaments': rows.map(_tournamentJson).toList()});
+  final hasMore = rows.length > _tournamentListLimit;
+  final page = hasMore ? rows.take(_tournamentListLimit).toList() : rows;
+  return _json({
+    'tournaments': page.map(_tournamentJson).toList(),
+    'hasMore': hasMore,
+  });
 }
 
 Response _tournament(Request request) => _json({
@@ -718,6 +810,213 @@ Response _tournament(Request request) => _json({
     _userId(request),
   ),
 });
+
+/// Validates and normalises a tournament name from [body].
+String _tournamentName(Map<String, dynamic> body) {
+  final name = _requiredString(body, 'name')
+      .trim()
+      .replaceAll(_controlCharacters, '')
+      .replaceAll(_whitespaceRun, ' ');
+  if (name.length < _tournamentNameMinLength ||
+      name.length > _tournamentNameMaxLength) {
+    throw ApiException(
+      400,
+      'Tournament name must be $_tournamentNameMinLength to '
+      '$_tournamentNameMaxLength characters.',
+    );
+  }
+  return name;
+}
+
+/// Validates optional text fields (description, location, prize).
+String? _optionalText(Map<String, dynamic> body, String key, int maxLength) {
+  final value = body[key];
+  if (value == null || value is! String) return null;
+  final cleaned = value
+      .trim()
+      .replaceAll(_controlCharacters, '')
+      .replaceAll(_whitespaceRun, ' ');
+  if (cleaned.isEmpty) return null;
+  if (cleaned.length > maxLength) {
+    throw ApiException(400, '"$key" must be at most $maxLength characters.');
+  }
+  return cleaned;
+}
+
+/// Creates a tournament. The signed-in user becomes its organizer.
+Future<Response> _createTournament(Request request) async {
+  final database = _database(request);
+  final userId = _userId(request);
+  final body = await _body(request);
+  final name = _tournamentName(body);
+  final description =
+      _optionalText(body, 'description', _descriptionMaxLength) ?? '';
+  final format = _requiredString(body, 'format');
+  if (!_tournamentFormats.contains(format)) {
+    throw ApiException(400, 'Invalid tournament format.');
+  }
+  final startDate = _requiredString(body, 'startDate');
+  final endDate = _requiredString(body, 'endDate');
+  if (!_isValidDate(startDate) || !_isValidDate(endDate)) {
+    throw ApiException(400, 'Dates must be YYYY-MM-DD.');
+  }
+  if (endDate.compareTo(startDate) < 0) {
+    throw ApiException(400, 'End date must be on or after start date.');
+  }
+  final maxTeams = body['maxTeams'];
+  if (maxTeams is! int || !_allowedMaxTeams.contains(maxTeams)) {
+    throw ApiException(
+      400,
+      'maxTeams must be one of ${_allowedMaxTeams.join(', ')}.',
+    );
+  }
+  final teamSize = body['teamSize'];
+  if (teamSize is! int || teamSize < _teamSizeMin || teamSize > _teamSizeMax) {
+    throw ApiException(
+      400,
+      'teamSize must be between $_teamSizeMin and $_teamSizeMax.',
+    );
+  }
+  final location =
+      _optionalText(body, 'location', _locationMaxLength) ?? '';
+  final prize = _optionalText(body, 'prize', _prizeMaxLength);
+
+  database.db.execute(
+    '''
+      INSERT INTO tournaments
+        (name, description, format, start_date, end_date, max_teams,
+         team_size, location, prize, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''',
+    [
+      name, description, format, startDate, endDate, maxTeams,
+      teamSize, location, prize, userId,
+    ],
+  );
+  final tournamentId = database.db.lastInsertRowId;
+  return _json({
+    'tournament': _tournamentDetailJson(database, tournamentId, userId),
+  }, status: 201);
+}
+
+bool _isValidDate(String value) =>
+    RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value) &&
+    DateTime.tryParse(value) != null;
+
+/// Ensures the signed-in user is the organizer of [tournamentId].
+void _requireOrganizer(AppDatabase database, int tournamentId, int userId) {
+  final rows = database.db.select(
+    'SELECT created_by FROM tournaments WHERE id = ?',
+    [tournamentId],
+  );
+  if (rows.isEmpty) throw ApiException(404, 'Tournament not found.');
+  if (rows.first['created_by'] != userId) {
+    throw ApiException(403, 'Only the tournament organizer can do this.');
+  }
+}
+
+/// Edits a tournament. Organizer only, and restricted once active.
+Future<Response> _editTournament(Request request) async {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _requireOrganizer(database, tournamentId, userId);
+  final tournament = _findTournament(database, tournamentId, userId);
+  final body = await _body(request);
+
+  // Status transitions.
+  final newStatus = body['status'] as String?;
+  if (newStatus != null) {
+    final currentStatus = tournament['status'] as String;
+    if (!_validStatusTransition(currentStatus, newStatus)) {
+      throw ApiException(
+        409,
+        'Cannot change status from $currentStatus to $newStatus.',
+      );
+    }
+    if (newStatus == 'active') {
+      final teamCount = tournament['current_teams'] as int;
+      if (teamCount < 2) {
+        throw ApiException(
+          409,
+          'At least 2 teams must join before starting.',
+        );
+      }
+    }
+    database.db.execute(
+      'UPDATE tournaments SET status = ? WHERE id = ?',
+      [newStatus, tournamentId],
+    );
+  }
+
+  // Field updates (only while upcoming).
+  final currentStatus = newStatus ?? tournament['status'] as String;
+  final name = body.containsKey('name') ? _tournamentName(body) : null;
+  final description = body.containsKey('description')
+      ? (_optionalText(body, 'description', _descriptionMaxLength) ?? '')
+      : null;
+  final location = body.containsKey('location')
+      ? (_optionalText(body, 'location', _locationMaxLength) ?? '')
+      : null;
+  final prize = body.containsKey('prize')
+      ? _optionalText(body, 'prize', _prizeMaxLength)
+      : null;
+  final startDate = body['startDate'] as String?;
+  final endDate = body['endDate'] as String?;
+
+  final hasFieldEdit = name != null ||
+      description != null ||
+      location != null ||
+      prize != null ||
+      startDate != null ||
+      endDate != null;
+
+  if (hasFieldEdit) {
+    if (currentStatus != 'upcoming') {
+      throw ApiException(
+        409,
+        'Tournament details can only be changed while upcoming.',
+      );
+    }
+    if (startDate != null && !_isValidDate(startDate)) {
+      throw ApiException(400, 'Dates must be YYYY-MM-DD.');
+    }
+    if (endDate != null && !_isValidDate(endDate)) {
+      throw ApiException(400, 'Dates must be YYYY-MM-DD.');
+    }
+    final sets = <String>[];
+    final params = <Object?>[];
+    void add(String column, Object? value) {
+      if (value == null) return;
+      sets.add('$column = ?');
+      params.add(value);
+    }
+    add('name', name);
+    add('description', description);
+    add('location', location);
+    add('prize', prize);
+    add('start_date', startDate);
+    add('end_date', endDate);
+    if (sets.isNotEmpty) {
+      params.add(tournamentId);
+      database.db.execute(
+        'UPDATE tournaments SET ${sets.join(', ')} WHERE id = ?',
+        params,
+      );
+    }
+  }
+  return _json({
+    'tournament': _tournamentDetailJson(database, tournamentId, userId),
+  });
+}
+
+bool _validStatusTransition(String from, String to) {
+  const transitions = {
+    'upcoming': {'active', 'cancelled'},
+    'active': {'finished', 'cancelled'},
+  };
+  return transitions[from]?.contains(to) ?? false;
+}
 
 Future<Response> _joinTournament(Request request) async {
   final database = _database(request);
@@ -788,6 +1087,21 @@ Future<Response> _joinTournament(Request request) async {
       [tournamentId, userId],
     );
   });
+  final tRow = database.db.select(
+    'SELECT created_by, name FROM tournaments WHERE id = ?',
+    [tournamentId],
+  );
+  final organizerId =
+      tRow.isNotEmpty ? tRow.first['created_by'] as int? : null;
+  if (organizerId != null && organizerId != userId) {
+    _createNotification(
+      database,
+      userId: organizerId,
+      title: 'New Team Joined',
+      body: 'Team "$teamName" joined ${tRow.first['name']}.',
+      tournamentId: tournamentId,
+    );
+  }
   return _json({
     'tournament': _tournamentDetailJson(database, tournamentId, userId),
   });
@@ -1042,6 +1356,22 @@ Response _dismissDisbandNotice(Request request) {
   return Response(204);
 }
 
+Response _dismissRemovedNotice(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _findTournament(database, tournamentId, userId);
+  database.db.execute(
+    '''
+      UPDATE join_requests SET notice_seen_at = CURRENT_TIMESTAMP
+      WHERE tournament_id = ? AND requester_id = ? AND status = 'removed'
+        AND notice_seen_at IS NULL
+    ''',
+    [tournamentId, userId],
+  );
+  return Response(204);
+}
+
 ApiException _notJoined() =>
     ApiException(409, 'You have not joined this tournament.');
 
@@ -1091,6 +1421,22 @@ Response _requestToJoinTeam(Request request) {
   if (database.db.updatedRows == 0) {
     _checkCanRequest(database, tournamentId, teamId, userId);
     throw ApiException(409, 'This request can no longer be sent.');
+  }
+  final t = database.db.select(
+    'SELECT name, created_by FROM tournaments WHERE id = ?',
+    [tournamentId],
+  );
+  if (t.isNotEmpty && t.first['created_by'] != null) {
+    final organizerId = t.first['created_by'] as int;
+    if (organizerId != userId) {
+      _createNotification(
+        database,
+        userId: organizerId,
+        title: 'New Join Request',
+        body: 'A player requested to join a team in ${t.first['name']}.',
+        tournamentId: tournamentId,
+      );
+    }
   }
   return _json({
     'tournament': _tournamentDetailJson(database, tournamentId, userId),
@@ -1223,6 +1569,16 @@ Future<Response> _answerJoinRequest(Request request) async {
     }
     throw ApiException(409, 'Your team is full.');
   }
+  final requesterId = existing['requester_id'] as int;
+  final accepted = status == 'accepted';
+  final teamName = existing['team_name'] as String? ?? 'the team';
+  _createNotification(
+    database,
+    userId: requesterId,
+    title: accepted ? 'Join Request Accepted' : 'Join Request Declined',
+    body: 'Your request to join $teamName was ${accepted ? 'accepted' : 'declined'}.',
+    tournamentId: tournamentId,
+  );
   return _json({
     'request': _joinRequestJson(
       _findJoinRequest(database, tournamentId, requestId, userId),
@@ -1282,6 +1638,252 @@ T _inTransaction<T>(AppDatabase database, T Function() action) {
   } catch (_) {
     database.db.execute('ROLLBACK');
     rethrow;
+  }
+}
+
+/// Records a match result. Organizer only; the match must exist and the
+/// tournament must be active.
+Future<Response> _scheduleMatch(Request request) async {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _requireOrganizer(database, tournamentId, userId);
+  final matchId = int.tryParse(request.params['matchId'] ?? '');
+  if (matchId == null) throw ApiException(400, 'Invalid match.');
+  final body = await _body(request);
+  final scheduledAt = body['scheduledAt'] as String?;
+  final location = _optionalText(body, 'location', 200);
+  if (scheduledAt != null) {
+    try {
+      DateTime.parse(scheduledAt);
+    } on FormatException {
+      throw ApiException(400, 'scheduledAt must be an ISO-8601 date-time.');
+    }
+  }
+  final matches = database.db.select(
+    'SELECT id FROM tournament_matches WHERE id = ? AND tournament_id = ?',
+    [matchId, tournamentId],
+  );
+  if (matches.isEmpty) throw ApiException(404, 'Match not found.');
+  if (scheduledAt != null) {
+    database.db.execute(
+      'UPDATE tournament_matches SET scheduled_at = ? WHERE id = ?',
+      [scheduledAt, matchId],
+    );
+  }
+  if (location != null) {
+    database.db.execute(
+      'UPDATE tournament_matches SET location = ? WHERE id = ?',
+      [location, matchId],
+    );
+  }
+  _hub(request)?.broadcast(tournamentId, {
+    'event': 'match_updated',
+    'matchId': matchId,
+    'scheduledAt': ?scheduledAt,
+    'location': ?location,
+  });
+  return _json({'success': true});
+}
+
+Future<Response> _recordMatchResult(Request request) async {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _requireOrganizer(database, tournamentId, userId);
+  final matchId = int.tryParse(request.params['matchId'] ?? '');
+  if (matchId == null) throw ApiException(400, 'Invalid match.');
+  final body = await _body(request);
+  final homeScore = body['homeScore'];
+  final awayScore = body['awayScore'];
+  if (homeScore is! int || awayScore is! int ||
+      homeScore < 0 || awayScore < 0) {
+    throw ApiException(400, 'Scores must be non-negative integers.');
+  }
+  final winnerId = body['winnerId'] as int?;
+  final tournament = _findTournament(database, tournamentId, userId);
+  if (tournament['status'] != 'active') {
+    throw ApiException(409, 'Results can only be recorded for active tournaments.');
+  }
+  final matches = database.db.select(
+    '''
+      SELECT id, home_team_id, away_team_id, status
+      FROM tournament_matches WHERE id = ? AND tournament_id = ?
+    ''',
+    [matchId, tournamentId],
+  );
+  if (matches.isEmpty) throw ApiException(404, 'Match not found.');
+  final match = matches.first;
+  if (match['status'] == 'played') {
+    throw ApiException(409, 'This match result was already recorded.');
+  }
+  final effectiveWinner = winnerId ??
+      (homeScore > awayScore
+          ? match['home_team_id']
+          : awayScore > homeScore
+              ? match['away_team_id']
+              : null);
+  database.db.execute(
+    '''
+      UPDATE tournament_matches
+      SET home_score = ?, away_score = ?, status = 'played',
+          winner_team_id = ?
+      WHERE id = ? AND tournament_id = ?
+    ''',
+    [homeScore, awayScore, effectiveWinner, matchId, tournamentId],
+  );
+  final homeTeam = database.db.select(
+    'SELECT name, captain_id FROM tournament_teams WHERE id = ?',
+    [match['home_team_id']],
+  );
+  final awayTeam = database.db.select(
+    'SELECT name, captain_id FROM tournament_teams WHERE id = ?',
+    [match['away_team_id']],
+  );
+  final homeCaptainId =
+      homeTeam.isNotEmpty ? homeTeam.first['captain_id'] as int? : null;
+  final awayCaptainId =
+      awayTeam.isNotEmpty ? awayTeam.first['captain_id'] as int? : null;
+  final homeName =
+      homeTeam.isNotEmpty ? homeTeam.first['name'] as String : 'Home';
+  final awayName =
+      awayTeam.isNotEmpty ? awayTeam.first['name'] as String : 'Away';
+  final captains = {?homeCaptainId, ?awayCaptainId};
+  for (final captainId in captains) {
+    _createNotification(
+      database,
+      userId: captainId,
+      title: 'Match Result Recorded',
+      body: 'Result recorded: $homeName $homeScore - $awayScore $awayName',
+      tournamentId: tournamentId,
+    );
+  }
+  _hub(request)?.broadcast(tournamentId, {
+    'event': 'match_updated',
+    'matchId': matchId,
+    'score': '$homeScore-$awayScore',
+    'homeScore': homeScore,
+    'awayScore': awayScore,
+    'winnerId': effectiveWinner,
+    'status': 'played',
+  });
+  return _json({'success': true});
+}
+
+/// Generates round-robin or knockout fixtures. Organizer only; tournament
+/// must be upcoming or active.
+Response _generateFixtures(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _requireOrganizer(database, tournamentId, userId);
+  final tournament = _findTournament(database, tournamentId, userId);
+  final status = tournament['status'] as String;
+  if (status != 'upcoming' && status != 'active') {
+    throw ApiException(
+      409,
+      'Fixtures can only be generated for upcoming or active tournaments.',
+    );
+  }
+  final format = tournament['format'] as String;
+  final teams = database.db.select(
+    '''
+      SELECT id, group_label FROM tournament_teams
+      WHERE tournament_id = ? AND status = 'active'
+      ORDER BY joined_at, id
+    ''',
+    [tournamentId],
+  );
+  if (teams.length < 2) {
+    throw ApiException(409, 'At least 2 teams are needed to generate fixtures.');
+  }
+  _inTransaction(database, () {
+    if (format == 'knockout') {
+      _generateKnockoutFixtures(database, tournamentId, teams, stage: 'knockout');
+    } else if (format == 'league' || format == 'round_robin') {
+      _generateRoundRobinFixtures(database, tournamentId, teams);
+    } else if (format == 'groups_knockout') {
+      final groups = <String?, List<Row>>{};
+      for (final team in teams) {
+        groups.putIfAbsent(team['group_label'] as String?, () => []).add(team);
+      }
+      for (final group in groups.values) {
+        _generateRoundRobinFixtures(database, tournamentId, group,
+            stage: 'group');
+      }
+    }
+  });
+  return _json({'success': true}, status: 201);
+}
+
+void _generateRoundRobinFixtures(
+  AppDatabase database,
+  int tournamentId,
+  List<Row> teams, {
+  String stage = 'group',
+}) {
+  final ids = teams.map((t) => t['id'] as int).toList();
+  final count = ids.length;
+  final effectiveIds = count.isOdd ? [...ids, -1] : ids;
+  final n = effectiveIds.length;
+  var round = 1;
+  for (var day = 0; day < n - 1; day++) {
+    for (var i = 0; i < n ~/ 2; i++) {
+      final home = effectiveIds[i];
+      final away = effectiveIds[n - 1 - i];
+      if (home == -1 || away == -1) continue;
+      database.db.execute(
+        '''
+          INSERT INTO tournament_matches
+            (tournament_id, home_team_id, away_team_id, round, stage, status)
+          VALUES (?, ?, ?, ?, ?, 'scheduled')
+        ''',
+        [tournamentId, home, away, round, stage],
+      );
+    }
+    round++;
+    // Rotate: fix first, rotate rest.
+    final last = effectiveIds.removeLast();
+    effectiveIds.insert(1, last);
+  }
+}
+
+void _generateKnockoutFixtures(
+  AppDatabase database,
+  int tournamentId,
+  List<Row> teams, {
+  required String stage,
+}) {
+  final ids = teams.map((t) => t['id'] as int).toList();
+  final slots = _nextPowerOfTwo(ids.length);
+  // Pad with byes.
+  while (ids.length < slots) {
+    ids.add(-1);
+  }
+  for (var i = 0; i < slots ~/ 2; i++) {
+    final home = ids[i * 2];
+    final away = ids[i * 2 + 1];
+    final isBye = home == -1 || away == -1;
+    database.db.execute(
+      '''
+        INSERT INTO tournament_matches
+          (tournament_id, home_team_id, away_team_id, round,
+           bracket_position, stage, status, winner_team_id)
+        VALUES (?, ?, ?, 1, ?, ?, ?,
+          CASE WHEN ? THEN COALESCE(NULLIF(?, -1), NULLIF(?, -1)) ELSE NULL END)
+      ''',
+      [
+        tournamentId,
+        home == -1 ? null : home,
+        away == -1 ? null : away,
+        i + 1,
+        stage,
+        isBye ? 'bye' : 'scheduled',
+        isBye ? 1 : 0,
+        home,
+        away,
+      ],
+    );
   }
 }
 
@@ -1475,6 +2077,7 @@ Map<String, Object?> _bracketMatch(Row row) {
     'status': status,
     'winnerId': winnerId,
     'scheduledAt': row['scheduled_at'],
+    'location': row['location'],
   };
 }
 
@@ -1624,10 +2227,20 @@ Map<String, Object?> _tournamentDetailJson(
     ''',
     [tournamentId, userId],
   );
+  final unseenRemovals = database.db.select(
+    '''
+      SELECT 1 FROM join_requests
+      WHERE tournament_id = ? AND requester_id = ? AND status = 'removed'
+        AND notice_seen_at IS NULL
+    ''',
+    [tournamentId, userId],
+  );
   return {
     ..._tournamentJson(tournament),
     // A team the user played for was disbanded and they have not been told.
     'teamDisbanded': unseenDisbands.isNotEmpty,
+    // The captain removed this user from the team and they have not been told.
+    'removedFromTeam': unseenRemovals.isNotEmpty,
     'teams': teams
         .map(
           (team) => {
@@ -1684,6 +2297,7 @@ Map<String, Object?> _tournamentJson(Row row) {
     'location': row['location'],
     'prize': row['prize'],
     'createdBy': row['created_by'] ?? '',
+    'isOrganizer': row['is_organizer'] == 1,
     'joined': row['joined'] == 1,
     'canLeave': actions.canLeave,
     'canTransfer': actions.canTransfer,
@@ -2063,3 +2677,167 @@ Response _json(Object? value, {int status = 200}) => Response(
   body: jsonEncode(value),
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
+
+LiveTournamentHub? _hub(Request request) =>
+    request.context['hub'] as LiveTournamentHub?;
+
+void _createNotification(
+  AppDatabase database, {
+  required int userId,
+  required String title,
+  required String body,
+  int? tournamentId,
+}) {
+  database.db.execute(
+    '''
+      INSERT INTO notifications (user_id, title, body, tournament_id)
+      VALUES (?, ?, ?, ?)
+    ''',
+    [userId, title, body, tournamentId],
+  );
+}
+
+Response _tournamentStats(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  final tournamentId = _tournamentId(request);
+  _findTournament(database, tournamentId, userId);
+
+  final matches = database.db.select(
+    '''
+      SELECT id, home_team_id, away_team_id, home_score, away_score, winner_team_id
+      FROM tournament_matches
+      WHERE tournament_id = ? AND status = 'played'
+    ''',
+    [tournamentId],
+  );
+
+  final teams = database.db.select(
+    '''
+      SELECT id, name
+      FROM tournament_teams
+      WHERE tournament_id = ? AND status = 'active'
+    ''',
+    [tournamentId],
+  );
+
+  var totalGoals = 0;
+  final totalMatches = matches.length;
+  final teamGoals = <int, int>{};
+  final teamPlayed = <int, int>{};
+  final teamWon = <int, int>{};
+
+  for (final team in teams) {
+    final tid = team['id'] as int;
+    teamGoals[tid] = 0;
+    teamPlayed[tid] = 0;
+    teamWon[tid] = 0;
+  }
+
+  for (final m in matches) {
+    final hScore = (m['home_score'] as int?) ?? 0;
+    final aScore = (m['away_score'] as int?) ?? 0;
+    totalGoals += (hScore + aScore);
+
+    final hId = m['home_team_id'] as int?;
+    final aId = m['away_team_id'] as int?;
+    final wId = m['winner_team_id'] as int?;
+
+    if (hId != null) {
+      teamGoals[hId] = (teamGoals[hId] ?? 0) + hScore;
+      teamPlayed[hId] = (teamPlayed[hId] ?? 0) + 1;
+    }
+    if (aId != null) {
+      teamGoals[aId] = (teamGoals[aId] ?? 0) + aScore;
+      teamPlayed[aId] = (teamPlayed[aId] ?? 0) + 1;
+    }
+    if (wId != null) {
+      teamWon[wId] = (teamWon[wId] ?? 0) + 1;
+    }
+  }
+
+  final teamNameMap = <int, String>{
+    for (final t in teams) t['id'] as int: t['name'] as String,
+  };
+
+  final sortedTeams = teamGoals.keys.toList()
+    ..sort((a, b) {
+      final diff = (teamGoals[b] ?? 0).compareTo(teamGoals[a] ?? 0);
+      if (diff != 0) return diff;
+      return (teamNameMap[a] ?? '').compareTo(teamNameMap[b] ?? '');
+    });
+
+  final topScorers = sortedTeams.take(5).map((tid) => {
+    'id': tid,
+    'name': teamNameMap[tid] ?? 'Team $tid',
+    'goals': teamGoals[tid] ?? 0,
+  }).toList();
+
+  final winRates = <String, double>{};
+  for (final tid in teamGoals.keys) {
+    final played = teamPlayed[tid] ?? 0;
+    final won = teamWon[tid] ?? 0;
+    final rate = played == 0 ? 0.0 : double.parse(((won / played) * 100).toStringAsFixed(1));
+    winRates[tid.toString()] = rate;
+  }
+
+  final avgGoals = totalMatches == 0 ? 0.0 : double.parse((totalGoals / totalMatches).toStringAsFixed(2));
+
+  return _json({
+    'topScorers': topScorers,
+    'winRates': winRates,
+    'tournamentTotals': {
+      'totalGoals': totalGoals,
+      'totalMatches': totalMatches,
+      'averageGoalsPerMatch': avgGoals,
+    },
+  });
+}
+
+Response _notifications(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  final rows = database.db.select(
+    '''
+      SELECT id, user_id, title, body, is_read, tournament_id, created_at
+      FROM notifications
+      WHERE user_id = ?
+      ORDER BY is_read ASC, created_at DESC
+      LIMIT 50
+    ''',
+    [userId],
+  );
+
+  final notifications = rows.map((r) => {
+    'id': r['id'],
+    'userId': r['user_id'],
+    'title': r['title'],
+    'body': r['body'],
+    'isRead': (r['is_read'] as int) == 1,
+    'tournamentId': r['tournament_id'],
+    'createdAt': r['created_at'],
+  }).toList();
+
+  final unreadCount = notifications.where((n) => n['isRead'] == false).length;
+
+  return _json({
+    'notifications': notifications,
+    'unreadCount': unreadCount,
+  });
+}
+
+Response _markNotificationRead(Request request) {
+  final database = _database(request);
+  final userId = _userId(request);
+  final notificationId = int.tryParse(request.params['notificationId'] ?? '');
+  if (notificationId == null) throw ApiException(400, 'Invalid notification.');
+  database.db.execute(
+    '''
+      UPDATE notifications
+      SET is_read = 1
+      WHERE id = ? AND user_id = ?
+    ''',
+    [notificationId, userId],
+  );
+  return _json({'success': true});
+}

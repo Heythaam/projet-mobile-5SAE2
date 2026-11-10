@@ -65,6 +65,7 @@ class BracketMatch {
     this.awayScore,
     this.winnerId,
     this.scheduledAt,
+    this.location,
   });
 
   /// Null for a slot that has no match row yet.
@@ -81,6 +82,7 @@ class BracketMatch {
   final BracketMatchStatus status;
   final int? winnerId;
   final DateTime? scheduledAt;
+  final String? location;
 
   bool get isBye => status == BracketMatchStatus.bye;
 
@@ -117,5 +119,6 @@ class BracketMatch {
       final String value => DateTime.tryParse(value),
       _ => null,
     },
+    location: json['location'] as String?,
   );
 }
