@@ -1,0 +1,443 @@
+{
+ "_comment": "Sample data for testing. Users and tournaments go to the backend with `dart run bin/seed.dart`; matches and challenges are loaded on the phone when the app runs with SAMPLE_DATA=true (tools/phone.ps1 does this). Password of every sample user: Test1234!",
+ "users": [
+  "sami",
+  "yassine",
+  "amine",
+  "karim",
+  "mehdi",
+  "nour",
+  "hatem",
+  "ali",
+  "rami",
+  "walid",
+  "aymen",
+  "oussama",
+  "firas",
+  "skander",
+  "bilel",
+  "anis",
+  "hamza",
+  "zied",
+  "marwen",
+  "slim"
+ ],
+ "tournaments": [
+  {
+   "name": "Medina Cup",
+   "description": "Five-a-side knockout in the heart of Tunis",
+   "format": "knockout",
+   "status": "upcoming",
+   "startDate": "2026-12-05",
+   "endDate": "2026-12-20",
+   "maxTeams": 8,
+   "location": "Tunis",
+   "prize": "Trophy + 500 TND"
+  },
+  {
+   "name": "Lac Winter League",
+   "description": "Weekly league on the Berges du Lac pitches",
+   "format": "league",
+   "status": "upcoming",
+   "startDate": "2026-12-01",
+   "endDate": "2027-02-28",
+   "maxTeams": 8,
+   "location": "Les Berges du Lac",
+   "prize": null
+  },
+  {
+   "name": "Sousse Round Robin",
+   "description": "Everyone plays everyone, one weekend",
+   "format": "round_robin",
+   "status": "active",
+   "startDate": "2026-11-07",
+   "endDate": "2026-11-15",
+   "maxTeams": 6,
+   "location": "Sousse",
+   "prize": "Medals"
+  },
+  {
+   "name": "Cap Bon Groups & Knockout",
+   "description": "Group stage then knockout rounds",
+   "format": "groups_knockout",
+   "status": "upcoming",
+   "startDate": "2027-01-10",
+   "endDate": "2027-01-31",
+   "maxTeams": 12,
+   "location": "Nabeul",
+   "prize": null
+  },
+  {
+   "name": "Autumn Classic",
+   "description": "Last season finished knockout",
+   "format": "knockout",
+   "status": "finished",
+   "startDate": "2026-09-05",
+   "endDate": "2026-09-20",
+   "maxTeams": 4,
+   "location": "Ariana",
+   "prize": "Trophy"
+  }
+ ],
+ "matches": [
+  {
+   "host": "Sami",
+   "stadium": "Complexe Sportif El Menzah, Tunis",
+   "latitude": 36.829,
+   "longitude": 10.152,
+   "capacity": 10,
+   "daysFromNow": 1,
+   "time": "18:00",
+   "players": [
+    "Yassine"
+   ]
+  },
+  {
+   "host": "Yassine",
+   "stadium": "Berges du Lac 2, Tunis",
+   "latitude": 36.835,
+   "longitude": 10.238,
+   "capacity": 8,
+   "daysFromNow": 2,
+   "time": "19:30",
+   "players": [
+    "Amine",
+    "Karim",
+    "Mehdi"
+   ]
+  },
+  {
+   "host": "Amine",
+   "stadium": "Corniche de La Marsa, La Marsa",
+   "latitude": 36.878,
+   "longitude": 10.325,
+   "capacity": 10,
+   "daysFromNow": 3,
+   "time": "20:00",
+   "players": [
+    "Karim",
+    "Mehdi",
+    "Nour",
+    "Hatem",
+    "Ali",
+    "Rami"
+   ]
+  },
+  {
+   "host": "Karim",
+   "stadium": "Complexe Amilcar, Carthage",
+   "latitude": 36.853,
+   "longitude": 10.323,
+   "capacity": 14,
+   "daysFromNow": 4,
+   "time": "17:30",
+   "players": [
+    "Mehdi",
+    "Nour",
+    "Hatem",
+    "Ali",
+    "Rami",
+    "Walid",
+    "Aymen",
+    "Oussama",
+    "Firas"
+   ]
+  },
+  {
+   "host": "Mehdi",
+   "stadium": "Complexe Sportif La Soukra, Ariana",
+   "latitude": 36.872,
+   "longitude": 10.265,
+   "capacity": 8,
+   "daysFromNow": 5,
+   "time": "21:00",
+   "players": [
+    "Nour",
+    "Hatem",
+    "Ali",
+    "Rami",
+    "Walid"
+   ]
+  },
+  {
+   "host": "Nour",
+   "stadium": "Stade Olympique de Radès, Radès",
+   "latitude": 36.7478,
+   "longitude": 10.2745,
+   "capacity": 10,
+   "daysFromNow": 6,
+   "time": "16:30",
+   "players": [
+    "Hatem",
+    "Ali",
+    "Rami",
+    "Walid",
+    "Aymen",
+    "Oussama"
+   ]
+  },
+  {
+   "host": "Hatem",
+   "stadium": "Stade de Ben Arous, Ben Arous",
+   "latitude": 36.753,
+   "longitude": 10.231,
+   "capacity": 10,
+   "daysFromNow": 7,
+   "time": "18:30",
+   "players": [
+    "Ali"
+   ]
+  },
+  {
+   "host": "Ali",
+   "stadium": "Complexe de la Manouba, Manouba",
+   "latitude": 36.809,
+   "longitude": 10.098,
+   "capacity": 8,
+   "daysFromNow": 1,
+   "time": "18:00",
+   "players": [
+    "Rami"
+   ]
+  },
+  {
+   "host": "Rami",
+   "stadium": "Stade de Hammam-Lif, Hammam-Lif",
+   "latitude": 36.73,
+   "longitude": 10.335,
+   "capacity": 10,
+   "daysFromNow": 2,
+   "time": "19:30",
+   "players": [
+    "Walid",
+    "Aymen",
+    "Oussama",
+    "Firas",
+    "Skander",
+    "Bilel"
+   ]
+  },
+  {
+   "host": "Walid",
+   "stadium": "Gammarth Sport Club, Gammarth",
+   "latitude": 36.916,
+   "longitude": 10.287,
+   "capacity": 10,
+   "daysFromNow": 3,
+   "time": "20:00",
+   "players": [
+    "Aymen"
+   ]
+  },
+  {
+   "host": "Aymen",
+   "stadium": "Stade Olympique de Sousse, Sousse",
+   "latitude": 35.819,
+   "longitude": 10.6,
+   "capacity": 14,
+   "daysFromNow": 4,
+   "time": "17:30",
+   "players": [
+    "Oussama",
+    "Firas",
+    "Skander",
+    "Bilel"
+   ]
+  },
+  {
+   "host": "Oussama",
+   "stadium": "Complexe Sportif de Nabeul, Nabeul",
+   "latitude": 36.4513,
+   "longitude": 10.7357,
+   "capacity": 8,
+   "daysFromNow": 5,
+   "time": "21:00",
+   "players": [
+    "Firas",
+    "Skander",
+    "Bilel",
+    "Anis",
+    "Hamza"
+   ]
+  },
+  {
+   "host": "Firas",
+   "stadium": "Stade 15 Octobre, Bizerte",
+   "latitude": 37.2744,
+   "longitude": 9.8739,
+   "capacity": 10,
+   "daysFromNow": 6,
+   "time": "16:30",
+   "players": [
+    "Skander"
+   ]
+  },
+  {
+   "host": "Skander",
+   "stadium": "Stade Taïeb Mhiri, Sfax",
+   "latitude": 34.7406,
+   "longitude": 10.7603,
+   "capacity": 8,
+   "daysFromNow": 7,
+   "time": "18:30",
+   "players": [
+    "Bilel",
+    "Anis",
+    "Hamza",
+    "Zied"
+   ]
+  }
+ ],
+ "challenges": [
+  {
+   "host": "Karim",
+   "description": "Friendly 5v5 near Tunis. Bring water and good vibes.",
+   "location": "Complexe Sportif El Menzah, Tunis",
+   "latitude": 36.829,
+   "longitude": 10.152,
+   "format": "5v5",
+   "pitchType": "Turf",
+   "skillLevel": "All Levels",
+   "difficulty": 1,
+   "durationMinutes": 60,
+   "daysFromNow": 1,
+   "hour": 17,
+   "joined": 0
+  },
+  {
+   "host": "Mehdi",
+   "description": "Friendly 7v7 near Tunis. Bring water and good vibes.",
+   "location": "Berges du Lac 2, Tunis",
+   "latitude": 36.835,
+   "longitude": 10.238,
+   "format": "7v7",
+   "pitchType": "Indoor",
+   "skillLevel": "Beginner",
+   "difficulty": 3,
+   "durationMinutes": 90,
+   "daysFromNow": 2,
+   "hour": 18,
+   "joined": 2
+  },
+  {
+   "host": "Nour",
+   "description": "Friendly 5v5 near La Marsa. Bring water and good vibes.",
+   "location": "Corniche de La Marsa, La Marsa",
+   "latitude": 36.878,
+   "longitude": 10.325,
+   "format": "5v5",
+   "pitchType": "Grass",
+   "skillLevel": "Intermediate",
+   "difficulty": 5,
+   "durationMinutes": 120,
+   "daysFromNow": 3,
+   "hour": 19,
+   "joined": 4
+  },
+  {
+   "host": "Hatem",
+   "description": "Friendly 11v11 near Ariana. Bring water and good vibes.",
+   "location": "Complexe Sportif La Soukra, Ariana",
+   "latitude": 36.872,
+   "longitude": 10.265,
+   "format": "11v11",
+   "pitchType": "Turf",
+   "skillLevel": "Advanced",
+   "difficulty": 2,
+   "durationMinutes": 60,
+   "daysFromNow": 4,
+   "hour": 20,
+   "joined": 6
+  },
+  {
+   "host": "Ali",
+   "description": "Friendly 5v5 near Radès. Bring water and good vibes.",
+   "location": "Stade Olympique de Radès, Radès",
+   "latitude": 36.7478,
+   "longitude": 10.2745,
+   "format": "5v5",
+   "pitchType": "Indoor",
+   "skillLevel": "All Levels",
+   "difficulty": 4,
+   "durationMinutes": 90,
+   "daysFromNow": 5,
+   "hour": 21,
+   "joined": 3
+  },
+  {
+   "host": "Rami",
+   "description": "Friendly 7v7 near Carthage. Bring water and good vibes.",
+   "location": "Complexe Amilcar, Carthage",
+   "latitude": 36.853,
+   "longitude": 10.323,
+   "format": "7v7",
+   "pitchType": "Grass",
+   "skillLevel": "All Levels",
+   "difficulty": 1,
+   "durationMinutes": 120,
+   "daysFromNow": 6,
+   "hour": 17,
+   "joined": 3
+  },
+  {
+   "host": "Walid",
+   "description": "Friendly 5v5 near Ben Arous. Bring water and good vibes.",
+   "location": "Stade de Ben Arous, Ben Arous",
+   "latitude": 36.753,
+   "longitude": 10.231,
+   "format": "5v5",
+   "pitchType": "Turf",
+   "skillLevel": "Beginner",
+   "difficulty": 3,
+   "durationMinutes": 60,
+   "daysFromNow": 7,
+   "hour": 18,
+   "joined": 2
+  },
+  {
+   "host": "Aymen",
+   "description": "Friendly 7v7 near Gammarth. Bring water and good vibes.",
+   "location": "Gammarth Sport Club, Gammarth",
+   "latitude": 36.916,
+   "longitude": 10.287,
+   "format": "7v7",
+   "pitchType": "Indoor",
+   "skillLevel": "Intermediate",
+   "difficulty": 5,
+   "durationMinutes": 90,
+   "daysFromNow": 8,
+   "hour": 19,
+   "joined": 0
+  },
+  {
+   "host": "Oussama",
+   "description": "Friendly 11v11 near Sousse. Bring water and good vibes.",
+   "location": "Stade Olympique de Sousse, Sousse",
+   "latitude": 35.819,
+   "longitude": 10.6,
+   "format": "11v11",
+   "pitchType": "Grass",
+   "skillLevel": "Advanced",
+   "difficulty": 2,
+   "durationMinutes": 120,
+   "daysFromNow": 9,
+   "hour": 20,
+   "joined": 5
+  },
+  {
+   "host": "Firas",
+   "description": "Friendly 5v5 near Nabeul. Bring water and good vibes.",
+   "location": "Complexe Sportif de Nabeul, Nabeul",
+   "latitude": 36.4513,
+   "longitude": 10.7357,
+   "format": "5v5",
+   "pitchType": "Turf",
+   "skillLevel": "All Levels",
+   "difficulty": 4,
+   "durationMinutes": 60,
+   "daysFromNow": 1,
+   "hour": 21,
+   "joined": 3
+  }
+ ]
+}

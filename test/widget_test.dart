@@ -1,14 +1,18 @@
+import 'package:football_match_app/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:football_match_app/api_client.dart';
+import 'package:football_match_app/services/api_client.dart';
 import 'package:football_match_app/app_route_observer.dart';
-import 'package:football_match_app/auth_screen.dart';
-import 'package:football_match_app/matches/football_match.dart';
-import 'package:football_match_app/matches/match_repository.dart';
-import 'package:football_match_app/models.dart';
-import 'package:football_match_app/screens/calendar_screen.dart';
-import 'package:football_match_app/screens/kickoff_shell.dart';
+import 'package:football_match_app/views/auth/auth_screen.dart';
+import 'package:football_match_app/services/friends/friends_service.dart';
+import 'package:football_match_app/entities/match/football_match.dart';
+import 'package:football_match_app/services/match/match_repository.dart';
+import 'package:football_match_app/entities/user/models.dart';
+import 'package:football_match_app/views/home/calendar_screen.dart';
+import 'package:football_match_app/views/home/kickoff_shell.dart';
+
+import 'support/fake_account_service.dart';
 
 void main() {
   testWidgets('switches between sign in and account creation', (
@@ -18,9 +22,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: AuthScreen(
-          api: ApiClient(),
+          account: FakeAccountService(),
           onAuthenticated: (user) => signedInUser = user,
-          onGuest: () {},
         ),
       ),
     );
@@ -31,10 +34,31 @@ void main() {
     await tester.tap(createAccountLink);
     await tester.pumpAndSettle();
 
-    expect(find.text('Player name'), findsOneWidget);
+    expect(find.text('Player name'), findsNothing);
     expect(find.text('Create account'), findsOneWidget);
     expect(find.text('Have an account? Sign in'), findsOneWidget);
     expect(signedInUser, isNull);
+  });
+
+  testWidgets('Continue with Google only shows when Google is available', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthScreen(account: FakeAccountService(), onAuthenticated: (_) {}),
+      ),
+    );
+    expect(find.byKey(const ValueKey('auth_google')), findsNothing);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthScreen(
+          account: FakeAccountService(supportsGoogle: true),
+          onAuthenticated: (_) {},
+        ),
+      ),
+    );
+    expect(find.text('Continue with Google'), findsOneWidget);
   });
 
   testWidgets('shell switches between home, calendar, and profile', (
@@ -262,7 +286,10 @@ void main() {
           tester.getTopLeft(find.text('@player')).dy,
           greaterThanOrEqualTo(34),
         );
-        expect(tester.getTopLeft(find.text('P')).dy, greaterThanOrEqualTo(34));
+        expect(
+          tester.getTopLeft(find.byKey(const ValueKey('profile_avatar'))).dy,
+          greaterThanOrEqualTo(34),
+        );
         expect(
           tester.getRect(find.byKey(const ValueKey('profile_avatar'))).height,
           closeTo(96 * (size.width / 360).clamp(1.0, 1.3), 0.1),
@@ -287,9 +314,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: AuthScreen(
-          api: ApiClient(),
+          account: FakeAccountService(),
           onAuthenticated: (_) {},
-          onGuest: () {},
         ),
       ),
     );
@@ -301,7 +327,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
-    expect(fields, findsNWidgets(4));
+    expect(fields, findsNWidgets(3));
     await tester.ensureVisible(fields.last);
     await tester.tap(fields.last);
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
@@ -393,6 +419,7 @@ Widget _shell({
 }) => MaterialApp(
   key: key,
   navigatorObservers: [appRouteObserver],
+  routes: appRoutes,
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context)
         .copyWith(textScaler: TextScaler.linear(textScale)),
@@ -400,6 +427,8 @@ Widget _shell({
   ),
   home: KickoffShell(
     api: api ?? _FakeApiClient(pendingRequests: pendingRequests),
+    account: FakeAccountService(),
+    friends: const EmptyFriendsService(),
     user: const UserAccount(id: 1, username: 'player', email: 'p@example.com'),
     onLogout: () {},
     matchRepository: const EmptyMatchRepository(),
@@ -408,8 +437,11 @@ Widget _shell({
 
 // ignore: unused_element
 Widget _guestShell() => MaterialApp(
+  routes: appRoutes,
   home: KickoffShell(
     api: _GuestApiClient(),
+    account: FakeAccountService(),
+    friends: const EmptyFriendsService(),
     user: const UserAccount(id: 0, username: 'guest', email: 'guest@local'),
     isGuest: true,
     onLogout: () {},

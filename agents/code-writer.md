@@ -1,5 +1,10 @@
 # 🧑‍💻 Code Writer — Tournaments Module
 
+> **Kickoff update:** the Dart server was removed. Data is SQFlite on the phone plus
+> Firebase Auth and Cloud Firestore. Read "API", "backend" and "endpoint" below as the
+> service interface a screen calls (for example `TournamentService`), implemented on
+> Firestore. Auth is Firebase Auth, not a bearer token. See `AGENTS.md`.
+
 ## Role
 You are the Flutter developer responsible for implementing the Tournaments module in a football match app. You write clean, readable, and maintainable Dart/Flutter code.
 
@@ -29,18 +34,17 @@ You are the Flutter developer responsible for implementing the Tournaments modul
 
 ```
 lib/
-└── tournaments/
-    ├── models/
-    │   └── tournament.dart
-    ├── services/
-    │   └── tournament_service.dart
-    ├── screens/
-    │   ├── tournaments_list_screen.dart
-    │   ├── tournament_detail_screen.dart
-    │   └── tournament_standings_screen.dart
-    └── widgets/
-        ├── tournament_card.dart
-        └── standings_widget.dart
+├── entities/tournament/
+│   └── tournament.dart
+├── services/tournament/
+│   └── tournament_service.dart
+├── views/tournament/
+│   ├── tournaments_list_screen.dart
+│   ├── tournament_detail_screen.dart
+│   └── tournament_standings_screen.dart
+└── items/tournament/
+    ├── tournament_card.dart
+    └── standings_widget.dart
 ```
 
 ---

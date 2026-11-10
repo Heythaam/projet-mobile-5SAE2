@@ -1,5 +1,10 @@
 # 🧠 Brainstorm — Tournaments Module
 
+> **Kickoff update:** the Dart server was removed. Data is SQFlite on the phone plus
+> Firebase Auth and Cloud Firestore. Read "API", "backend" and "endpoint" below as the
+> service interface a screen calls (for example `TournamentService`), implemented on
+> Firestore. Auth is Firebase Auth, not a bearer token. See `AGENTS.md`.
+
 ## Project: Football Match App
 ## Module: Tournaments
 ## Date: October 2026

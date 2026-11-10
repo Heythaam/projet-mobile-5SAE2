@@ -4,14 +4,15 @@
 // see the slot released.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:football_match_app/local/local_database.dart';
-import 'package:football_match_app/local/match_local_store.dart';
-import 'package:football_match_app/local/session_store.dart';
-import 'package:football_match_app/local/user_local_store.dart';
-import 'package:football_match_app/matches/match_controller.dart';
-import 'package:football_match_app/matches/stadium_directory.dart';
-import 'package:football_match_app/screens/match/match_mock_data.dart';
-import 'package:football_match_app/users/user_profile_controller.dart';
+import 'package:football_match_app/bd/local_database.dart';
+import 'package:football_match_app/bd/match_local_store.dart';
+import 'package:football_match_app/bd/session_store.dart';
+import 'package:football_match_app/bd/user_local_store.dart';
+import 'package:football_match_app/services/match/match_controller.dart';
+import 'package:football_match_app/entities/stadium/real_stadium.dart';
+import 'package:football_match_app/services/stadium/stadium_directory.dart';
+import 'package:football_match_app/entities/match/match_mock_data.dart';
+import 'package:football_match_app/services/user/user_profile_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

@@ -1,19 +1,60 @@
 import 'package:flutter/material.dart';
 
-import 'api_client.dart';
-import 'auth_screen.dart';
-import 'local/session_store.dart';
-import 'security/app_lock.dart';
-import 'models.dart';
-import 'screens/kickoff_shell.dart';
+import 'services/api_client.dart';
+import 'services/auth/account_service.dart';
+import 'services/auth/firebase_account_service.dart';
+import 'services/auth/google_auth.dart';
+import 'views/auth/auth_screen.dart';
+import 'services/challenge/challenge_cloud.dart';
+import 'services/challenge/firestore_challenge_cloud.dart';
+import 'services/friends/firestore_friends_service.dart';
+import 'bd/doc_store.dart';
+import 'bd/local_database.dart';
+import 'services/tournament/firestore_tournament_service.dart';
+import 'services/tournament/tournament_store.dart';
+import 'services/stadium/firestore_stadiums.dart';
+import 'services/stadium/stadium_store.dart';
+import 'services/friends/friends_service.dart';
+import 'bd/session_store.dart';
+import 'services/security/app_lock.dart';
+import 'entities/user/models.dart';
+import 'views/home/kickoff_shell.dart';
+import 'views/user/choose_username_screen.dart';
 import 'app_route_observer.dart';
+import 'app_routes.dart';
+import 'services/firebase/cloud_sync.dart';
+import 'services/firebase/firebase_cloud_sync.dart';
 
-void main() {
-  runApp(const FootballMatchApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cloud = await FirebaseCloudSync.start();
+  final AccountService account = cloud is FirebaseCloudSync
+      ? FirebaseAccountService(google: PlatformGoogleAuth())
+      : const UnavailableAccountService();
+  runApp(
+    FootballMatchApp(
+      account: account,
+      cloud: cloud,
+      friendsFor: cloud is FirebaseCloudSync
+          ? (user) => FirestoreFriendsService(me: user)
+          : (_) => const EmptyFriendsService(),
+    ),
+  );
 }
 
 class FootballMatchApp extends StatefulWidget {
-  const FootballMatchApp({super.key});
+  const FootballMatchApp({
+    required this.account,
+    required this.friendsFor,
+    this.cloud = const NoopCloudSync(),
+    super.key,
+  });
+
+  final AccountService account;
+
+  /// Friends and chat for the signed-in player.
+  final FriendsService Function(UserAccount user) friendsFor;
+  final CloudSync cloud;
 
   @override
   State<FootballMatchApp> createState() => _FootballMatchAppState();
@@ -25,7 +66,16 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   final Authenticator _authenticator = LocalAuthAuthenticator();
   AppLockSettings? _appLock;
   UserAccount? _user;
-  bool _guest = false;
+  late final StadiumRepo _stadiumRepo = StadiumRepo(
+    store: FirestoreStadiumStore(),
+    cache: () async => DocStore(await LocalDatabase.open()),
+  );
+
+  /// True while a signed-in player adds another account from Settings.
+  bool _adding = false;
+
+  /// Email to fill in on the login screen after choosing a saved profile.
+  String? _prefillEmail;
   Object? _startupError;
   bool _starting = true;
 
@@ -44,7 +94,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
         await store.clear();
       } else {
         await store.save(
-          uid: '${user.id}',
+          uid: user.storageUid,
           username: user.username,
           email: user.email,
         );
@@ -59,12 +109,11 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
       } catch (_) {
         // Without saved settings the app simply opens unlocked.
       }
-      final user = await _api.restoreSession();
+      final user = await widget.account.restoreSession();
       if (user != null) await _remember(user);
       if (!mounted) return;
       setState(() {
         _user = user;
-        _guest = user == null;
         _startupError = null;
         _starting = false;
       });
@@ -78,20 +127,31 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
   }
 
   Future<void> _logout() async {
-    await _api.logout();
+    await widget.account.logout();
     await _remember(null);
     if (mounted) {
       setState(() {
         _user = null;
-        _guest = false;
+        _adding = false;
       });
     }
   }
 
-  /// Signed-in players get the app lock; guests have nothing to protect.
+  /// Signs out and opens the login screen with the chosen profile's email
+  /// filled in: Firebase keeps one signed-in account at a time.
+  Future<bool> _switchTo(String uid) async {
+    final saved = (await widget.account.rememberedAccounts())
+        .where((a) => a.uid == uid)
+        .firstOrNull;
+    if (saved == null) return false;
+    await _logout();
+    if (mounted) setState(() => _prefillEmail = saved.email);
+    return true;
+  }
+
   Widget _locked(Widget shell) {
     final settings = _appLock;
-    if (_guest || settings == null) return shell;
+    if (settings == null) return shell;
     return AppLockGate(
       settings: settings,
       authenticator: _authenticator,
@@ -104,6 +164,7 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
     title: 'Kickoff',
     debugShowCheckedModeBanner: false,
     navigatorObservers: [appRouteObserver],
+    routes: appRoutes,
     theme: ThemeData(
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFF0B5FE8),
@@ -141,44 +202,74 @@ class _FootballMatchAppState extends State<FootballMatchApp> {
               _restoreSession();
             },
           )
-        : _user == null && !_guest
+        : _user == null || _adding
         ? AuthScreen(
-            api: _api,
+            account: widget.account,
+            prefillEmail: _prefillEmail,
+            onCancel: _user != null
+                ? () => setState(() => _adding = false)
+                : null,
             onAuthenticated: (user) {
               _remember(user);
               setState(() {
                 _user = user;
-                _guest = false;
+                _adding = false;
+                _prefillEmail = null;
               });
             },
-            onGuest: () => setState(() {
-              _user = null;
-              _guest = true;
-              _startupError = null;
-            }),
+          )
+        : !_user!.usernameChosen
+        ? ChooseUsernameScreen(
+            account: widget.account,
+            onLogout: _logout,
+            onDone: (user) {
+              _remember(user);
+              setState(() => _user = user);
+            },
           )
         : _locked(
             KickoffShell(
+              key: ValueKey(_user!.id),
               api: _api,
-              user: _user ?? _guestUser,
-              isGuest: _guest,
+              account: widget.account,
+              friends: widget.friendsFor(_user!),
+              challengeCloud: widget.cloud is FirebaseCloudSync
+                  ? FirestoreChallengeCloud()
+                  : const NoopChallengeCloud(),
+              tournaments: widget.cloud is FirebaseCloudSync
+                  ? FirestoreTournamentService(
+                      meId: _user!.id,
+                      meName: _user!.username,
+                      store: FirestoreTournamentStore(),
+                      cache: () async => DocStore(await LocalDatabase.open()),
+                    )
+                  : null,
+              stadiumApi: widget.cloud is FirebaseCloudSync
+                  ? FirestoreStadiumApi(
+                      meId: _user!.id,
+                      meName: _user!.username,
+                      repo: _stadiumRepo,
+                    )
+                  : null,
+              stadiumDirectory: widget.cloud is FirebaseCloudSync
+                  ? FirestoreStadiumDirectory(
+                      meId: _user!.id,
+                      meName: _user!.username,
+                      repo: _stadiumRepo,
+                    )
+                  : null,
+              cloud: widget.cloud,
+              user: _user!,
               onLogout: _logout,
-              appLock: _guest ? null : _appLock,
+              onSwitchAccount: _switchTo,
+              onForgetAccount: widget.account.forget,
+              onAddAccount: () => setState(() => _adding = true),
+              appLock: _appLock,
               authenticator: _authenticator,
-              onOpenAuth: () => setState(() {
-                _guest = false;
-                _user = null;
-              }),
             ),
           ),
   );
 }
-
-const _guestUser = UserAccount(
-  id: 0,
-  username: 'guest',
-  email: 'guest@local',
-);
 
 class _StartupError extends StatelessWidget {
   const _StartupError({required this.error, required this.onRetry});

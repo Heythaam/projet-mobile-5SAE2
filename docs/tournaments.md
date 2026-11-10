@@ -2,12 +2,12 @@
 
 Players discover tournaments, register a team (or ask to join someone
 else's), follow standings and knockout brackets, and captains manage their
-roster. Everything shown comes from the API; the app holds no sample
+roster. Everything shown comes from Firestore; the app holds no sample
 tournaments, matches or results.
 
-- Flutter code: `lib/tournaments/`
-- API routes and rules: `backend/lib/app.dart`
-- Schema and migrations: `backend/lib/database.dart`
+- Flutter code: `lib/{entities,services,views,items}/tournament/`
+- Rules (create, join, leave, requests): `lib/services/tournament/tournament_rules.dart`
+- Fixtures, results, standings, bracket: `lib/services/tournament/tournament_fixtures.dart`
 - Team agents' guidelines: `agents/` (brainstorm, code-writer, ux-designer,
   code-reviewer)
 
@@ -397,28 +397,34 @@ The same lock affects `dart test`; stop the API before running backend tests.
 ## Code layout
 
 ```
-lib/tournaments/
-├── tournament_constants.dart   endpoints, colours, sizes, all user-facing copy
-├── models/
+lib/
+├── entities/tournament/
 │   ├── tournament.dart         Tournament, teams, standings, requests, TeamName
 │   ├── team_details.dart       roster and team stats
 │   ├── player_profile.dart     public profile and match history
-│   └── bracket.dart            rounds and bracket matches
-├── services/
-│   └── tournament_service.dart every API call, with timeout and friendly errors
-├── screens/
+│   ├── bracket.dart            rounds and bracket matches
+│   └── tournament_notification.dart, tournament_stats.dart
+├── services/tournament/
+│   ├── tournament_service.dart            interface and TournamentException
+│   ├── firestore_tournament_service.dart  Firestore implementation
+│   ├── tournament_rules.dart, tournament_fixtures.dart   pure rules
+│   └── tournament_store.dart              one document, changed by `mutate`
+├── views/tournament/
 │   ├── tournaments_list_screen.dart
 │   ├── tournament_detail_screen.dart  tabs by format, join/leave/transfer/
 │   │                                  disband/requests
 │   ├── tournament_standings_screen.dart  standings view, per group
-│   └── tournament_bracket_view.dart
-└── widgets/
+│   ├── tournament_bracket_view.dart
+│   └── create_tournament_screen.dart, notifications_screen.dart
+└── items/tournament/
+    ├── tournament_constants.dart   paths, colours, sizes, all user-facing copy
     ├── tournament_card.dart, requests_badge.dart (card badge, home banner)
-    ├── standings_widget.dart, bracket_widget.dart
+    ├── standings_widget.dart, bracket_widget.dart, tournament_stats_widget.dart
     ├── team_tile.dart, team_details_sheet.dart, player_profile_sheet.dart
     ├── join_team_sheet.dart, join_requests_sheet.dart
     ├── confirm_action_sheet.dart (leave, disband, remove), sheet_frame.dart
     ├── transfer_captaincy_sheet.dart, team_disbanded_banner.dart
+    ├── schedule_match_sheet.dart, record_result_sheet.dart, notification_bell.dart
     └── tournament_states.dart (header, loading, skeleton, error, empty)
 ```
 
@@ -428,7 +434,7 @@ network, timeout and parsing failures into `TournamentException` with a
 friendly message; constants are UPPER_SNAKE in `tournament_constants.dart`;
 every model has `fromJson`.
 
-`lib/achievement_icons.dart` maps achievement icon names for both the
+`lib/items/awards/achievement_icons.dart` maps achievement icon names for both the
 profile screen and the tournaments profile sheet.
 
 ## Testing
@@ -448,9 +454,9 @@ dart test                         # stop the API first on Windows
 | `backend/test/team_management_test.dart` | team details, removing players, pending totals, profile access, `removed` migration |
 | `backend/test/captaincy_test.dart` | transfer and its error codes, disband and its notice, player leave, `tournament_teams` migration |
 | `backend/test/bracket_test.dart` | bracket shape, winners, penalties, byes, positions, group tables, match constraints, `tournament_matches` migration |
-| `test/tournaments_test.dart` | service parsing, every sheet and tab, format-based tabs, bracket drawing, transfer / disband / leave-team flows, transfer error codes, swipe guard, disbanded notice, list refresh on return and resume, 360 dp / 1.3× layouts, 48 dp targets |
+| `test/services/tournament/tournaments_test.dart` | service parsing, every sheet and tab, format-based tabs, bracket drawing, transfer / disband / leave-team flows, transfer error codes, swipe guard, disbanded notice, list refresh on return and resume, 360 dp / 1.3× layouts, 48 dp targets |
 | `test/widget_test.dart` | ball menu entry, home requests banner and its refresh (back from any screen, Home tab selected again, app resumed) |
-| `test/api_client_test.dart` | session restore: 401 and 404 clear the token, other errors keep it |
+| `test/services/api_client_test.dart` | session restore: 401 and 404 clear the token, other errors keep it |
 
 ## Troubleshooting
 
@@ -514,7 +520,7 @@ before the round closed.
 - **Also fixed**: after reseeding, a saved token pointed at a deleted
   account; `GET /me` answered 404 and the app stayed on a retry screen that
   could never succeed. `restoreSession` now clears the token on 404 as on 401
-  (`test/api_client_test.dart`).
+  (`test/services/api_client_test.dart`).
 - **Found**: the API had been started from the repo root and used
   `<root>/data/football_matches.sqlite` instead of `backend/data/`. Fixed
   afterwards: `bin/server.dart` and `bin/seed.dart` resolve the default from
